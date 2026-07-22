@@ -1,0 +1,347 @@
+"use client";
+
+import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import api from "@/lib/api";
+import { toast } from "sonner";
+import { 
+  Ticket, 
+  Plus, 
+  Settings, 
+  Edit, 
+  Trash2, 
+  CheckCircle2, 
+  AlertCircle 
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+const ticketSchema = z.object({
+  name: z.string().min(2, "Tên loại vé quá ngắn"),
+  description: z.string().optional(),
+  price: z.coerce.number().min(0, "Giá không được âm"),
+  capacity: z.coerce.number().min(1, "Số lượng phải lớn hơn 0"),
+  maxPerUser: z.coerce.number().min(1, "Giới hạn mua phải lớn hơn 0"),
+});
+
+export default function SellerEventDetailPage() {
+  const params = useParams();
+  const eventId = params.id as string;
+  const router = useRouter();
+  const [isAddingTicket, setIsAddingTicket] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  // Fetch all seller events to get the specific event
+  const { data: event, isLoading: isLoadingEvent, refetch: refetchEvent } = useQuery({
+    queryKey: ["seller-event", eventId],
+    queryFn: async () => {
+      const res = await api.get("/seller/events");
+      const foundEvent = res.data.data.events.find((e: any) => e.id === eventId);
+      if (!foundEvent) throw new Error("Event not found");
+      return foundEvent;
+    },
+  });
+
+  // Fetch ticket types for this event
+  const { data: ticketTypes, isLoading: isLoadingTickets, refetch: refetchTickets } = useQuery({
+    queryKey: ["event-tickets", eventId],
+    queryFn: async () => {
+      const res = await api.get(`/events/${eventId}/tickets`);
+      return res.data.data;
+    },
+  });
+
+  const form = useForm<z.infer<typeof ticketSchema>>({
+    resolver: zodResolver(ticketSchema) as any,
+    defaultValues: {
+      name: "",
+      description: "",
+      price: 0,
+      capacity: 100,
+      maxPerUser: 4,
+    },
+  });
+
+  async function onCreateTicket(values: z.infer<typeof ticketSchema>) {
+    setIsSubmitting(true);
+    try {
+      await api.post(`/events/${eventId}/tickets`, values);
+      toast.success("Thêm loại vé thành công!");
+      setIsAddingTicket(false);
+      form.reset();
+      refetchTickets();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || "Lỗi khi thêm loại vé");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function onPublishEvent() {
+    setIsPublishing(true);
+    try {
+      const newStatus = event.isPublished ? "DRAFT" : "PUBLISHED";
+      await api.patch(`/events/${eventId}/status`, { status: newStatus });
+      toast.success(`Đã ${event.isPublished ? "ẩn" : "công khai"} sự kiện!`);
+      refetchEvent();
+    } catch (error: any) {
+      toast.error("Không thể thay đổi trạng thái sự kiện");
+    } finally {
+      setIsPublishing(false);
+    }
+  }
+
+  if (isLoadingEvent) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-24 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (!event) {
+    return <div className="text-center py-20">Không tìm thấy sự kiện.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">{event.title}</h2>
+            {event.isPublished ? (
+              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Đang Công Khai</Badge>
+            ) : (
+              <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none">Bản Nháp</Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground mt-1">
+            Quản lý thông tin và các loại vé cho sự kiện này.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="rounded-xl shadow-sm" onClick={() => router.push(`/seller/events/${eventId}/edit`)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Sửa thông tin
+          </Button>
+          <Button 
+            className="rounded-xl shadow-sm" 
+            variant={event.isPublished ? "secondary" : "default"}
+            onClick={onPublishEvent}
+            disabled={isPublishing}
+          >
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            {event.isPublished ? "Chuyển về Nháp" : "Công Khai Sự Kiện"}
+          </Button>
+        </div>
+      </div>
+
+      <Card className="rounded-2xl border-border/50 shadow-sm">
+        <CardHeader className="bg-muted/10 pb-4 border-b border-border/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Ticket className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Quản lý Loại Vé</CardTitle>
+            </div>
+            {!event.hasSeatMap && (
+              <Dialog open={isAddingTicket} onOpenChange={setIsAddingTicket}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="rounded-full shadow-sm">
+                    <Plus className="h-4 w-4 mr-1" /> Thêm loại vé
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="rounded-2xl sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Thêm Loại Vé Mới</DialogTitle>
+                    <DialogDescription>
+                      Thiết lập tên, giá và số lượng cho loại vé này.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onCreateTicket as any)} className="space-y-4">
+                      <FormField
+                        control={form.control as any}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tên loại vé</FormLabel>
+                            <FormControl>
+                              <Input placeholder="VD: Vé VIP, Vé Thường..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control as any}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Mô tả (Tùy chọn)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Quyền lợi đi kèm..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control as any}
+                          name="price"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Giá vé (VNĐ)</FormLabel>
+                              <FormControl>
+                                <Input type="number" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control as any}
+                          name="capacity"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Số lượng tổng</FormLabel>
+                              <FormControl>
+                                <Input type="number" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={form.control as any}
+                        name="maxPerUser"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Giới hạn mua / Người</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="flex justify-end pt-4">
+                        <Button type="submit" disabled={isSubmitting} className="rounded-xl w-full">
+                          {isSubmitting ? "Đang lưu..." : "Xác nhận tạo"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0 p-0">
+          {event.hasSeatMap ? (
+            <div className="p-8 text-center space-y-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <Settings className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">Sự kiện sử dụng Sơ đồ ghế</h3>
+                <p className="text-muted-foreground text-sm mt-1">Bạn cần thiết lập các khu vực và ghế ngồi trên bản đồ thay vì tạo loại vé cơ bản.</p>
+              </div>
+              <Button className="rounded-xl" onClick={() => router.push(`/seller/events/${eventId}/seats`)}>
+                Đến trình Quản lý sơ đồ ghế
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="font-bold">Loại Vé</TableHead>
+                  <TableHead className="font-bold text-right">Giá</TableHead>
+                  <TableHead className="font-bold text-center">Số lượng</TableHead>
+                  <TableHead className="font-bold text-center">Đã bán</TableHead>
+                  <TableHead className="font-bold text-right">Hành động</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoadingTickets ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Đang tải...</TableCell>
+                  </TableRow>
+                ) : ticketTypes?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
+                        <AlertCircle className="h-8 w-8 opacity-50" />
+                        <p>Chưa có loại vé nào được tạo.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  ticketTypes?.map((ticket: any) => (
+                    <TableRow key={ticket.id}>
+                      <TableCell>
+                        <div className="font-bold">{ticket.name}</div>
+                        {ticket.description && <div className="text-xs text-muted-foreground">{ticket.description}</div>}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-primary">
+                        {Number(ticket.price).toLocaleString("vi-VN")} ₫
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline">{ticket.inventory?.capacity || 0}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="secondary">
+                          {(ticket.inventory?.capacity || 0) - (ticket.inventory?.quantityAvailable || 0)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

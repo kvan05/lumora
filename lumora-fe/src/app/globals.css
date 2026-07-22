@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@plugin "../../node_modules/tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #FFF5F8; /* Soft cute pinkish-white */
+  --foreground: #5D4037; /* Warm soft brown text */
+  --card: #FFFFFF;
+  --card-foreground: #5D4037;
+  --popover: #FFFFFF;
+  --popover-foreground: #5D4037;
+  --primary: #FFA6C9; /* Carnation Pink - very cute */
+  --primary-foreground: #FFFFFF; /* White text on pink */
+  --secondary: #B5EAD7; /* Pastel Mint */
+  --secondary-foreground: #5D4037;
+  --muted: #FCE4EC; /* Light pink muted bg */
+  --muted-foreground: #8D6E63;
+  --accent: #FFF5BA; /* Pastel Yellow */
+  --accent-foreground: #5D4037;
+  --destructive: #FF9AA2; /* Soft pastel red */
+  --destructive-foreground: #5D4037;
+  --border: #F8BBD0; /* Soft pink border */
+  --input: #F8BBD0;
+  --ring: #FFA6C9;
+  --radius: 1rem; /* Bubbly, cute rounded corners */
+  --success: #C8E6C9; /* Cute light green */
+  --success-dark: #81C784;
+}
+
+.dark {
+  --background: #2D1B19; /* Dark Cacao base */
+  --foreground: #FAF7F4;
+  --card: #3A2320;
+  --card-foreground: #FAF7F4;
+  --popover: #3A2320;
+  --popover-foreground: #FAF7F4;
+  --primary: #6B403B; /* Cacao */
+  --primary-foreground: #FAF7F4;
+  --secondary: #65613F; /* Jungle */
+  --secondary-foreground: #FAF7F4;
+  --muted: #4B5263; /* Darker Sky */
+  --muted-foreground: #CCC3D1;
+  --accent: #D8A4AF; /* Dusty Rose */
+  --accent-foreground: #FAF7F4;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #f8fafc;
+  --border: #4a3633;
+  --input: #4a3633;
+  --ring: #6B403B;
+  --success: #8D8B4C;
+  --success-dark: #65613F;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-dark: var(--success-dark);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+}

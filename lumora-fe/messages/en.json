@@ -1,0 +1,12 @@
+{
+  "Index": {
+    "title": "Light Up Life's Best Moments",
+    "subtitle": "Discover and book tickets for the best events around you."
+  },
+  "Navigation": {
+    "events": "Events",
+    "login": "Log In",
+    "register": "Sign Up",
+    "dashboard": "Dashboard"
+  }
+}

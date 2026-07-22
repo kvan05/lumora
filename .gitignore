@@ -1,0 +1,11 @@
+# Frontend
+lumora-fe/node_modules/
+lumora-fe/.next/
+lumora-fe/.env.local
+
+# Backend
+lumora-be/node_modules/
+lumora-be/.env
+
+# Mac
+.DS_Store
