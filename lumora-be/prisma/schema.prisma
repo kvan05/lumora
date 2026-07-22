@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// Enums converted to Strings for SQL Server compatibility
+
+// ========================
+// USER & AUTH
+// ========================
+
+
+model User {
+  id          String   @id @default(cuid())
+  username    String?  @unique
+  email       String   @unique
+  name        String?
+  password    String?  // null if using OAuth
+  avatar      String?
+  phone       String?
+  role        String   @default("BUYER") // BUYER, SELLER, ADMIN
+  isVerified  Boolean  @default(false)
+  locale      String   @default("vi") // "en" | "vi"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  events        Event[]        @relation("SellerEvents")
+  orders        Order[]
+  notifications Notification[]
+  sessions      UserSession[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  type      String   // REGISTER, FORGOT_PASSWORD
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, code])
+  @@map("otps")
+}
+
+// ========================
+// EVENT
+// ========================
+
+model Event {
+  id            String      @id @default(cuid())
+  sellerId      String
+  title         String
+  slug          String      @unique
+  description   String      @db.NVarChar(Max)
+  bannerUrl     String?
+  imageUrls     String?     @db.NVarChar(Max) // JSON array
+  category      String
+  venue         String
+  address       String
+  city          String
+  latitude      Float?
+  longitude     Float?
+  startDate     DateTime
+  endDate       DateTime
+  status        String      @default("DRAFT") // DRAFT, PUBLISHED, PAUSED, CANCELLED, COMPLETED
+  isFeatured    Boolean     @default(false)
+  hasSeatMap    Boolean     @default(false) // True if fixed seating
+  tags          String?     @db.NVarChar(Max) // JSON array
+  metaTitle     String?
+  metaDesc      String?     @db.NVarChar(500)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  seller      User          @relation("SellerEvents", fields: [sellerId], references: [id])
+  ticketTypes TicketType[]
+  seatSections SeatSection[]
+  orders      Order[]
+
+  @@map("events")
+}
+
+// ========================
+// TICKET TYPES (for non-seat events)
+// ========================
+
+model TicketType {
+  id            String           @id @default(cuid())
+  eventId       String
+  name          String           // VIP, Standard, Early Bird...
+  description   String?
+  price         Decimal          @db.Decimal(12, 2)
+  originalPrice Decimal?         @db.Decimal(12, 2)
+  quantity      Int
+  maxPerOrder   Int              @default(10)
+  saleStart     DateTime?
+  saleEnd       DateTime?
+  status        String           @default("ACTIVE") // ACTIVE, PAUSED, SOLD_OUT, EXPIRED
+  sortOrder     Int              @default(0)
+  color         String?          // hex color for UI badge
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  // Relations
+  event     Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  inventory TicketInventory?
+  orderItems OrderItem[]
+
+  @@map("ticket_types")
+}
+
+model TicketInventory {
+  id           String     @id @default(cuid())
+  ticketTypeId String     @unique
+  totalQty     Int
+  reservedQty  Int        @default(0) // Held for pending orders
+  soldQty      Int        @default(0)
+  updatedAt    DateTime   @updatedAt
+
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_inventories")
+}
+
+// ========================
+// SEAT MAP (Fixed seating)
+// ========================
+
+model SeatSection {
+  id          String  @id @default(cuid())
+  eventId     String
+  name        String  // "Section A", "VIP Zone", "Balcony"
+  label       String  // Short label: "A", "VIP", "B"
+  color       String? // Hex color for map rendering
+  price       Decimal @db.Decimal(12, 2)
+  rowCount    Int     @default(0)
+  seatsPerRow Int     @default(0)
+  sortOrder   Int     @default(0)
+
+  // Relations
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  rows  SeatRow[]
+
+  @@map("seat_sections")
+}
+
+model SeatRow {
+  id         String      @id @default(cuid())
+  sectionId  String
+  rowLabel   String      // "A", "B", "C"
+  sortOrder  Int         @default(0)
+
+  section SeatSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  seats   Seat[]
+
+  @@map("seat_rows")
+}
+
+model Seat {
+  id          String     @id @default(cuid())
+  rowId       String
+  seatNumber  String     // "1", "2", "A1"
+  seatLabel   String     // Display label: "A-1"
+  status      String     @default("AVAILABLE") // AVAILABLE, RESERVED, SOLD, BLOCKED
+  reservedBy  String?    // userId
+  reservedAt  DateTime?
+  expiresAt   DateTime?  // Reservation timeout
+
+  row        SeatRow     @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@map("seats")
+}
+
+// ========================
+// ORDER
+// ========================
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique // ORD-XXXXXXXX
+  buyerId     String
+  eventId     String
+  status      String      @default("PENDING") // PENDING, CONFIRMED, CANCELLED, REFUNDED, CHECKED_IN
+  subtotal    Decimal     @db.Decimal(12, 2)
+  fees        Decimal     @db.Decimal(12, 2) @default(0)
+  total       Decimal     @db.Decimal(12, 2)
+  currency    String      @default("VND")
+  notes       String?
+  expiresAt   DateTime    // Timeout: now() + 15 mins
+  confirmedAt DateTime?
+  checkedInAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  buyer   User        @relation(fields: [buyerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  event   Event       @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items   OrderItem[]
+  payment Payment?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  ticketTypeId String?  // null if seat-based
+  seatId       String?  // null if ticket-type based
+  quantity     Int      @default(1)
+  unitPrice    Decimal  @db.Decimal(12, 2)
+  subtotal     Decimal  @db.Decimal(12, 2)
+  qrCode       String?  @db.NVarChar(Max)  // QR data per ticket
+  ticketCode   String?  @unique            // Unique ticket code
+  isCheckedIn  Boolean  @default(false)
+  checkedInAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketType TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  seat       Seat?       @relation(fields: [seatId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("order_items")
+}
+
+// ========================
+// PAYMENT (VietQR / PayOS)
+// ========================
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String        @unique
+  payosOrderCode  BigInt        @unique    // PayOS order code (numeric)
+  payosPaymentId  String?       @unique    // PayOS payment ID after success
+  checkoutUrl     String        @db.NVarChar(Max) // QR payment URL
+  qrCode          String?       @db.NVarChar(Max) // QR code image data
+  amount          Decimal       @db.Decimal(12, 2)
+  currency        String        @default("VND")
+  status          String        @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
+  failureReason   String?
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  order        Order         @relation(fields: [orderId], references: [id])
+  transactions Transaction[]
+
+  @@map("payments")
+}
+
+model Transaction {
+  id             String   @id @default(cuid())
+  paymentId      String
+  payosEventId   String   @unique  // PayOS webhook event ID (idempotency)
+  type           String   // PAYMENT_SUCCESS, PAYMENT_FAILED, REFUND
+  amount         Decimal  @db.Decimal(12, 2)
+  status         String
+  rawPayload     String   @db.NVarChar(Max) // Raw PayOS event JSON
+  createdAt      DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@map("transactions")
+}
+
+// ========================
+// NOTIFICATION
+// ========================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String   @db.NVarChar(Max)
+  type      String   // ORDER_CONFIRMED, SEAT_RESERVED, EVENT_CANCELLED, REVENUE_UPDATE
+  isRead    Boolean  @default(false)
+  metadata  String?  @db.NVarChar(Max) // JSON: orderId, eventId, etc.
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
