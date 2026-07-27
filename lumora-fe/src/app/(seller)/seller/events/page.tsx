@@ -147,13 +147,21 @@ export default function SellerEventsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {event.isPublished ? (
-                        <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-100 border-none px-2 py-0.5 rounded-full font-semibold">
-                          <Eye className="w-3 h-3 mr-1" /> Công khai
+                      {event.status === "PUBLISHED" ? (
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none px-2 py-0.5 rounded-full font-semibold">
+                          <Eye className="w-3 h-3 mr-1" /> Đã duyệt & Mở bán
+                        </Badge>
+                      ) : event.status === "PENDING_APPROVAL" ? (
+                        <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-none px-2 py-0.5 rounded-full font-semibold">
+                          <EyeOff className="w-3 h-3 mr-1" /> Chờ Admin duyệt
+                        </Badge>
+                      ) : event.status === "REJECTED" ? (
+                        <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-none px-2 py-0.5 rounded-full font-semibold">
+                          Bị từ chối
                         </Badge>
                       ) : (
-                        <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-100 border-none px-2 py-0.5 rounded-full font-semibold">
-                          <EyeOff className="w-3 h-3 mr-1" /> Nháp
+                        <Badge className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-none px-2 py-0.5 rounded-full font-semibold">
+                          <EyeOff className="w-3 h-3 mr-1" /> Bản nháp
                         </Badge>
                       )}
                     </TableCell>

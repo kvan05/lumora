@@ -387,3 +387,186 @@ export async function exportReport(
     next(err);
   }
 }
+
+// ─── Get Organizer Profile ──────────────────────────────────────────────
+export async function getSellerProfile(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const profile = await prisma.organizerProfile.findUnique({
+      where: { userId: sellerId },
+      include: { bankInfo: true, documents: true },
+    });
+    const user = await prisma.user.findUnique({
+      where: { id: sellerId },
+      select: { name: true, email: true, phone: true, avatar: true, role: true },
+    });
+    res.json({ success: true, data: { profile, user } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Finance Overview ────────────────────────────────────────────────────
+export async function getFinanceOverview(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+
+    const [totalRevenue, settlements, pendingWithdrawals, completedWithdrawals] = await Promise.all([
+      prisma.order.aggregate({
+        where: { event: { sellerId }, status: "CONFIRMED" },
+        _sum: { total: true },
+      }),
+      prisma.settlement.findMany({
+        where: { sellerId },
+        include: { event: { select: { title: true, endDate: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.withdrawal.aggregate({
+        where: { sellerId, status: { in: ["PENDING", "PROCESSING"] } },
+        _sum: { amount: true },
+      }),
+      prisma.withdrawal.aggregate({
+        where: { sellerId, status: "COMPLETED" },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const gross = Number(totalRevenue._sum.total || 0);
+    const totalCommission = settlements.reduce((sum, s) => sum + Number(s.commissionFee), 0);
+    const totalSettled = settlements
+      .filter(s => s.status === "COMPLETED")
+      .reduce((sum, s) => sum + Number(s.netAmount), 0);
+    const pendingSettlement = settlements
+      .filter(s => s.status === "PENDING" || s.status === "PROCESSING")
+      .reduce((sum, s) => sum + Number(s.netAmount), 0);
+
+    res.json({
+      success: true,
+      data: {
+        grossRevenue: gross,
+        totalCommission,
+        totalSettled,
+        pendingSettlement,
+        pendingWithdrawals: Number(pendingWithdrawals._sum.amount || 0),
+        completedWithdrawals: Number(completedWithdrawals._sum.amount || 0),
+        settlements,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Withdrawal list ────────────────────────────────────────────────────
+export async function getWithdrawals(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const withdrawals = await prisma.withdrawal.findMany({
+      where: { sellerId },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data: withdrawals });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Request Withdrawal ─────────────────────────────────────────────────
+export async function requestWithdrawal(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const { amount, bankName, accountNumber, accountHolder } = req.body;
+
+    if (!amount || !bankName || !accountNumber || !accountHolder) {
+      throw createError("Vui lòng điền đầy đủ thông tin rút tiền", 400);
+    }
+    if (Number(amount) < 100000) {
+      throw createError("Số tiền rút tối thiểu là 100,000 ₫", 400);
+    }
+
+    // Check pending withdrawal
+    const pendingCount = await prisma.withdrawal.count({
+      where: { sellerId, status: { in: ["PENDING", "PROCESSING"] } },
+    });
+    if (pendingCount > 0) {
+      throw createError("Bạn đã có yêu cầu rút tiền đang chờ xử lý", 400);
+    }
+
+    const withdrawal = await prisma.withdrawal.create({
+      data: {
+        sellerId,
+        amount,
+        bankName,
+        accountNumber,
+        accountHolder,
+        status: "PENDING",
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: withdrawal,
+      message: "Yêu cầu rút tiền đã được gửi. Admin sẽ xử lý trong 1-3 ngày làm việc.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Submit Event for Approval ───────────────────────────────────────────
+export async function submitEventForApproval(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const eventId = req.params.eventId as string;
+
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, sellerId, status: "DRAFT" },
+    });
+    if (!event) throw createError("Sự kiện không tồn tại hoặc không ở trạng thái DRAFT", 404);
+
+    const updated = await prisma.event.update({
+      where: { id: eventId },
+      data: { status: "PENDING_APPROVAL" },
+    });
+
+    res.json({
+      success: true,
+      data: updated,
+      message: "Đã gửi sự kiện để Admin xét duyệt.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Get event approval logs ────────────────────────────────────────────
+export async function getEventApprovalLogs(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const eventId = req.params.eventId as string;
+
+    const event = await prisma.event.findFirst({ where: { id: eventId, sellerId } });
+    if (!event) throw createError("Event not found", 404);
+
+    const logs = await prisma.eventApprovalLog.findMany({
+      where: { eventId },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data: logs });
+  } catch (err) {
+    next(err);
+  }
+}

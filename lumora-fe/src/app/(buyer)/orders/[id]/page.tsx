@@ -9,6 +9,9 @@ import { vi } from "date-fns/locale";
 import api from "@/lib/api";
 import QRCode from "qrcode";
 
+import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +29,9 @@ import {
   User,
   Armchair,
   Tag,
-  Download
+  Download,
+  RotateCcw,
+  RefreshCw,
 } from "lucide-react";
 
 // Helper component for QR Code generation
@@ -81,14 +86,33 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
 
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
 
-  const { data: order, isLoading, error } = useQuery({
+  const { data: order, isLoading, error, refetch } = useQuery({
     queryKey: ["order", orderId],
     queryFn: async () => {
       const res = await api.get(`/orders/${orderId}`);
       return res.data.data;
     },
   });
+
+  const handleRequestRefund = async () => {
+    if (!refundReason.trim()) return;
+    setIsSubmittingRefund(true);
+    try {
+      const res = await api.post(`/orders/${orderId}/refund`, { reason: refundReason });
+      toast.success(res.data.message || "Yêu cầu hoàn tiền đã được gửi");
+      setShowRefundModal(false);
+      setRefundReason("");
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || "Không thể gửi yêu cầu hoàn tiền");
+    } finally {
+      setIsSubmittingRefund(false);
+    }
+  };
 
   // Handle countdown timer for PENDING orders
   useEffect(() => {
@@ -164,9 +188,26 @@ export default function OrderDetailPage() {
         </Button>
 
         {isConfirmed && (
-          <Button variant="outline" onClick={handlePrint} className="rounded-full gap-2">
-            <Printer className="h-4 w-4" /> In vé điện tử
-          </Button>
+          <div className="flex gap-2">
+            {order.RefundRequest ? (
+              <Badge className="bg-amber-100 text-amber-800 border-amber-200 px-3 py-1.5 text-xs font-bold rounded-full">
+                ⏳ Đang xử lý hoàn tiền ({order.RefundRequest.status})
+              </Badge>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRefundModal(true)}
+                className="rounded-full gap-1.5 text-muted-foreground hover:text-destructive border-dashed"
+              >
+                <RotateCcw className="h-4 w-4" /> Yêu cầu hoàn tiền
+              </Button>
+            )}
+            <Button variant="outline" onClick={handlePrint} className="rounded-full gap-2 font-bold shadow-sm">
+              <Download className="h-4 w-4" /> 
+              <span>Tải / In vé (PDF)</span>
+            </Button>
+          </div>
         )}
       </div>
 
@@ -404,6 +445,48 @@ export default function OrderDetailPage() {
           })}
         </div>
       </div>
+
+      {/* Refund Request Modal */}
+      {showRefundModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print">
+          <div className="bg-card rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4 border border-border">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                <RotateCcw className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-lg">Yêu cầu hoàn tiền</h3>
+                <p className="text-xs text-muted-foreground">Mã đơn: {order.orderNumber}</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Vui lòng nhập lý do bạn muốn yêu cầu hoàn tiền cho đơn hàng này. Ban quản trị sẽ kiểm tra và phản hồi trong thời gian sớm nhất.
+            </p>
+            <Textarea
+              placeholder="Nhập lý do chi tiết (sự kiện hoãn/hủy, lý do cá nhân, ...)"
+              value={refundReason}
+              onChange={(e) => setRefundReason(e.target.value)}
+              className="min-h-[100px] resize-none"
+            />
+            <div className="flex gap-3 justify-end pt-2">
+              <Button variant="ghost" onClick={() => setShowRefundModal(false)}>Huỷ</Button>
+              <Button
+                onClick={handleRequestRefund}
+                disabled={isSubmittingRefund || !refundReason.trim()}
+                className="gap-2 rounded-xl font-bold"
+              >
+                {isSubmittingRefund ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" /> Đang gửi...
+                  </>
+                ) : (
+                  "Gửi yêu cầu"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

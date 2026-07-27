@@ -16,7 +16,7 @@ export const generalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { ip: false },
+  validate: false,
   keyGenerator: customKeyGenerator,
   message: {
     success: false,
@@ -32,7 +32,7 @@ export const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { ip: false },
+  validate: false,
   keyGenerator: customKeyGenerator,
   message: {
     success: false,
@@ -48,7 +48,7 @@ export const bookingLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { ip: false },
+  validate: false,
   keyGenerator: (req) => req.user?.userId || customKeyGenerator(req),
   message: {
     success: false,

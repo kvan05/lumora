@@ -9,6 +9,7 @@ export const sellerRoutes = Router();
 sellerRoutes.use(authenticate, requireSeller);
 
 sellerRoutes.get("/dashboard", SellerController.getDashboard);
+sellerRoutes.get("/profile", SellerController.getSellerProfile);
 sellerRoutes.get("/events", SellerController.getSellerEvents);
 sellerRoutes.get("/orders", SellerController.getSellerOrders);
 sellerRoutes.get("/orders/:orderId", SellerController.getSellerOrderDetail);
@@ -17,3 +18,13 @@ sellerRoutes.patch("/orders/items/:itemId/checkin", SellerController.checkInItem
 sellerRoutes.get("/analytics", SellerController.getAnalytics);
 sellerRoutes.get("/customers", SellerController.getCustomers);
 sellerRoutes.get("/reports/export", SellerController.exportReport);
+
+// Finance routes
+sellerRoutes.get("/finance", SellerController.getFinanceOverview);
+sellerRoutes.get("/withdrawals", SellerController.getWithdrawals);
+sellerRoutes.post("/withdrawals", SellerController.requestWithdrawal);
+
+// Event approval workflow
+sellerRoutes.post("/events/:eventId/submit", SellerController.submitEventForApproval);
+sellerRoutes.get("/events/:eventId/approval-logs", SellerController.getEventApprovalLogs);
+

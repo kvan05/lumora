@@ -3,17 +3,21 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { format } from "date-fns";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
 import { useSession } from "next-auth/react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MapPin, Info, Tag, Armchair, Plus, Minus, ZoomIn, ZoomOut, Maximize, Lock, ShoppingCart } from "lucide-react";
+import { Calendar, MapPin, Info, Tag, Armchair, Plus, Minus, ZoomIn, ZoomOut, Maximize, Lock, ShoppingCart, Star, Flag, Send } from "lucide-react";
+import { FavoriteButton } from "@/components/ui/FavoriteButton";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -252,6 +256,14 @@ export default function EventDetailPage() {
               </div>
             </div>
           </div>
+          {/* Favorite button overlay on hero */}
+          <div className="absolute top-4 right-4">
+            <FavoriteButton
+              eventId={event.id}
+              variant="outline"
+              className="bg-background/80 backdrop-blur border border-border/60 shadow-md h-10 w-10"
+            />
+          </div>
         </div>
       </div>
 
@@ -265,6 +277,42 @@ export default function EventDetailPage() {
             <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
               {event.description}
             </p>
+          </section>
+
+          {/* Map Section */}
+          <section className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
+            <h2 className="text-2xl font-extrabold flex items-center gap-2 mb-4">
+              <MapPin className="h-6 w-6 text-primary" /> Bản đồ địa điểm
+            </h2>
+            <div className="rounded-xl overflow-hidden border bg-muted aspect-[21/9] flex items-center justify-center">
+              <iframe
+                src={`https://www.google.com/maps?q=${encodeURIComponent(event.venue + ", " + event.city)}&output=embed`}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+            <div className="mt-4 flex items-start gap-2 text-sm font-medium">
+              <MapPin className="h-5 w-5 text-muted-foreground shrink-0" />
+              <span>{event.venue}, {event.address && `${event.address}, `}{event.city}</span>
+            </div>
+          </section>
+
+          {/* Terms Section */}
+          <section className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
+            <h2 className="text-2xl font-extrabold flex items-center gap-2 mb-4">
+              <Info className="h-6 w-6 text-primary" /> Điều khoản tham gia
+            </h2>
+            <div className="space-y-3 text-sm text-muted-foreground bg-muted/30 p-4 rounded-xl border border-border/50">
+              <p>• Vé đã mua không thể hoàn trả hoặc đổi trả trong bất kỳ trường hợp nào trừ khi sự kiện bị hủy từ phía nhà tổ chức.</p>
+              <p>• Trẻ em dưới độ tuổi quy định sẽ không được phép tham gia sự kiện (Vui lòng xem kỹ độ tuổi giới hạn nếu có).</p>
+              <p>• Vui lòng đến trước giờ bắt đầu 30 phút để thực hiện các thủ tục check-in.</p>
+              <p>• Mã QR code của vé chỉ có giá trị cho một lần quét duy nhất. Vui lòng bảo mật mã QR của bạn.</p>
+              <p>• Ban tổ chức có quyền từ chối sự tham gia của bất kỳ cá nhân nào vi phạm nội quy sự kiện.</p>
+            </div>
           </section>
 
           {!event.hasSeatMap && (
@@ -630,6 +678,224 @@ export default function EventDetailPage() {
             >
               {isBooking ? "Đang xử lý..." : "Thanh toán"}
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Review + Report Section */}
+      <ReviewSection eventId={event.id} eventSlug={event.slug} />
+    </div>
+  );
+}
+
+// ─── Review Section Component ─────────────────────────────────────────────────
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onMouseEnter={() => setHovered(star)}
+          onMouseLeave={() => setHovered(0)}
+          onClick={() => onChange(star)}
+          className="transition-all"
+        >
+          <Star
+            className={`h-7 w-7 transition-colors ${
+              star <= (hovered || value)
+                ? "fill-amber-400 text-amber-400"
+                : "text-muted-foreground/40"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReviewSection({ eventId, eventSlug }: { eventId: string; eventSlug: string }) {
+  const { data: session } = useSession();
+  const [rating, setRating] = useState(0);
+  const [content, setContent] = useState("");
+  const [reportReason, setReportReason] = useState("");
+  const [showReportModal, setShowReportModal] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["reviews", eventId],
+    queryFn: async () => {
+      const res = await api.get(`/events/${eventId}/reviews`);
+      return res.data.data;
+    },
+  });
+
+  const submitReview = useMutation({
+    mutationFn: () => api.post("/reviews", { eventId, rating, content }),
+    onSuccess: () => {
+      toast.success("Đã gửi đánh giá thành công!");
+      setRating(0);
+      setContent("");
+      queryClient.invalidateQueries({ queryKey: ["reviews", eventId] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error?.message || "Có lỗi xảy ra. Bạn cần đã tham dự sự kiện này để đánh giá.");
+    },
+  });
+
+  const submitReport = useMutation({
+    mutationFn: () => api.post("/reports", { targetType: "EVENT", targetId: eventId, reason: reportReason }),
+    onSuccess: () => {
+      toast.success("Báo cáo đã được gửi. Chúng tôi sẽ xem xét sớm nhất.");
+      setShowReportModal(false);
+      setReportReason("");
+    },
+    onError: () => {
+      toast.error("Không thể gửi báo cáo. Vui lòng thử lại.");
+    },
+  });
+
+  const reviews = data?.reviews || [];
+  const stats = data?.stats;
+
+  return (
+    <div className="mt-10 space-y-6">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-extrabold flex items-center gap-2">
+          <Star className="h-6 w-6 text-amber-400 fill-amber-400" /> Đánh giá từ người tham dự
+        </h2>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-destructive gap-1.5"
+          onClick={() => {
+            if (!session) { toast.info("Vui lòng đăng nhập để báo cáo sự kiện"); return; }
+            setShowReportModal(true);
+          }}
+        >
+          <Flag className="h-4 w-4" /> Báo cáo sự kiện
+        </Button>
+      </div>
+
+      {/* Stats */}
+      {stats && stats.totalReviews > 0 && (
+        <div className="flex items-center gap-4 bg-card border border-border/60 rounded-2xl p-5 shadow-sm">
+          <div className="text-center">
+            <p className="text-5xl font-black text-foreground">{stats.averageRating}</p>
+            <div className="flex justify-center mt-1">
+              {[1,2,3,4,5].map(s => (
+                <Star key={s} className={`h-4 w-4 ${s <= Math.round(stats.averageRating) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`} />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{stats.totalReviews} đánh giá</p>
+          </div>
+        </div>
+      )}
+
+      {/* Review list */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        </div>
+      ) : reviews.length === 0 ? (
+        <div className="text-center py-12 bg-card border border-border/60 rounded-2xl">
+          <Star className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+          <p className="text-muted-foreground font-medium">Chưa có đánh giá nào. Hãy là người đầu tiên!</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {reviews.map((review: any) => (
+            <div key={review.id} className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm shrink-0">
+                    {review.user?.name?.[0]?.toUpperCase() || "U"}
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm">{review.user?.name || "Ẩn danh"}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} className={`h-3.5 w-3.5 ${s <= review.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/20"}`} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(review.createdAt), "dd/MM/yyyy")}
+                </span>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{review.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Write review form */}
+      {session ? (
+        <div className="bg-card border border-primary/20 rounded-2xl p-6 shadow-sm">
+          <h3 className="font-extrabold text-base mb-4">✍️ Viết đánh giá của bạn</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground mb-2">Chọn số sao</p>
+              <StarRating value={rating} onChange={setRating} />
+            </div>
+            <Textarea
+              placeholder="Chia sẻ trải nghiệm của bạn về sự kiện này..."
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              className="min-h-[100px] resize-none"
+            />
+            <Button
+              onClick={() => submitReview.mutate()}
+              disabled={submitReview.isPending || rating === 0 || !content.trim()}
+              className="gap-2 rounded-xl font-bold"
+            >
+              <Send className="h-4 w-4" />
+              {submitReview.isPending ? "Đang gửi..." : "Gửi đánh giá"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-muted/30 border border-border rounded-2xl p-6 text-center">
+          <p className="text-muted-foreground font-medium">
+            <Link href={`/login?callbackUrl=/events/${eventSlug}`} className="text-primary font-bold hover:underline">Đăng nhập</Link> để viết đánh giá sự kiện.
+          </p>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4 border border-border">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-xl">
+                <Flag className="h-5 w-5 text-destructive" />
+              </div>
+              <h3 className="font-extrabold text-lg">Báo cáo sự kiện</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Cho chúng tôi biết lý do bạn muốn báo cáo sự kiện này. Báo cáo sẽ được đội ngũ Admin xem xét.
+            </p>
+            <Textarea
+              placeholder="Mô tả lý do báo cáo (nội dung vi phạm, thông tin sai lệch, ...)"
+              value={reportReason}
+              onChange={e => setReportReason(e.target.value)}
+              className="min-h-[100px] resize-none"
+            />
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" onClick={() => setShowReportModal(false)}>Huỷ</Button>
+              <Button
+                variant="destructive"
+                onClick={() => submitReport.mutate()}
+                disabled={submitReport.isPending || !reportReason.trim()}
+                className="gap-2 rounded-xl"
+              >
+                <Flag className="h-4 w-4" />
+                {submitReport.isPending ? "Đang gửi..." : "Gửi báo cáo"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

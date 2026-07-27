@@ -69,18 +69,23 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Organizers */}
+          {/* Support & Organizers */}
           <div className="space-y-3">
-            <h4 className="font-bold text-foreground text-sm uppercase tracking-wider">Nhà tổ chức</h4>
+            <h4 className="font-bold text-foreground text-sm uppercase tracking-wider">Hỗ trợ & Hợp tác</h4>
             <ul className="space-y-2.5 text-sm text-muted-foreground">
               <li>
-                <Link href="/seller/dashboard" className="hover:text-primary transition-colors">
-                  Đăng sự kiện
+                <Link href="/faq" className="hover:text-primary transition-colors">
+                  Câu hỏi thường gặp (FAQ)
                 </Link>
               </li>
               <li>
-                <Link href="/register" className="hover:text-primary transition-colors">
-                  Tạo tài khoản
+                <Link href="/support" className="hover:text-primary transition-colors">
+                  Liên hệ hỗ trợ
+                </Link>
+              </li>
+              <li>
+                <Link href="/seller/dashboard" className="hover:text-primary transition-colors">
+                  Tổ chức sự kiện cùng Lumora
                 </Link>
               </li>
             </ul>

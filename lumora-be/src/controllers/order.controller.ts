@@ -221,6 +221,7 @@ export async function getOrderById(
         event: true,
         items: { include: { ticketType: true, seat: { include: { row: { include: { section: true } } } } } },
         payment: true,
+        RefundRequest: true,
       },
     });
 
@@ -287,3 +288,127 @@ export async function releaseInventory(
     });
   });
 }
+
+// ─── Apply Voucher ────────────────────────────────────────────────────────
+export async function applyVoucher(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const buyerId = req.user!.userId;
+    const { code } = req.body;
+
+    if (!code) throw createError("Voucher code is required", 400);
+
+    const order = await prisma.order.findFirst({
+      where: { id, buyerId },
+    });
+
+    if (!order) throw createError("Order not found", 404);
+    if (order.status !== "PENDING") {
+      throw createError("Cannot apply voucher to a non-pending order", 400);
+    }
+    if (order.voucherCode) {
+      throw createError("Voucher already applied to this order", 400);
+    }
+
+    const voucher = await prisma.voucher.findUnique({
+      where: { code },
+    });
+
+    if (!voucher || voucher.status !== "ACTIVE" || new Date() < voucher.startDate || new Date() > voucher.endDate) {
+      throw createError("Invalid or expired voucher", 400, "INVALID_VOUCHER");
+    }
+
+    if (voucher.usageLimit && voucher.usedCount >= voucher.usageLimit) {
+      throw createError("Voucher usage limit reached", 400, "VOUCHER_LIMIT_REACHED");
+    }
+
+    if (voucher.minOrderValue && Number(order.subtotal) < Number(voucher.minOrderValue)) {
+      throw createError(`Minimum order value is ${Number(voucher.minOrderValue).toLocaleString("vi-VN")} ₫`, 400);
+    }
+
+    // Calculate discount
+    let discount = 0;
+    if (voucher.discountType === "FIXED") {
+      discount = Number(voucher.discountValue);
+    } else if (voucher.discountType === "PERCENTAGE") {
+      discount = (Number(order.subtotal) * Number(voucher.discountValue)) / 100;
+      if (voucher.maxDiscount && discount > Number(voucher.maxDiscount)) {
+        discount = Number(voucher.maxDiscount);
+      }
+    }
+
+    // Never discount more than subtotal
+    if (discount > Number(order.subtotal)) {
+      discount = Number(order.subtotal);
+    }
+
+    const newTotal = Number(order.subtotal) + Number(order.fees) - discount;
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        discount: discount,
+        total: newTotal > 0 ? newTotal : 0,
+        voucherCode: voucher.code,
+      },
+      include: {
+        event: true,
+        items: { include: { ticketType: true, seat: { include: { row: { include: { section: true } } } } } },
+      }
+    });
+
+    res.json({ success: true, data: updatedOrder, message: "Áp dụng mã giảm giá thành công" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Request Refund ───────────────────────────────────────────────────────
+export async function requestRefund(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const buyerId = req.user!.userId;
+    const { reason } = req.body;
+
+    if (!reason) throw createError("Vui lòng nhập lý do hoàn tiền", 400);
+
+    const order = await prisma.order.findFirst({
+      where: { id, buyerId },
+      include: { RefundRequest: true },
+    });
+
+    if (!order) throw createError("Order not found", 404);
+    if (!["CONFIRMED", "CHECKED_IN"].includes(order.status)) {
+      throw createError("Chỉ có thể yêu cầu hoàn tiền cho đơn hàng đã thanh toán", 400);
+    }
+    if (order.RefundRequest) {
+      throw createError("Đơn hàng này đã có yêu cầu hoàn tiền", 400);
+    }
+
+    const refund = await prisma.refundRequest.create({
+      data: {
+        orderId: order.id,
+        userId: buyerId,
+        reason,
+        amount: order.total,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: refund,
+      message: "Yêu cầu hoàn tiền đã được gửi. Ban quản trị sẽ xử lý sớm nhất.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+

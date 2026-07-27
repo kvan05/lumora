@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,12 +23,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { User, Phone, Mail, ShieldCheck, Ticket, ChevronRight } from "lucide-react";
+import { User, Phone, Mail, ShieldCheck, Ticket, ChevronRight, Trash2, AlertTriangle, Camera, Building2 } from "lucide-react";
 import Link from "next/link";
 
 const profileSchema = z.object({
   name: z.string().min(2, "Tên phải có ít nhất 2 ký tự"),
   phone: z.string().optional(),
+  avatar: z.string().optional(),
 });
 
 const passwordSchema = z.object({
@@ -47,10 +48,12 @@ export default function ProfilePage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const profileForm = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { name: "", phone: "" },
+    defaultValues: { name: "", phone: "", avatar: "" },
   });
 
   const passwordForm = useForm<z.infer<typeof passwordSchema>>({
@@ -68,6 +71,7 @@ export default function ProfilePage() {
           profileForm.reset({
             name: data.name || "",
             phone: data.phone || "",
+            avatar: data.avatar || "",
           });
         }
       } catch (error) {
@@ -90,13 +94,25 @@ export default function ProfilePage() {
       const res = await api.put("/auth/profile", values);
       if (res.data.success) {
         toast.success("Cập nhật hồ sơ thành công!");
-        await update({ name: values.name });
+        await update({ name: values.name, image: values.avatar });
         setProfile((prev: any) => ({ ...prev, ...values }));
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || "Cập nhật thất bại");
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true);
+    try {
+      await api.delete("/auth/account");
+      toast.success("Đã xóa tài khoản.");
+      signOut({ callbackUrl: "/" });
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || "Xóa tài khoản thất bại");
+      setIsDeleting(false);
     }
   }
 
@@ -156,7 +172,28 @@ export default function ProfilePage() {
 
       <Separator />
 
+      {/* Become Organizer Banner */}
+      {profile?.role === "BUYER" && (
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-primary/10 rounded-xl shrink-0">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-extrabold text-base">Bạn muốn tổ chức sự kiện?</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Đăng ký trở thành Nhà tổ chức Lumora. Xét duyệt trong 1–3 ngày làm việc.</p>
+            </div>
+          </div>
+          <Button asChild className="rounded-full font-bold gap-2 shrink-0 shadow-sm">
+            <Link href="/become-organizer">
+              Đăng ký ngay <ChevronRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      )}
+
       {/* Personal Info Card */}
+
       <Card className="rounded-2xl border border-border/60 shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2">
@@ -191,6 +228,22 @@ export default function ProfilePage() {
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input placeholder="0901 234 567" className="pl-10" {...field} />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={profileForm.control}
+                name="avatar"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-semibold">Ảnh đại diện (URL)</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Camera className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="https://example.com/avatar.jpg" className="pl-10" {...field} />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -268,6 +321,58 @@ export default function ProfilePage() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Danger Zone: Delete Account */}
+      <Card className="rounded-2xl border border-destructive/30 bg-destructive/5 shadow-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2 text-destructive">
+            <Trash2 className="h-5 w-5" />
+            <CardTitle className="text-lg">Xóa tài khoản</CardTitle>
+          </div>
+          <CardDescription>
+            Hành động này sẽ xóa vĩnh viễn tài khoản và tất cả dữ liệu lịch sử của bạn trên Lumora.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="destructive"
+            onClick={() => setShowDeleteModal(true)}
+            className="rounded-full gap-2 font-bold"
+          >
+            <Trash2 className="h-4 w-4" /> Xóa tài khoản vĩnh viễn
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-4 border border-border">
+            <div className="flex items-center gap-3 text-destructive">
+              <div className="p-2.5 bg-destructive/10 rounded-xl">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <h3 className="font-extrabold text-lg">Xác nhận xóa tài khoản</h3>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Bạn có chắc chắn muốn xóa tài khoản? Tất cả vé đã mua, sự kiện yêu thích và thông tin cá nhân của bạn sẽ bị hủy và không thể khôi phục.
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <Button variant="ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>
+                Huỷ
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="gap-2 rounded-xl font-bold"
+              >
+                {isDeleting ? "Đang xóa..." : "Xác nhận xóa"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

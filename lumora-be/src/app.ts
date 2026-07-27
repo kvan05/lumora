@@ -12,6 +12,10 @@ import { orderRoutes } from "./routes/order.routes";
 import { paymentRoutes } from "./routes/payment.routes";
 import { sellerRoutes } from "./routes/seller.routes";
 import { seatRoutes } from "./routes/seat.routes";
+import { adminRoutes } from "./routes/admin.routes";
+import { favoriteRoutes } from "./routes/favorite.routes";
+import { reviewRoutes } from "./routes/review.routes";
+import { notificationRoutes } from "./routes/notification.routes";
 import { startOrderTimeoutJob } from "./jobs/orderTimeout.job";
 
 dotenv.config();
@@ -47,6 +51,10 @@ app.use("/api/events", seatRoutes);      // /api/events/:id/seats
 app.use("/api/orders", orderRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/seller", sellerRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/favorites", favoriteRoutes);
+app.use("/api", reviewRoutes);  // /api/events/:eventId/reviews, /api/reviews, /api/reports
+app.use("/api/notifications", notificationRoutes);
 
 // ─── Error Handler (must be last) ─────────────────────────────────────
 app.use(errorHandler);

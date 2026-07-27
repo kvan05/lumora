@@ -10,6 +10,7 @@ import { vi } from "date-fns/locale";
 import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,8 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   const [qrData, setQrData] = useState<{
     checkoutUrl: string;
     qrCode: string;
@@ -93,6 +96,22 @@ export default function CheckoutPage() {
   };
 
   const isExpiringSoon = timeLeft > 0 && timeLeft <= 60;
+
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim() || !order) return;
+    setIsApplyingVoucher(true);
+    try {
+      const res = await api.patch(`/orders/${order.id}/apply-voucher`, { code: voucherCode });
+      if (res.data.success) {
+        setOrder(res.data.data);
+        toast.success("Áp dụng mã giảm giá thành công!");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || "Mã giảm giá không hợp lệ");
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
 
   const handleGeneratePayment = useCallback(async () => {
     if (!order) return;
@@ -225,19 +244,56 @@ export default function CheckoutPage() {
 
                 <Separator />
 
+                {/* Voucher Input */}
+                {!order.voucherCode ? (
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Nhập mã giảm giá" 
+                      value={voucherCode} 
+                      onChange={e => setVoucherCode(e.target.value.toUpperCase())}
+                      className="uppercase h-10"
+                    />
+                    <Button 
+                      variant="secondary" 
+                      className="h-10 px-6 font-bold"
+                      onClick={handleApplyVoucher} 
+                      disabled={isApplyingVoucher || !voucherCode.trim()}
+                    >
+                      {isApplyingVoucher ? "..." : "Áp dụng"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 px-3 py-2.5 rounded-xl border border-emerald-200">
+                    <span className="text-sm font-bold flex items-center gap-2">
+                      <Ticket className="h-4 w-4" /> Đã áp dụng: {order.voucherCode}
+                    </span>
+                    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 shadow-none border-emerald-200 border">
+                      - {Number(order.discount || 0).toLocaleString("vi-VN")} ₫
+                    </Badge>
+                  </div>
+                )}
+
+                <Separator />
+
                 {/* Totals */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-muted-foreground">
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between text-muted-foreground font-medium">
                     <span>Tạm tính</span>
                     <span>{Number(order.subtotal).toLocaleString("vi-VN")} ₫</span>
                   </div>
-                  <div className="flex justify-between text-muted-foreground">
+                  <div className="flex justify-between text-muted-foreground font-medium">
                     <span>Phí dịch vụ</span>
                     <span>{Number(order.fees).toLocaleString("vi-VN")} ₫</span>
                   </div>
-                  <div className="flex justify-between text-xl font-extrabold text-foreground pt-2 border-t border-border/50">
+                  {Number(order.discount) > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-bold">
+                      <span>Giảm giá</span>
+                      <span>- {Number(order.discount).toLocaleString("vi-VN")} ₫</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xl font-extrabold text-foreground pt-3 border-t border-border/50">
                     <span>Tổng cộng</span>
-                    <span className="text-primary">
+                    <span className="text-primary text-2xl">
                       {Number(order.total).toLocaleString("vi-VN")} ₫
                     </span>
                   </div>

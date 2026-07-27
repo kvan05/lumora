@@ -3,6 +3,7 @@ import prisma from "../prisma/client";
 import { createError } from "../middleware/errorHandler";
 // @ts-ignore - TS Server caching issue
 import { generateSlug } from "../utils/slug";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 // ─── List Events (with filter + pagination) ────────────────────────────
 export async function listEvents(
@@ -15,11 +16,11 @@ export async function listEvents(
       category,
       city,
       search,
-      dateFrom,
-      dateTo,
+      date,
+      price,
       page = "1",
       limit = "12",
-      sort = "startDate",
+      sort = "upcoming",
     } = req.query as Record<string, string>;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -35,14 +36,38 @@ export async function listEvents(
           { city: { contains: search } },
         ],
       }),
-      ...(dateFrom && { startDate: { gte: new Date(dateFrom) } }),
-      ...(dateTo && { endDate: { lte: new Date(dateTo) } }),
     };
 
-    const orderBy: any =
-      sort === "price"
-        ? { ticketTypes: { _min: { price: "asc" } } }
-        : { [sort]: "asc" };
+    // Date semantic filters
+    if (date) {
+      const now = new Date();
+      if (date === "today") {
+        where.startDate = { gte: startOfDay(now), lte: endOfDay(now) };
+      } else if (date === "this_week") {
+        where.startDate = { gte: startOfWeek(now), lte: endOfWeek(now) };
+      } else if (date === "this_month") {
+        where.startDate = { gte: startOfMonth(now), lte: endOfMonth(now) };
+      }
+    }
+
+    // Price semantic filters
+    if (price) {
+      if (price === "free") {
+        where.ticketTypes = { some: { price: 0 } };
+      } else if (price === "under_500") {
+        where.ticketTypes = { some: { price: { gt: 0, lte: 500000 } } };
+      } else if (price === "500_1000") {
+        where.ticketTypes = { some: { price: { gt: 500000, lte: 1000000 } } };
+      } else if (price === "over_1000") {
+        where.ticketTypes = { some: { price: { gt: 1000000 } } };
+      }
+    }
+
+    let orderBy: any = { startDate: "asc" }; // Default upcoming
+    if (sort === "latest") orderBy = { createdAt: "desc" };
+    else if (sort === "upcoming") orderBy = { startDate: "asc" };
+    else if (sort === "price_asc") orderBy = { ticketTypes: { _min: { price: "asc" } } };
+    else if (sort === "price_desc") orderBy = { ticketTypes: { _max: { price: "desc" } } };
 
     const [events, total] = await Promise.all([
       prisma.event.findMany({

@@ -106,6 +106,82 @@ export async function verifyRegisterOtp(
 }
 
 
+// ─── Become Organizer (Multi-step registration) ──────────────────────────
+export async function becomeOrganizer(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+
+    // Check if already applied
+    const existing = await prisma.organizerProfile.findUnique({ where: { userId } });
+    if (existing) {
+      if (existing.verifyStatus === "APPROVED") {
+        throw createError("Tài khoản của bạn đã là Nhà tổ chức sự kiện.", 400);
+      }
+      if (existing.verifyStatus === "PENDING") {
+        throw createError("Đơn đăng ký của bạn đang chờ xét duyệt.", 400);
+      }
+      // If REJECTED — allow re-apply by deleting old one
+      await prisma.organizerProfile.delete({ where: { userId } });
+    }
+
+    const {
+      orgName, orgLogo, orgBanner, orgDescription, website, facebook,
+      address, representative,
+      // Bank info
+      bankName, accountNumber, accountHolder,
+      // Documents
+      documents = [], // [{ docType: 'CCCD', docUrl: '...' }]
+      agreeTerms,
+    } = req.body;
+
+    if (!orgName || !representative || !bankName || !accountNumber || !accountHolder) {
+      throw createError("Vui lòng điền đầy đủ thông tin bắt buộc", 400);
+    }
+    if (!agreeTerms) {
+      throw createError("Bạn cần đồng ý với Điều khoản bán vé của Lumora", 400);
+    }
+
+    const profile = await prisma.organizerProfile.create({
+      data: {
+        userId,
+        orgName, orgLogo, orgBanner, orgDescription, website, facebook,
+        address, representative,
+        verifyStatus: "PENDING",
+        bankInfo: {
+          create: { bankName, accountNumber, accountHolder },
+        },
+        documents: {
+          create: documents.map((doc: { docType: string; docUrl: string }) => ({
+            docType: doc.docType,
+            docUrl: doc.docUrl,
+          })),
+        },
+      },
+      include: { bankInfo: true, documents: true },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: profile,
+      message: "Đã gửi đơn đăng ký. Admin sẽ xét duyệt trong 1-3 ngày làm việc.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getOrganizerStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+    const profile = await prisma.organizerProfile.findUnique({
+      where: { userId },
+      include: { bankInfo: true, documents: true },
+    });
+    res.json({ success: true, data: profile });
+  } catch (err) {
+    next(err);
+  }
+}
 // ─── Login ─────────────────────────────────────────────────────────────
 export async function login(
   req: Request,
@@ -458,3 +534,19 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     next(err);
   }
 }
+
+export async function deleteAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+    await prisma.$transaction([
+      prisma.userSession.deleteMany({ where: { userId } }),
+      prisma.favorite.deleteMany({ where: { userId } }),
+      prisma.notification.deleteMany({ where: { userId } }),
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
+    res.json({ success: true, message: "Tài khoản của bạn đã được xóa thành công." });
+  } catch (err) {
+    next(err);
+  }
+}
+

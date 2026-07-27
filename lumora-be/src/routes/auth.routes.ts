@@ -20,3 +20,8 @@ authRoutes.post("/logout", authenticate, AuthController.logout);
 authRoutes.get("/me", authenticate, AuthController.getMe);
 authRoutes.put("/profile", authenticate, AuthController.updateProfile);
 authRoutes.put("/change-password", authenticate, AuthController.changePassword);
+authRoutes.delete("/account", authenticate, AuthController.deleteAccount);
+authRoutes.post("/become-organizer", authenticate, AuthController.becomeOrganizer);
+authRoutes.get("/organizer-status", authenticate, AuthController.getOrganizerStatus);
+
+
