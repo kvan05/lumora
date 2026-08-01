@@ -67,7 +67,12 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ success: true, data: users });
+    const formattedUsers = users.map((u) => ({
+      ...u,
+      isBlocked: !u.isVerified,
+    }));
+
+    res.json({ success: true, data: formattedUsers });
   } catch (err) {
     next(err);
   }
@@ -79,14 +84,16 @@ export async function toggleUserBlock(req: Request, res: Response, next: NextFun
     const user = await prisma.user.findUnique({ where: { id: id as string } });
     if (!user) throw createError("User not found", 404);
 
-    // Toggle verified or we can add a isBlocked field.
-    // For simplicity, let's toggle isVerified as a lock/unlock mechanism or simulate it.
     const updated = await prisma.user.update({
       where: { id: id as string },
       data: { isVerified: !user.isVerified },
     });
 
-    res.json({ success: true, message: `Trạng thái tài khoản đã thay đổi.`, data: updated });
+    res.json({
+      success: true,
+      message: updated.isVerified ? "Đã mở khóa tài khoản." : "Đã khóa tài khoản.",
+      data: { ...updated, isBlocked: !updated.isVerified },
+    });
   } catch (err) {
     next(err);
   }

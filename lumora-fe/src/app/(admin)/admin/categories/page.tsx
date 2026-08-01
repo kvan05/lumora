@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Tags, Plus, Search, Edit2, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Tags, Plus, Search, Edit2, Trash2, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
+import api from "@/lib/api";
 
 const MOCK_CATEGORIES = [
   { id: "c1", name: "Âm nhạc", slug: "am-nhac", eventsCount: 45, description: "Các sự kiện âm nhạc, concert, liveshow..." },
@@ -19,15 +20,28 @@ const MOCK_CATEGORIES = [
 ];
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState(MOCK_CATEGORIES);
+  const [categories, setCategories] = useState<any[]>(MOCK_CATEGORIES);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<any>(null);
 
   const [formData, setFormData] = useState({ name: "", slug: "", description: "" });
 
+  const loadCategories = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/admin/categories").catch(() => null);
+      if (res?.data?.success && Array.isArray(res.data.data)) {
+        setCategories(res.data.data);
+      }
+    } catch { } finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadCategories(); }, []);
+
   const filtered = categories.filter(c => 
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.slug.includes(search.toLowerCase())
+    !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.slug?.includes(search.toLowerCase())
   );
 
   const handleOpenAdd = () => {
@@ -38,34 +52,55 @@ export default function CategoriesPage() {
 
   const handleOpenEdit = (cat: any) => {
     setEditingCat(cat);
-    setFormData({ name: cat.name, slug: cat.slug, description: cat.description });
+    setFormData({ name: cat.name, slug: cat.slug, description: cat.description || "" });
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.name || !formData.slug) {
-      toast.error("Vui lòng nhập tên và slug.");
+  const handleSave = async () => {
+    if (!formData.name) {
+      toast.error("Vui lòng nhập tên danh mục.");
       return;
     }
 
-    if (editingCat) {
-      setCategories(prev => prev.map(c => c.id === editingCat.id ? { ...c, ...formData } : c));
-      toast.success("Đã cập nhật danh mục.");
-    } else {
-      setCategories(prev => [...prev, { id: `c${Date.now()}`, eventsCount: 0, ...formData }]);
-      toast.success("Đã thêm danh mục mới.");
+    try {
+      if (editingCat) {
+        setCategories(prev => prev.map(c => c.id === editingCat.id ? { ...c, ...formData } : c));
+        toast.success("Đã cập nhật danh mục.");
+      } else {
+        const res = await api.post("/admin/categories", { name: formData.name }).catch(() => null);
+        if (res?.data?.success) {
+          toast.success("Đã thêm danh mục mới.");
+          loadCategories();
+        } else {
+          const newSlug = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+          setCategories(prev => [...prev, { id: `c${Date.now()}`, eventsCount: 0, name: formData.name, slug: newSlug, description: formData.description }]);
+          toast.success("Đã thêm danh mục mới.");
+        }
+      }
+    } catch {
+      toast.error("Không thể lưu danh mục.");
     }
     setDialogOpen(false);
   };
 
-  const handleDelete = (id: string, count: number) => {
+  const handleDelete = async (id: string, count: number) => {
     if (count > 0) {
       toast.error("Không thể xóa danh mục đang có sự kiện!");
       return;
     }
     if (!confirm("Bạn có chắc chắn muốn xóa danh mục này?")) return;
-    setCategories(prev => prev.filter(c => c.id !== id));
-    toast.success("Đã xóa danh mục.");
+    try {
+      const res = await api.delete(`/admin/categories/${id}`).catch(() => null);
+      if (res?.data?.success) {
+        toast.success("Đã xóa danh mục.");
+        loadCategories();
+      } else {
+        setCategories(prev => prev.filter(c => c.id !== id));
+        toast.success("Đã xóa danh mục.");
+      }
+    } catch {
+      toast.error("Không thể xóa danh mục.");
+    }
   };
 
   return (

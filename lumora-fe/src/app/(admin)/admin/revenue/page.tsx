@@ -68,7 +68,7 @@ export default function AdminFinancePage() {
     queryKey: ["admin-events-list"],
     queryFn: async () => {
       const res = await api.get("/admin/events");
-      return res.data.data.events as any[];
+      return (Array.isArray(res.data.data) ? res.data.data : res.data.data?.events || []) as any[];
     },
   });
 

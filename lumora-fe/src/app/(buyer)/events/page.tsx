@@ -18,8 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const CATEGORIES = ["Âm nhạc", "Thể thao", "Sân khấu", "Nghệ thuật", "Ẩm thực", "Hội thảo"];
-const CITIES = ["Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Cần Thơ", "Hải Phòng"];
+const CATEGORIES = ["Âm nhạc", "Thể thao", "Workshop", "Lễ hội", "Triển lãm", "Sân khấu", "Nghệ thuật", "Ẩm thực", "Hội thảo"];
+const CITIES = ["Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Phan Thiết", "Cần Thơ", "Hải Phòng"];
 
 export default function EventsPage() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function EventsPage() {
   const [sortBy, setSortBy] = useState("latest");
   const [showFilters, setShowFilters] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["events", search, category, city, priceRange, dateFilter, sortBy],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -43,8 +43,9 @@ export default function EventsPage() {
       if (sortBy) params.append("sort", sortBy);
       
       const res = await api.get(`/events?${params.toString()}`);
-      return res.data.data.events;
+      return res.data.data.events as any[];
     },
+    retry: 2,
   });
 
   const handleClear = () => {
@@ -188,6 +189,19 @@ export default function EventsPage() {
               <Skeleton className="h-4 w-1/2" />
             </div>
           ))}
+        </div>
+      ) : isError ? (
+        <div className="text-center py-20 bg-card rounded-3xl border border-destructive/20">
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Search className="h-6 w-6 text-destructive" />
+          </div>
+          <h3 className="text-lg font-bold">Không thể tải sự kiện</h3>
+          <p className="text-muted-foreground mt-2 max-w-sm mx-auto">
+            Có lỗi xảy ra khi tải danh sách sự kiện. Vui lòng thử lại sau.
+          </p>
+          <Button variant="outline" className="mt-6 rounded-xl" onClick={() => window.location.reload()}>
+            Thử lại
+          </Button>
         </div>
       ) : data?.length === 0 ? (
         <div className="text-center py-20 bg-card rounded-3xl border border-border/50">

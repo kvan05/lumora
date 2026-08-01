@@ -28,7 +28,7 @@ export async function listEvents(
     const where: any = {
       status: "PUBLISHED",
       ...(category && { category }),
-      ...(city && { city }),
+      ...(city && { city: { contains: city } }),
       ...(search && {
         OR: [
           { title: { contains: search } },

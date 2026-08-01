@@ -30,7 +30,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string; icon: an
 };
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState(MOCK_ORDERS);
+  const [orders, setOrders] = useState<any[]>(MOCK_ORDERS);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -41,14 +41,29 @@ export default function OrdersPage() {
     setLoading(true);
     try {
       const res = await api.get("/admin/orders").catch(() => null);
-      if (res?.data?.success && Array.isArray(res.data.data)) setOrders(res.data.data);
+      if (res?.data?.success && Array.isArray(res.data.data)) {
+        const normalized = res.data.data.map((o: any) => ({
+          ...o,
+          buyerName: typeof o.buyer === "object" ? (o.buyer?.name || o.buyer?.email || "N/A") : (o.buyer || "N/A"),
+          buyerEmail: typeof o.buyer === "object" ? o.buyer?.email : (o.buyerEmail || ""),
+          eventTitle: typeof o.event === "object" ? o.event?.title : (o.event || "N/A"),
+          ticketType: o.items?.[0]?.ticketType?.name || o.items?.[0]?.seat?.seatLabel || o.ticketType || "Vé",
+          quantity: o.items ? o.items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : (o.quantity || 1),
+          amount: Number(o.total || o.amount || 0),
+          createdAtStr: typeof o.createdAt === "string" ? o.createdAt.split("T")[0] : "",
+        }));
+        setOrders(normalized);
+      }
     } catch { } finally { setLoading(false); }
   };
 
   useEffect(() => { loadOrders(); }, []);
 
   const filtered = orders.filter(o => {
-    const matchSearch = !search || o.orderNumber.toLowerCase().includes(search.toLowerCase()) || o.buyer.toLowerCase().includes(search.toLowerCase()) || o.event.toLowerCase().includes(search.toLowerCase());
+    const buyerStr = (o.buyerName || "").toLowerCase();
+    const eventStr = (o.eventTitle || "").toLowerCase();
+    const searchLower = search.toLowerCase();
+    const matchSearch = !search || o.orderNumber?.toLowerCase().includes(searchLower) || buyerStr.includes(searchLower) || eventStr.includes(searchLower);
     const matchStatus = statusFilter === "ALL" || o.status === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -66,7 +81,7 @@ export default function OrdersPage() {
     } catch { toast.error("Có lỗi xảy ra."); }
   };
 
-  const totalRevenue = orders.filter(o => o.status === "CONFIRMED").reduce((sum, o) => sum + o.amount, 0);
+  const totalRevenue = orders.filter(o => o.status === "CONFIRMED").reduce((sum, o) => sum + (o.amount || 0), 0);
   const pendingCount = orders.filter(o => o.status === "PENDING").length;
 
   return (
@@ -140,14 +155,14 @@ export default function OrdersPage() {
                 <TableRow key={order.id} className="hover:bg-muted/20">
                   <TableCell>
                     <p className="font-mono text-sm font-bold">{order.orderNumber}</p>
-                    <p className="text-xs text-muted-foreground">{order.createdAt.split(" ")[0]}</p>
+                    <p className="text-xs text-muted-foreground">{order.createdAtStr || (typeof order.createdAt === "string" ? order.createdAt.split("T")[0] : "")}</p>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <p className="text-sm font-medium">{order.buyer}</p>
+                    <p className="text-sm font-medium">{order.buyerName || order.buyer}</p>
                     <p className="text-xs text-muted-foreground">{order.buyerEmail}</p>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <p className="text-sm">{order.event}</p>
+                    <p className="text-sm">{order.eventTitle || order.event}</p>
                     <p className="text-xs text-muted-foreground">{order.ticketType}</p>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">

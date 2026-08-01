@@ -6,14 +6,19 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 15000,
 });
 
 api.interceptors.request.use(async (config) => {
-  const session = await getSession();
-  const token = (session as any)?.accessToken;
-  
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  try {
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // Không có session hoặc lỗi khi lấy session - tiếp tục gửi request không có auth
   }
   return config;
 });
