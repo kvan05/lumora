@@ -49,22 +49,39 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
+      const trimmedIdentifier = values.identifier.trim();
       const res = await signIn("credentials", {
         redirect: false,
-        identifier: values.identifier, // we renamed email to identifier in our NextAuth config?
+        identifier: trimmedIdentifier,
+        email: trimmedIdentifier,
         password: values.password,
         rememberMe: values.rememberMe,
       });
 
       if (res?.error) {
-        toast.error("Tài khoản hoặc mật khẩu không chính xác. Vui lòng thử lại.");
+        toast.error("Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.");
       } else {
-        toast.success("Đăng nhập thành công! Chào mừng bạn trở lại.");
-        router.push(callbackUrl);
-        router.refresh();
+        toast.success("Đăng nhập thành công! Đang chuyển hướng...");
+
+        // Fetch session to determine role-based destination
+        try {
+          const sessionRes = await fetch("/api/auth/session");
+          const session = await sessionRes.json();
+          const role = session?.user?.role;
+
+          if (role === "ADMIN") {
+            window.location.href = "/admin";
+          } else if (role === "SELLER") {
+            window.location.href = "/seller/dashboard";
+          } else {
+            window.location.href = callbackUrl && callbackUrl !== "/login" ? callbackUrl : "/";
+          }
+        } catch {
+          window.location.href = callbackUrl && callbackUrl !== "/login" ? callbackUrl : "/";
+        }
       }
     } catch (error) {
-      toast.error("Có lỗi xảy ra. Vui lòng thử lại sau.");
+      toast.error("Có lỗi xảy ra trong quá trình đăng nhập.");
     } finally {
       setIsLoading(false);
     }

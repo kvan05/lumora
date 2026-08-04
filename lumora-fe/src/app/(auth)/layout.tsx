@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 export default async function AuthLayout({ children }: { children: ReactNode }) {
@@ -9,8 +10,14 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
       <div className="flex flex-col justify-center items-center p-8 bg-background">
         <div className="w-full max-w-md">
           <div className="flex justify-between items-center mb-8">
-            <Link href="/" className="text-2xl font-extrabold text-primary tracking-tight">
-              Lumora
+            <Link href="/" className="inline-block hover:scale-105 transition-transform">
+              <Image
+                src="/logo.png"
+                alt="Lumora Logo"
+                width={140}
+                height={44}
+                className="h-10 w-auto object-contain"
+              />
             </Link>
             <ThemeToggle />
           </div>

@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon --watch src -e ts --exec ts-node src/app.ts",
+    "start": "ts-node src/app.ts",
     "seed": "node prisma/seed.js",
+    "seed:admin": "node prisma/seed-admin.js",
     "seed:events": "node prisma/seed-real-events.js"
   },
   "keywords": [],

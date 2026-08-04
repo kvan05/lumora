@@ -30,17 +30,17 @@ export default function SellerDashboard() {
     const fetchDashboard = async () => {
       try {
         const [dashRes, eventsRes] = await Promise.all([
-          api.get("/seller/dashboard"),
-          api.get("/seller/events"),
+          api.get("/seller/dashboard").catch(() => ({ data: { success: false } })),
+          api.get("/seller/events").catch(() => ({ data: { success: false } })),
         ]);
-        if (dashRes.data.success) {
+        if (dashRes.data?.success && dashRes.data?.data) {
           setStats(dashRes.data.data.stats);
         }
-        if (eventsRes.data.success) {
+        if (eventsRes.data?.success && eventsRes.data?.data) {
           setEvents(eventsRes.data.data.events || []);
         }
       } catch (error) {
-        toast.error("Không thể tải dữ liệu thống kê");
+        console.error("Seller dashboard fetch error:", error);
       } finally {
         setLoading(false);
       }
@@ -48,6 +48,8 @@ export default function SellerDashboard() {
 
     if (session) {
       fetchDashboard();
+    } else {
+      setLoading(false);
     }
   }, [session]);
 

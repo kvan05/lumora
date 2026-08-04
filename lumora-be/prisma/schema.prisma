@@ -68,6 +68,18 @@ model Otp {
   @@map("otps")
 }
 
+model EmailVerification {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  otp       String
+  password  String   @db.NVarChar(Max)
+  name      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("email_verifications")
+}
+
 // ========================
 // EVENT
 // ========================
@@ -78,7 +90,7 @@ model Event {
   title       String
   slug        String   @unique
   description String   @db.NVarChar(Max)
-  bannerUrl   String?
+  bannerUrl   String?  @db.NVarChar(Max)
   imageUrls   String?  @db.NVarChar(Max) // JSON array
   category    String
   venue       String
@@ -92,6 +104,8 @@ model Event {
   approvalNote    String?  @db.NVarChar(Max) // Admin note when approving/rejecting
   approvedAt      DateTime?
   approvedById    String?
+  pendingChanges  String?  @db.NVarChar(Max) // JSON proposed changes submitted by Seller for published event
+  editRequestStatus String? // PENDING_REVIEW, APPROVED, REJECTED
   isFeatured      Boolean  @default(false)
   hasSeatMap      Boolean  @default(false) // True if fixed seating
   refundPolicy    String?  @db.NVarChar(Max) // Chính sách hoàn tiền

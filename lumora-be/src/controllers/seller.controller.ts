@@ -531,9 +531,9 @@ export async function submitEventForApproval(
     const eventId = req.params.eventId as string;
 
     const event = await prisma.event.findFirst({
-      where: { id: eventId, sellerId, status: "DRAFT" },
+      where: req.user!.role === "ADMIN" ? { id: eventId } : { id: eventId, sellerId },
     });
-    if (!event) throw createError("Sự kiện không tồn tại hoặc không ở trạng thái DRAFT", 404);
+    if (!event) throw createError("Sự kiện không tồn tại", 404);
 
     const updated = await prisma.event.update({
       where: { id: eventId },

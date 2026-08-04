@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { EventTicket } from "@/components/ticket/EventTicket";
 
 const MOCK_ORDERS = [
   { id: "o1", orderNumber: "ORD-2026-001", buyer: "Nguyễn Văn An", buyerEmail: "vanan@gmail.com", event: "Live Concert Sky Dec", ticketType: "VIP", quantity: 2, amount: 2400000, status: "CONFIRMED", paymentMethod: "PayOS", createdAt: "2026-07-15 10:30:00" },
@@ -194,34 +195,77 @@ export default function OrdersPage() {
       </Card>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-lg rounded-2xl">
+        <DialogContent className="max-w-2xl rounded-3xl p-6">
           <DialogHeader>
-            <DialogTitle className="font-bold">Chi tiết đơn hàng</DialogTitle>
+            <DialogTitle className="font-bold text-lg flex items-center gap-2">
+              <Ticket className="h-5 w-5 text-primary" /> Chi tiết đơn hàng #{selectedOrder?.orderNumber}
+            </DialogTitle>
           </DialogHeader>
           {selectedOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 {[
                   { label: "Mã đơn", value: selectedOrder.orderNumber },
-                  { label: "Người mua", value: selectedOrder.buyer },
-                  { label: "Email", value: selectedOrder.buyerEmail },
-                  { label: "Sự kiện", value: selectedOrder.event },
+                  { label: "Người mua", value: selectedOrder.buyerName || selectedOrder.buyer },
+                  { label: "Email", value: selectedOrder.buyerEmail || "N/A" },
+                  { label: "Sự kiện", value: selectedOrder.eventTitle || selectedOrder.event },
                   { label: "Loại vé", value: selectedOrder.ticketType },
                   { label: "Số lượng", value: `${selectedOrder.quantity} vé` },
-                  { label: "Phương thức TT", value: selectedOrder.paymentMethod },
-                  { label: "Thời gian mua", value: selectedOrder.createdAt },
+                  { label: "Phương thức TT", value: selectedOrder.paymentMethod || "PayOS" },
+                  { label: "Thời gian", value: selectedOrder.createdAtStr || selectedOrder.createdAt },
                 ].map(item => (
-                  <div key={item.label} className="bg-muted/30 rounded-xl p-3">
-                    <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
-                    <p className="font-semibold mt-0.5 text-sm">{item.value}</p>
+                  <div key={item.label} className="bg-muted/30 rounded-xl p-2.5">
+                    <p className="text-[11px] text-muted-foreground font-medium">{item.label}</p>
+                    <p className="font-semibold mt-0.5 text-xs truncate">{item.value}</p>
                   </div>
                 ))}
               </div>
-              <div className="bg-primary/5 rounded-xl p-3 flex justify-between items-center">
-                <span className="font-bold">Tổng tiền</span>
+
+              <div className="bg-primary/5 rounded-xl p-3 flex justify-between items-center border border-primary/10">
+                <span className="font-bold text-sm">Tổng tiền thanh toán</span>
                 <span className="text-xl font-black text-primary">{selectedOrder.amount.toLocaleString("vi-VN")} ₫</span>
               </div>
-              <div className="flex justify-between pt-2">
+
+              <Separator />
+
+              {/* Phôi vé Barcode preview */}
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase font-extrabold tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Ticket className="h-4 w-4 text-primary" /> Phôi vé Điện tử có Mã Vạch (Barcode)
+                </h4>
+                <div className="space-y-4">
+                  {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                    selectedOrder.items.map((item: any) => (
+                      <EventTicket
+                        key={item.id}
+                        ticketCode={item.ticketCode || `TKT-${item.id.slice(-8).toUpperCase()}`}
+                        eventTitle={selectedOrder.eventTitle || selectedOrder.event}
+                        bannerUrl={selectedOrder.event?.bannerUrl}
+                        category={selectedOrder.event?.category || "Sự kiện"}
+                        ticketType={item.ticketType?.name || selectedOrder.ticketType}
+                        startDate={selectedOrder.event?.startDate || new Date()}
+                        venue={selectedOrder.event?.venue || "Địa điểm Lumora"}
+                        city={selectedOrder.event?.city || "Việt Nam"}
+                        status={selectedOrder.status}
+                        isCheckedIn={item.isCheckedIn}
+                      />
+                    ))
+                  ) : (
+                    <EventTicket
+                      ticketCode={selectedOrder.orderNumber ? `TKT-${selectedOrder.orderNumber}` : "LM20268888"}
+                      eventTitle={selectedOrder.eventTitle || selectedOrder.event || "Sự kiện Lumora"}
+                      category="Sự kiện"
+                      ticketType={selectedOrder.ticketType || "Vé Tiêu Chuẩn"}
+                      startDate={new Date()}
+                      venue="Trung tâm Hội nghị Lumora"
+                      city="TP. Hồ Chí Minh"
+                      status={selectedOrder.status === "CONFIRMED" ? "CONFIRMED" : selectedOrder.status}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-2 border-t">
                 <div className="flex gap-2">
                   {selectedOrder.status === "PENDING" && (
                     <Button variant="outline" className="rounded-xl text-destructive border-destructive/30" onClick={() => { handleCancelOrder(selectedOrder.id); setDetailOpen(false); }}>
@@ -229,7 +273,7 @@ export default function OrdersPage() {
                     </Button>
                   )}
                 </div>
-                <Button className="rounded-xl" onClick={() => setDetailOpen(false)}>Đóng</Button>
+                <Button className="rounded-xl font-bold" onClick={() => setDetailOpen(false)}>Đóng</Button>
               </div>
             </div>
           )}

@@ -27,7 +27,7 @@ export async function listEvents(
 
     const where: any = {
       status: "PUBLISHED",
-      ...(category && { category }),
+      ...(category && { category: { contains: category } }),
       ...(city && { city: { contains: city } }),
       ...(search && {
         OR: [
@@ -321,11 +321,11 @@ export async function updateEvent(
 ): Promise<void> {
   try {
     const id = req.params.id as string;
-    const sellerId = req.user!.userId;
+    const userId = req.user!.userId;
+    const userRole = req.user!.role;
 
-    const event = await prisma.event.findFirst({
-      where: { id, sellerId },
-    });
+    const where = userRole === "ADMIN" ? { id } : { id, sellerId: userId };
+    const event = await prisma.event.findFirst({ where });
     if (!event) throw createError("Event not found or access denied", 404);
 
     const {
@@ -344,8 +344,47 @@ export async function updateEvent(
       tags,
       metaTitle,
       metaDesc,
+      status,
     } = req.body;
 
+    // If event is already PUBLISHED and user is SELLER, save changes as Edit Request for Admin approval
+    if (event.status === "PUBLISHED" && userRole === "SELLER") {
+      const proposedPayload = {
+        title: title || event.title,
+        description: description || event.description,
+        bannerUrl: bannerUrl || event.bannerUrl,
+        imageUrls: imageUrls ? JSON.stringify(imageUrls) : event.imageUrls,
+        category: category || event.category,
+        venue: venue || event.venue,
+        address: address || event.address,
+        city: city || event.city,
+        latitude: latitude ?? event.latitude,
+        longitude: longitude ?? event.longitude,
+        startDate: startDate || event.startDate,
+        endDate: endDate || event.endDate,
+        tags: tags ? JSON.stringify(tags) : event.tags,
+        metaTitle: metaTitle || event.metaTitle,
+        metaDesc: metaDesc || event.metaDesc,
+      };
+
+      const updated = await prisma.event.update({
+        where: { id },
+        data: {
+          pendingChanges: JSON.stringify(proposedPayload),
+          editRequestStatus: "PENDING_REVIEW",
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "Sự kiện đã mở bán. Đã gửi yêu cầu chỉnh sửa thông tin đến Admin để xét duyệt.",
+        data: updated,
+        isEditRequest: true,
+      });
+      return;
+    }
+
+    // Direct update for DRAFT, PENDING_APPROVAL, REJECTED, or if user is ADMIN
     const updated = await prisma.event.update({
       where: { id },
       data: {
@@ -359,15 +398,21 @@ export async function updateEvent(
         city,
         latitude,
         longitude,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
+        startDate: startDate && !isNaN(new Date(startDate).getTime()) ? new Date(startDate) : undefined,
+        endDate: endDate && !isNaN(new Date(endDate).getTime()) ? new Date(endDate) : undefined,
         tags: tags ? JSON.stringify(tags) : undefined,
         metaTitle,
         metaDesc,
+        status: userRole === "ADMIN" && status ? status : (event.status === "REJECTED" ? "PENDING_APPROVAL" : event.status),
       },
     });
 
-    res.json({ success: true, data: updated });
+    res.json({
+      success: true,
+      message: "Cập nhật thông tin sự kiện thành công.",
+      data: updated,
+      isEditRequest: false,
+    });
   } catch (err) {
     next(err);
   }

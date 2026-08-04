@@ -15,7 +15,9 @@ import {
   Edit, 
   Trash2, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Send,
+  Clock
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -110,15 +112,14 @@ export default function SellerEventDetailPage() {
     }
   }
 
-  async function onPublishEvent() {
+  async function onSubmitApproval() {
     setIsPublishing(true);
     try {
-      const newStatus = event.isPublished ? "DRAFT" : "PUBLISHED";
-      await api.patch(`/events/${eventId}/status`, { status: newStatus });
-      toast.success(`Đã ${event.isPublished ? "ẩn" : "công khai"} sự kiện!`);
+      await api.post(`/seller/events/${eventId}/submit`);
+      toast.success("Đã gửi yêu cầu duyệt sự kiện tới Admin thành công!");
       refetchEvent();
     } catch (error: any) {
-      toast.error("Không thể thay đổi trạng thái sự kiện");
+      toast.error(error.response?.data?.error?.message || "Lỗi khi gửi yêu cầu duyệt sự kiện");
     } finally {
       setIsPublishing(false);
     }
@@ -143,8 +144,10 @@ export default function SellerEventDetailPage() {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-3xl font-extrabold tracking-tight text-foreground">{event.title}</h2>
-            {event.isPublished ? (
+            {event.status === "PUBLISHED" || event.isPublished ? (
               <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Đang Công Khai</Badge>
+            ) : event.status === "PENDING_APPROVAL" ? (
+              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">Đang Chờ Duyệt</Badge>
             ) : (
               <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none">Bản Nháp</Badge>
             )}
@@ -153,20 +156,31 @@ export default function SellerEventDetailPage() {
             Quản lý thông tin và các loại vé cho sự kiện này.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="rounded-xl shadow-sm" onClick={() => router.push(`/seller/events/${eventId}/edit`)}>
+        <div className="flex gap-2 items-center">
+          <Button variant="outline" className="rounded-xl shadow-sm border-[#93C453] text-[#4A7C59] dark:text-[#93C453] hover:bg-[#93C453]/10" onClick={() => router.push(`/seller/events/${eventId}/edit`)}>
             <Edit className="mr-2 h-4 w-4" />
             Sửa thông tin
           </Button>
-          <Button 
-            className="rounded-xl shadow-sm" 
-            variant={event.isPublished ? "secondary" : "default"}
-            onClick={onPublishEvent}
-            disabled={isPublishing}
-          >
-            <CheckCircle2 className="mr-2 h-4 w-4" />
-            {event.isPublished ? "Chuyển về Nháp" : "Công Khai Sự Kiện"}
-          </Button>
+
+          {event.status === "PUBLISHED" || event.isPublished ? (
+            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-3 py-2 rounded-xl border-none">
+              ✓ Đã duyệt & Mở bán
+            </Badge>
+          ) : event.status === "PENDING_APPROVAL" || event.status === "PENDING" ? (
+            <Button disabled className="rounded-xl shadow-sm bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-bold cursor-not-allowed opacity-90">
+              <Clock className="mr-2 h-4 w-4 animate-spin" />
+              Đang chờ Admin duyệt
+            </Button>
+          ) : (
+            <Button
+              className="rounded-xl shadow-sm bg-[#93C453] hover:bg-[#82B342] text-slate-900 font-extrabold"
+              onClick={onSubmitApproval}
+              disabled={isPublishing}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Gửi yêu cầu duyệt
+            </Button>
+          )}
         </div>
       </div>
 

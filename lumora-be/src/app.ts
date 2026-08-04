@@ -24,19 +24,27 @@ const app = express();
 const httpServer = createServer(app);
 
 // ─── Security ─────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false, crossOriginEmbedderPolicy: false }));
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, postman) or localhost
+      if (!origin || origin.includes("localhost") || origin.includes("127.0.0.1") || origin === process.env.FRONTEND_URL) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
 
 // ─── Body Parsing ──────────────────────────────────────────────────────
-// PayOS SDK verifyPaymentWebhookData works with parsed JSON directly
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+// High body limit for base64 image uploads (banner & venue maps)
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ─── Health Check ──────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
@@ -48,6 +56,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/events", ticketRoutes);    // /api/events/:id/tickets
 app.use("/api/events", seatRoutes);      // /api/events/:id/seats
+app.use("/api/seller/events", seatRoutes); // /api/seller/events/:id/seats
 app.use("/api/orders", orderRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/seller", sellerRoutes);

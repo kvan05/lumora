@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Loader2, ArrowRight, Ticket, Home, RefreshCw, PartyPopper } from "lucide-react";
+import { EventTicket } from "@/components/ticket/EventTicket";
 
 export default function PaymentStatusPage() {
   const params = useParams();
@@ -97,10 +98,10 @@ export default function PaymentStatusPage() {
 
         {/* SUCCESS */}
         {status === "SUCCESS" && (
-          <div className="rounded-3xl border border-green-200/60 dark:border-green-900/40 bg-card shadow-xl p-10 flex flex-col items-center text-center space-y-6 animate-in fade-in zoom-in duration-500">
+          <div className="w-full max-w-2xl rounded-3xl border border-green-200/60 dark:border-green-900/40 bg-card shadow-xl p-6 md:p-8 flex flex-col items-center text-center space-y-6 animate-in fade-in zoom-in duration-500">
             <div className="relative">
-              <div className="w-28 h-28 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                <CheckCircle2 className="h-16 w-16 text-green-500" />
+              <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                <CheckCircle2 className="h-12 w-12 text-green-500" />
               </div>
               <div className="absolute -top-1 -right-1 bg-primary rounded-full p-1.5 animate-bounce">
                 <PartyPopper className="h-4 w-4 text-primary-foreground" />
@@ -108,47 +109,45 @@ export default function PaymentStatusPage() {
             </div>
 
             <div>
-              <h2 className="text-3xl font-extrabold text-green-600 dark:text-green-400">
+              <h2 className="text-2xl md:text-3xl font-extrabold text-green-600 dark:text-green-400">
                 Thanh toán thành công!
               </h2>
-              <p className="text-muted-foreground mt-2">
-                Vé của bạn đã được xác nhận. Email xác nhận đã được gửi đến hộp thư của bạn.
+              <p className="text-muted-foreground mt-1 text-sm">
+                Vé của bạn đã được xác nhận. Dưới đây là phôi vé điện tử chính thức của bạn:
               </p>
             </div>
 
-            {orderDetails && (
-              <div className="w-full bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-2xl p-4 text-left space-y-2">
-                <p className="text-sm font-bold text-green-700 dark:text-green-400">
-                  📋 Thông tin đơn hàng
-                </p>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <div className="flex justify-between">
-                    <span>Sự kiện</span>
-                    <span className="font-semibold text-foreground line-clamp-1 max-w-[180px]">
-                      {orderDetails.event?.title}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Số vé</span>
-                    <span className="font-semibold text-foreground">
-                      {orderDetails.items?.length} vé
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Tổng tiền</span>
-                    <span className="font-bold text-green-600 dark:text-green-400">
-                      {Number(orderDetails.total).toLocaleString("vi-VN")} ₫
-                    </span>
-                  </div>
-                </div>
+            {/* Display Ticket Card */}
+            {orderDetails && orderDetails.items && orderDetails.items.length > 0 && (
+              <div className="w-full text-left space-y-4 my-2">
+                {orderDetails.items.map((item: any) => {
+                  const ticketTypeName = item.ticketType?.name || (item.seat ? "Vé Có Số Ghế" : "General Admission");
+                  const seatLabel = item.seat ? `Hàng ${item.seat.row.rowLabel} — Ghế ${item.seat.seatLabel}` : undefined;
+                  return (
+                    <EventTicket
+                      key={item.id}
+                      ticketCode={item.ticketCode || `TKT-${item.id.slice(-6).toUpperCase()}`}
+                      eventTitle={orderDetails.event?.title || "Sự kiện Lumora"}
+                      bannerUrl={orderDetails.event?.bannerUrl}
+                      category={orderDetails.event?.category || "Sự kiện"}
+                      ticketType={ticketTypeName}
+                      startDate={orderDetails.event?.startDate}
+                      venue={orderDetails.event?.venue}
+                      city={orderDetails.event?.city}
+                      seatInfo={seatLabel}
+                      status={orderDetails.status}
+                      isCheckedIn={item.isCheckedIn}
+                    />
+                  );
+                })}
               </div>
             )}
 
-            <div className="w-full space-y-3">
+            <div className="w-full space-y-3 pt-2">
               <Button size="lg" className="w-full rounded-2xl h-12 font-bold" asChild>
                 <Link href={`/orders/${orderId}`}>
                   <Ticket className="mr-2 h-5 w-5" />
-                  Xem vé của tôi
+                  Xem vé trong Lịch sử của tôi
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>

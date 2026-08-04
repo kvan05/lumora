@@ -104,7 +104,7 @@ export default function OrganizersPage() {
                     <span className="text-sm font-semibold">{org.eventsCount} sự kiện</span>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
-                    <span className="text-sm font-bold text-emerald-600">{org.revenue.toLocaleString("vi-VN")}₫</span>
+                    <span className="text-sm font-bold text-emerald-600">{(org.revenue || 0).toLocaleString("vi-VN")}₫</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
@@ -152,7 +152,7 @@ export default function OrganizersPage() {
                   { label: "Số điện thoại", value: selectedOrg.phone },
                   { label: "Mã ĐKKD/MST", value: selectedOrg.businessLicense },
                   { label: "Số sự kiện đã tạo", value: `${selectedOrg.eventsCount} sự kiện` },
-                  { label: "Doanh thu tích lũy", value: `${selectedOrg.revenue.toLocaleString("vi-VN")} ₫` },
+                  { label: "Doanh thu tích lũy", value: `${(selectedOrg.revenue || 0).toLocaleString("vi-VN")} ₫` },
                 ].map(item => (
                   <div key={item.label} className="bg-muted/30 rounded-xl p-3">
                     <p className="text-xs text-muted-foreground font-medium">{item.label}</p>

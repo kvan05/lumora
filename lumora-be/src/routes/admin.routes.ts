@@ -20,6 +20,7 @@ adminRoutes.patch("/users/:id/approve-organizer", AdminController.approveOrganiz
 // Event management
 adminRoutes.get("/events", AdminController.getEvents);
 adminRoutes.patch("/events/:id/status", AdminController.approveEvent);
+adminRoutes.patch("/events/:id/edit-request", AdminController.handleEditRequest);
 
 // Category management
 adminRoutes.get("/categories", AdminController.getCategories);

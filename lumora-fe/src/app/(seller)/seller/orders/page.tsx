@@ -13,7 +13,9 @@ import {
   XCircle,
   ExternalLink,
   User,
-  AlertCircle
+  AlertCircle,
+  Barcode,
+  Eye,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -30,6 +32,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { ETicketModal } from "@/components/ticket/EventTicket";
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = {
   PENDING: { label: "Chờ thanh toán", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30", icon: Clock },
@@ -39,6 +42,8 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: any }> = 
 
 export default function SellerOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["seller-orders"],
@@ -55,12 +60,33 @@ export default function SellerOrdersPage() {
     order.event.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleOpenTicket = (order: any) => {
+    const firstItem = order.items?.[0];
+    const ticketCode = firstItem?.ticketCode || `TKT-${order.id.slice(-8).toUpperCase()}`;
+    setSelectedTicket({
+      ticketCode: ticketCode,
+      eventTitle: order.event.title,
+      bannerUrl: order.event.bannerUrl,
+      category: order.event.category || "Sự kiện",
+      ticketType: firstItem?.ticketType?.name || "Vé Tiêu Chuẩn",
+      startDate: order.event.startDate || order.createdAt,
+      venue: order.event.venue || "Địa điểm sự kiện",
+      city: order.event.city || "Việt Nam",
+      status: order.status,
+      isCheckedIn: firstItem?.isCheckedIn || false,
+      holderName: order.buyer.name,
+    });
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Quản lý Đơn hàng</h2>
+        <h2 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+          <Ticket className="h-7 w-7 text-primary" /> Quản lý Đơn hàng & Vé bán
+        </h2>
         <p className="text-muted-foreground mt-1">
-          Theo dõi tất cả đơn hàng đã được đặt cho các sự kiện của bạn.
+          Theo dõi tất cả đơn hàng và xem phôi vé điện tử có mã vạch dành cho khách hàng.
         </p>
       </div>
 
@@ -90,7 +116,7 @@ export default function SellerOrdersPage() {
                 <TableHead className="font-bold text-muted-foreground uppercase tracking-wider text-xs">Ngày đặt</TableHead>
                 <TableHead className="font-bold text-muted-foreground uppercase tracking-wider text-xs text-right">Tổng tiền</TableHead>
                 <TableHead className="font-bold text-muted-foreground uppercase tracking-wider text-xs text-center">Trạng thái</TableHead>
-                <TableHead className="font-bold text-muted-foreground uppercase tracking-wider text-xs text-right">Chi tiết</TableHead>
+                <TableHead className="font-bold text-muted-foreground uppercase tracking-wider text-xs text-right">Phôi Vé Barcode</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -118,7 +144,7 @@ export default function SellerOrdersPage() {
                   
                   return (
                     <TableRow key={order.id} className="group hover:bg-muted/30 transition-colors">
-                      <TableCell className="font-mono text-xs uppercase font-medium">
+                      <TableCell className="font-mono text-xs uppercase font-bold text-primary">
                         {order.id.slice(0, 8)}...
                       </TableCell>
                       <TableCell>
@@ -153,10 +179,13 @@ export default function SellerOrdersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-50 group-hover:opacity-100 transition-opacity" asChild>
-                          <Link href={`#`}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-xl text-xs font-bold gap-1.5 border-primary/30 text-primary hover:bg-primary/5 shadow-xs"
+                          onClick={() => handleOpenTicket(order)}
+                        >
+                          <Barcode className="h-3.5 w-3.5" /> Xem Phôi Vé
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -167,6 +196,9 @@ export default function SellerOrdersPage() {
           </Table>
         </div>
       </Card>
+
+      <ETicketModal open={isModalOpen} onOpenChange={setIsModalOpen} ticket={selectedTicket} />
     </div>
   );
 }
+

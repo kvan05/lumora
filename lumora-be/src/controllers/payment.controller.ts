@@ -57,7 +57,7 @@ export async function createPayment(
           qrCode: existingPayment.qrCode,
           orderId: order.id,
           orderNumber: order.orderNumber,
-          amount: Math.round(Number(order.total)),
+          amount: Math.max(0, Math.round(Number(order.subtotal) - Number(order.discount || 0))),
           expiresAt: order.expiresAt,
         },
       });
@@ -66,7 +66,7 @@ export async function createPayment(
 
     // PayOS order code must be a unique number ≤ 9007199254740991
     const payosOrderCode = Number(String(Date.now()).slice(-9));
-    const amountVND = Math.round(Number(order.total));
+    const amountVND = Math.max(0, Math.round(Number(order.subtotal) - Number(order.discount || 0)));
 
     // Build items list for QR display
     const items = order.items.map((item) => ({

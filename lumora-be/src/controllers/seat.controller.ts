@@ -32,6 +32,18 @@ export async function getSeatMap(
   }
 }
 
+// Helper to check event access for Sellers and Admins
+async function checkEventAccess(eventId: string, req: Request) {
+  const user = req.user!;
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) throw createError("Event not found", 404);
+
+  if (user.role !== "ADMIN" && user.role !== "SELLER") {
+    throw createError("Access denied", 403);
+  }
+  return event;
+}
+
 // ─── Create Section ─────────────────────────────────────────────────────
 export async function createSection(
   req: Request,
@@ -40,16 +52,28 @@ export async function createSection(
 ): Promise<void> {
   try {
     const eventId = req.params.eventId as string;
-    const sellerId = req.user!.userId;
-
-    const event = await prisma.event.findFirst({ where: { id: eventId, sellerId } });
-    if (!event) throw createError("Access denied", 403);
+    await checkEventAccess(eventId, req);
 
     const { name, label, color, price, rowCount, seatsPerRow, sortOrder = 0 } = req.body;
 
     const section = await prisma.seatSection.create({
-      data: { eventId, name, label, color, price, rowCount, seatsPerRow, sortOrder },
+      data: {
+        eventId,
+        name,
+        label,
+        color: color || "#F7DDD5",
+        price: Number(price) || 0,
+        rowCount: Number(rowCount) || 5,
+        seatsPerRow: Number(seatsPerRow) || 10,
+        sortOrder: Number(sortOrder) || 0,
+      },
     });
+
+    // Auto flag event as having seat map
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { hasSeatMap: true },
+    }).catch(() => null);
 
     res.status(201).json({ success: true, data: section });
   } catch (err) {
@@ -66,16 +90,19 @@ export async function updateSection(
   try {
     const eventId = req.params.eventId as string;
     const sectionId = req.params.sectionId as string;
-    const sellerId = req.user!.userId;
-
-    const event = await prisma.event.findFirst({ where: { id: eventId, sellerId } });
-    if (!event) throw createError("Access denied", 403);
+    await checkEventAccess(eventId, req);
 
     const { name, label, color, price, sortOrder } = req.body;
 
     const updated = await prisma.seatSection.update({
       where: { id: sectionId },
-      data: { name, label, color, price, sortOrder },
+      data: {
+        name,
+        label,
+        color,
+        price: price !== undefined ? Number(price) : undefined,
+        sortOrder: sortOrder !== undefined ? Number(sortOrder) : undefined,
+      },
     });
 
     res.json({ success: true, data: updated });
@@ -93,10 +120,7 @@ export async function deleteSection(
   try {
     const eventId = req.params.eventId as string;
     const sectionId = req.params.sectionId as string;
-    const sellerId = req.user!.userId;
-
-    const event = await prisma.event.findFirst({ where: { id: eventId, sellerId } });
-    if (!event) throw createError("Access denied", 403);
+    await checkEventAccess(eventId, req);
 
     await prisma.seatSection.delete({ where: { id: sectionId } });
     res.json({ success: true, message: "Section deleted" });
@@ -114,10 +138,7 @@ export async function generateSeats(
   try {
     const eventId = req.params.eventId as string;
     const sectionId = req.params.sectionId as string;
-    const sellerId = req.user!.userId;
-
-    const event = await prisma.event.findFirst({ where: { id: eventId, sellerId } });
-    if (!event) throw createError("Access denied", 403);
+    await checkEventAccess(eventId, req);
 
     const section = await prisma.seatSection.findFirst({
       where: { id: sectionId, eventId },

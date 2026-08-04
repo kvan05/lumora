@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,20 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  QrCode, Search, CheckCircle2, XCircle, AlertCircle, RefreshCw,
-  Camera, CameraOff, Volume2, VolumeX, Sparkles, Ticket
+  Barcode, Search, CheckCircle2, XCircle, AlertCircle, RefreshCw,
+  Camera, CameraOff, Volume2, VolumeX, Sparkles, Ticket, ScanLine, Eye
 } from "lucide-react";
+import { BarcodeImage, ETicketModal } from "@/components/ticket/EventTicket";
 
 export default function SellerCheckinPage() {
   const [ticketCode, setTicketCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkinResult, setCheckinResult] = useState<any>(null);
   const [recentCheckins, setRecentCheckins] = useState<any[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Camera scanner states
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [scannerReady, setScannerReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<any>(null);
   const lastScannedCode = useRef<string | null>(null);
   const lastScannedTime = useRef<number>(0);
@@ -35,22 +40,19 @@ export default function SellerCheckinPage() {
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      if (success) {
-        osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 note
-        osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.1); // E6 note
-      } else {
-        osc.frequency.setValueAtTime(300, ctx.currentTime);
-        osc.frequency.setValueAtTime(150, ctx.currentTime + 0.15);
-      }
-      osc.start();
-      osc.stop(ctx.currentTime + 0.25);
+      osc.frequency.value = success ? 880 : 280;
+      osc.type = success ? "sine" : "square";
+      gain.gain.setValueAtTime(0.4, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
     } catch {
       // AudioContext might be restricted until user interaction
     }
   };
 
   // Perform check-in API call
-  const performCheckin = async (code: string) => {
+  const performCheckin = useCallback(async (code: string) => {
     const cleanCode = code.trim();
     if (!cleanCode) return;
 
@@ -93,7 +95,7 @@ export default function SellerCheckinPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isMuted]);
 
   // Manual Submit
   const handleManualCheckin = (e: React.FormEvent) => {
@@ -105,51 +107,58 @@ export default function SellerCheckinPage() {
     performCheckin(ticketCode);
   };
 
-  // Camera scanner effect
+  // Barcode camera scanner using @zxing/browser
   useEffect(() => {
-    let html5Qrcode: any = null;
+    let active = true;
 
     if (isCameraActive) {
       setCameraError(null);
-      import("html5-qrcode").then(({ Html5Qrcode }) => {
-        html5Qrcode = new Html5Qrcode("reader");
-        scannerRef.current = html5Qrcode;
+      setScannerReady(false);
 
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      import("@zxing/browser").then(({ BrowserMultiFormatReader }) => {
+        if (!active || !videoRef.current) return;
 
-        html5Qrcode.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText: string) => {
-            const now = Date.now();
-            // Debounce scanning same code within 3 seconds
-            if (lastScannedCode.current === decodedText && now - lastScannedTime.current < 3000) {
-              return;
+        const codeReader = new BrowserMultiFormatReader();
+        scannerRef.current = codeReader;
+
+        codeReader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          (result, err) => {
+            if (result) {
+              const text = result.getText();
+              const now = Date.now();
+              if (lastScannedCode.current === text && now - lastScannedTime.current < 3000) {
+                return;
+              }
+              lastScannedCode.current = text;
+              lastScannedTime.current = now;
+              performCheckin(text);
             }
-            lastScannedCode.current = decodedText;
-            lastScannedTime.current = now;
-            performCheckin(decodedText);
-          },
-          () => {
-            // Ignore scan errors (frame did not contain QR)
+            // Ignore NotFoundException (frame with no barcode)
           }
-        ).catch((err: any) => {
-          console.error("Camera access error:", err);
-          setCameraError("Không thể mở webcam/camera. Vui lòng cấp quyền truy cập camera trên trình duyệt.");
+        ).then(() => {
+          if (active) setScannerReady(true);
+        }).catch((err: any) => {
+          if (!active) return;
+          console.error("Camera barcode scanner error:", err);
+          setCameraError("Không thể mở camera. Vui lòng cấp quyền truy cập camera trên trình duyệt.");
           setIsCameraActive(false);
         });
       });
     }
 
     return () => {
+      active = false;
       if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {}).then(() => {
-          scannerRef.current.clear();
-        });
+        try {
+          scannerRef.current.reset();
+        } catch {}
         scannerRef.current = null;
       }
+      setScannerReady(false);
     };
-  }, [isCameraActive]);
+  }, [isCameraActive, performCheckin]);
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -157,10 +166,10 @@ export default function SellerCheckinPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
-            <QrCode className="h-7 w-7 text-primary" /> Check-in Scanner
+            <Barcode className="h-7 w-7 text-primary" /> Barcode Soát Vé
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Quét mã QR bằng Camera hoặc nhập mã vé thủ công để kiểm tra tính hợp lệ khi vào cổng
+            Quét mã vạch bằng Camera hoặc nhập mã vé thủ công để kiểm tra tính hợp lệ khi vào cổng
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -194,23 +203,46 @@ export default function SellerCheckinPage() {
         {/* Scanner & Form Section (Left 2 cols) */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* WebCam Scanner Card */}
+          {/* Camera Barcode Scanner Card */}
           {isCameraActive && (
             <Card className="rounded-3xl border-2 border-primary/40 shadow-xl overflow-hidden bg-card">
               <CardHeader className="pb-2 border-b border-border/40 bg-primary/5">
                 <CardTitle className="text-sm font-extrabold flex items-center justify-between text-primary">
                   <span className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 animate-pulse" /> Camera Scanner Live
+                    <Sparkles className="h-4 w-4 animate-pulse" /> Barcode Camera Scanner Live
                   </span>
-                  <Badge className="bg-emerald-500 text-white text-[10px] uppercase font-bold animate-pulse">
-                    Đang quét...
+                  <Badge className={`text-white text-[10px] uppercase font-bold ${scannerReady ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}>
+                    {scannerReady ? "Đang quét..." : "Đang khởi động..."}
                   </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 flex flex-col items-center justify-center">
-                <div id="reader" className="w-full max-w-sm rounded-2xl overflow-hidden border border-border"></div>
-                <p className="text-xs text-muted-foreground mt-3 text-center">
-                  Căn chỉnh mã QR vé trên điện thoại của khách vào giữa khung hình scanner
+              <CardContent className="p-4 flex flex-col items-center justify-center relative">
+                {/* Video Feed */}
+                <div className="relative w-full max-w-sm rounded-2xl overflow-hidden border border-border bg-black">
+                  <video
+                    ref={videoRef}
+                    className="w-full aspect-video object-cover"
+                    autoPlay
+                    muted
+                    playsInline
+                  />
+                  {/* Scanning overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    {/* Scan line animation */}
+                    <div
+                      className="w-4/5 h-0.5 bg-primary/80"
+                      style={{ animation: "scan 2s linear infinite", boxShadow: "0 0 8px 2px hsl(var(--primary) / 0.6)" }}
+                    />
+                    {/* Corner brackets */}
+                    <div className="absolute top-4 left-4 w-10 h-10 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                    <div className="absolute top-4 right-4 w-10 h-10 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                    <div className="absolute bottom-4 left-4 w-10 h-10 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                    <div className="absolute bottom-4 right-4 w-10 h-10 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 text-center flex items-center gap-1">
+                  <ScanLine className="h-3.5 w-3.5" />
+                  Căn chỉnh mã vạch vé vào giữa khung hình để quét tự động
                 </p>
               </CardContent>
             </Card>
@@ -227,19 +259,21 @@ export default function SellerCheckinPage() {
           <Card className="rounded-3xl border border-border/60 shadow-lg">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-extrabold flex items-center gap-2">
-                <Search className="h-4 w-4 text-primary" /> Nhập mã vé / ID thủ công
+                <Search className="h-4 w-4 text-primary" /> Nhập mã vé / mã vạch thủ công
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <form onSubmit={handleManualCheckin} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mã vé (Ticket Code)</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mã vé (Barcode / Ticket Code)</label>
                   <div className="relative">
+                    <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       placeholder="VD: TCK-88X9A21 hoặc UUID"
                       value={ticketCode}
                       onChange={e => setTicketCode(e.target.value)}
-                      className="h-12 text-lg font-mono uppercase tracking-wider pl-4 rounded-xl"
+                      className="h-12 text-lg font-mono uppercase tracking-wider pl-10 rounded-xl"
+                      autoFocus
                     />
                   </div>
                 </div>
@@ -248,30 +282,60 @@ export default function SellerCheckinPage() {
                   disabled={loading || !ticketCode.trim()}
                   className="w-full h-12 rounded-xl font-bold text-base gap-2 bg-primary hover:bg-primary/90 shadow-md"
                 >
-                  {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : "Xác nhận Check-in ngay"}
+                  {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : (
+                    <><Barcode className="h-5 w-5" /> Xác nhận Check-in ngay</>
+                  )}
                 </Button>
               </form>
 
               {/* Status Banner */}
               {checkinResult && (
-                <div className={`p-5 rounded-2xl border-2 flex items-start gap-4 transition-all animate-in fade-in ${
+                <div className={`p-5 rounded-2xl border-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all animate-in fade-in ${
                   checkinResult.status === "SUCCESS"
                     ? "bg-emerald-50 border-emerald-300 text-emerald-950 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-200"
                     : "bg-red-50 border-red-300 text-red-950 dark:bg-red-950/50 dark:border-red-800 dark:text-red-200"
                 }`}>
-                  {checkinResult.status === "SUCCESS" ? (
-                    <div className="p-2 bg-emerald-500 text-white rounded-full shrink-0">
-                      <CheckCircle2 className="h-7 w-7" />
+                  <div className="flex items-start gap-4">
+                    {checkinResult.status === "SUCCESS" ? (
+                      <div className="p-2 bg-emerald-500 text-white rounded-full shrink-0">
+                        <CheckCircle2 className="h-7 w-7" />
+                      </div>
+                    ) : (
+                      <div className="p-2 bg-red-500 text-white rounded-full shrink-0">
+                        <XCircle className="h-7 w-7" />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <p className="font-black text-lg">{checkinResult.message}</p>
+                      <p className="text-sm font-mono font-bold">Mã vé: {checkinResult.ticketCode}</p>
+                      <p className="text-xs opacity-75">Thời gian: {checkinResult.time}</p>
                     </div>
-                  ) : (
-                    <div className="p-2 bg-red-500 text-white rounded-full shrink-0">
-                      <XCircle className="h-7 w-7" />
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <p className="font-black text-lg">{checkinResult.message}</p>
-                    <p className="text-sm font-mono font-semibold">Mã vé: {checkinResult.ticketCode}</p>
-                    <p className="text-xs opacity-75">Thời gian: {checkinResult.time}</p>
+                  </div>
+
+                  {/* Render Barcode SVG preview */}
+                  <div className="bg-white p-2.5 rounded-xl border border-border/60 shadow-xs flex flex-col items-center shrink-0">
+                    <BarcodeImage text={checkinResult.ticketCode} height={40} width={1.4} fontSize={10} />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-1 h-6 text-[10px] font-bold text-primary hover:bg-primary/5 px-2"
+                      onClick={() => {
+                        setSelectedTicket({
+                          ticketCode: checkinResult.ticketCode,
+                          eventTitle: "Sự kiện Soát Vé",
+                          category: "Sự kiện",
+                          ticketType: "Vé Khách Hàng",
+                          startDate: new Date(),
+                          venue: "Địa điểm Soát vé",
+                          city: "Việt Nam",
+                          status: checkinResult.status === "SUCCESS" ? "CONFIRMED" : "FAILED",
+                          isCheckedIn: checkinResult.status === "SUCCESS",
+                        });
+                        setIsModalOpen(true);
+                      }}
+                    >
+                      <Eye className="h-3 w-3 mr-1" /> Xem Phôi Vé Full
+                    </Button>
                   </div>
                 </div>
               )}
@@ -295,15 +359,34 @@ export default function SellerCheckinPage() {
             <CardContent className="p-4">
               {recentCheckins.length === 0 ? (
                 <div className="py-16 text-center text-muted-foreground text-sm space-y-2">
-                  <QrCode className="h-10 w-10 mx-auto opacity-30" />
+                  <Barcode className="h-10 w-10 mx-auto opacity-30" />
                   <p>Chưa có vé nào được quét trong phiên làm việc này</p>
                 </div>
               ) : (
                 <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
                   {recentCheckins.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-muted/40 border border-border/40 text-xs">
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3 rounded-2xl bg-muted/40 border border-border/40 text-xs hover:border-primary/40 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setSelectedTicket({
+                          ticketCode: item.ticketCode,
+                          eventTitle: "Sự kiện Lumora",
+                          category: "Sự kiện",
+                          ticketType: "Vé Khách Hàng",
+                          startDate: new Date(),
+                          venue: "Địa điểm Soát vé",
+                          city: "Việt Nam",
+                          status: item.status === "SUCCESS" ? "CONFIRMED" : "FAILED",
+                          isCheckedIn: item.status === "SUCCESS",
+                        });
+                        setIsModalOpen(true);
+                      }}
+                    >
                       <div className="space-y-0.5">
-                        <p className="font-mono font-bold uppercase text-foreground">{item.ticketCode}</p>
+                        <p className="font-mono font-bold uppercase text-primary flex items-center gap-1">
+                          <Barcode className="h-3 w-3" /> {item.ticketCode}
+                        </p>
                         <p className="text-[10px] text-muted-foreground">{item.time}</p>
                       </div>
                       <Badge className={item.status === "SUCCESS" ? "bg-emerald-500" : "bg-red-500"}>
@@ -318,6 +401,8 @@ export default function SellerCheckinPage() {
         </div>
 
       </div>
+
+      <ETicketModal open={isModalOpen} onOpenChange={setIsModalOpen} ticket={selectedTicket} />
     </div>
   );
 }

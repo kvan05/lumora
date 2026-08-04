@@ -20,10 +20,13 @@ import {
   ShieldCheck,
   MapPin,
   Calendar,
-  QrCode,
   ArrowUpRight,
   AlertCircle,
   RefreshCw,
+  User,
+  Phone,
+  Mail,
+  Home,
 } from "lucide-react";
 
 export default function CheckoutPage() {
@@ -38,12 +41,26 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
-  const [qrData, setQrData] = useState<{
-    checkoutUrl: string;
-    qrCode: string;
-    amount: number;
-    orderNumber: string;
-  } | null>(null);
+
+  // Recipient Information Form State
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
+  const [ward, setWard] = useState("");
+  const [address, setAddress] = useState("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (session?.user) {
+      setRecipientName(session.user.name || "");
+      setRecipientEmail(session.user.email || "");
+      if ((session.user as any).phone) {
+        setRecipientPhone((session.user as any).phone);
+      }
+    }
+  }, [session]);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -113,25 +130,40 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleGeneratePayment = useCallback(async () => {
+  const handleConfirmAndPay = async () => {
     if (!order) return;
+    if (!recipientName.trim()) {
+      toast.error("Vui lòng nhập Tên người nhận vé");
+      return;
+    }
+    if (!recipientPhone.trim()) {
+      toast.error("Vui lòng nhập Số điện thoại nhận vé");
+      return;
+    }
+    if (!recipientEmail.trim()) {
+      toast.error("Vui lòng nhập Email nhận vé");
+      return;
+    }
+
     setIsProcessing(true);
     try {
+      // Create VietQR PayOS payment link
       const res = await api.post("/payment/create", { orderId: order.id });
 
       if (res.data.success) {
-        const { checkoutUrl, qrCode, amount, orderNumber } = res.data.data;
-        setQrData({ checkoutUrl, qrCode, amount, orderNumber });
-        toast.success("Đã tạo mã thanh toán! Quét QR hoặc bấm nút để thanh toán.");
+        const { checkoutUrl } = res.data.data;
+        toast.success("Đang chuyển hướng tới cổng thanh toán PayOS...");
+        // Redirect directly to PayOS payment screen
+        window.location.href = checkoutUrl;
       } else {
-        toast.error("Không thể tạo liên kết thanh toán.");
+        toast.error("Không thể tạo liên kết thanh toán PayOS.");
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || "Lỗi khi tạo thanh toán");
     } finally {
       setIsProcessing(false);
     }
-  }, [order]);
+  };
 
   if (loading) {
     return (
@@ -152,7 +184,7 @@ export default function CheckoutPage() {
         {/* Header */}
         <div className="text-center space-y-1">
           <h1 className="text-4xl font-extrabold tracking-tight">Thanh toán đặt vé</h1>
-          <p className="text-muted-foreground">Xem lại đơn hàng và hoàn tất thanh toán của bạn.</p>
+          <p className="text-muted-foreground">Xem lại đơn hàng và hoàn tất thông tin nhận vé.</p>
         </div>
 
         {/* Countdown Timer */}
@@ -281,10 +313,6 @@ export default function CheckoutPage() {
                     <span>Tạm tính</span>
                     <span>{Number(order.subtotal).toLocaleString("vi-VN")} ₫</span>
                   </div>
-                  <div className="flex justify-between text-muted-foreground font-medium">
-                    <span>Phí dịch vụ</span>
-                    <span>{Number(order.fees).toLocaleString("vi-VN")} ₫</span>
-                  </div>
                   {Number(order.discount) > 0 && (
                     <div className="flex justify-between text-emerald-600 font-bold">
                       <span>Giảm giá</span>
@@ -293,8 +321,8 @@ export default function CheckoutPage() {
                   )}
                   <div className="flex justify-between text-xl font-extrabold text-foreground pt-3 border-t border-border/50">
                     <span>Tổng cộng</span>
-                    <span className="text-primary text-2xl">
-                      {Number(order.total).toLocaleString("vi-VN")} ₫
+                    <span className="text-[#4A7C59] dark:text-[#93C453] text-2xl">
+                      {Math.max(0, Number(order.subtotal) - Number(order.discount || 0)).toLocaleString("vi-VN")} ₫
                     </span>
                   </div>
                 </div>
@@ -302,132 +330,153 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* RIGHT: Payment panel */}
+          {/* RIGHT: Receiver Information & Direct PayOS Payment Form */}
           <div className="space-y-4">
-            {!qrData ? (
-              /* Step 1: Generate payment */
-              <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden">
-                <div className="bg-primary/5 border-b border-border/40 p-6">
-                  <h3 className="text-lg font-extrabold">Phương thức thanh toán</h3>
-                  <p className="text-muted-foreground text-sm mt-1">
-                    Lumora sử dụng PayOS — cổng thanh toán VietQR hàng đầu Việt Nam.
+            <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden">
+              <div className="bg-muted/30 border-b border-border/40 p-6">
+                <h3 className="text-lg font-extrabold text-foreground">Cập nhật thông tin nhận vé</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Nhập thông tin nhận vé chính xác để hệ thống gửi vé QR và hóa đơn.
+                </p>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Tên người nhận */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Tên người nhận *</label>
+                  <Input
+                    placeholder="Nhập tên người nhận..."
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Số điện thoại */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Số điện thoại *</label>
+                  <Input
+                    placeholder="Nhập số điện thoại..."
+                    value={recipientPhone}
+                    onChange={(e) => setRecipientPhone(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Email *</label>
+                  <Input
+                    type="email"
+                    placeholder="phanthikhanhvan2505@gmail.com"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    className="h-11 rounded-xl bg-muted/20"
+                  />
+                </div>
+
+                <div className="pt-2 pb-1 border-t border-border/40">
+                  <p className="text-xs font-bold text-muted-foreground">
+                    Địa chỉ nhận hàng (vui lòng cập nhật khi mua vé cứng)
                   </p>
                 </div>
-                <div className="p-6 space-y-6">
-                  {/* PayOS card option */}
-                  <div className="border-2 border-primary rounded-2xl p-5 bg-primary/5 flex items-start gap-4 cursor-pointer">
-                    <div className="mt-0.5 w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center bg-primary shrink-0">
-                      <div className="w-2.5 h-2.5 rounded-full bg-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold">VietQR / Ngân hàng nội địa</p>
-                      <p className="text-sm text-muted-foreground">
-                        Quét mã QR bằng app ngân hàng bất kỳ. Hỗ trợ 40+ ngân hàng Việt Nam.
-                      </p>
-                      <div className="mt-3 flex gap-2 flex-wrap">
-                        {["VCB", "TCB", "MB", "ACB", "VPB"].map((bank) => (
-                          <span
-                            key={bank}
-                            className="text-[10px] font-bold bg-muted px-2 py-1 rounded-lg text-muted-foreground"
-                          >
-                            {bank}
-                          </span>
-                        ))}
-                        <span className="text-[10px] font-bold bg-muted px-2 py-1 rounded-lg text-muted-foreground">
-                          +35 nữa
-                        </span>
-                      </div>
-                    </div>
-                    <QrCode className="h-8 w-8 text-primary shrink-0" />
+
+                {/* Tỉnh/Thành phố */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Tỉnh/Thành Phố</label>
+                  <Input
+                    placeholder="Chọn Tỉnh/Thành Phố"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Quận/Huyện */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Quận/Huyện</label>
+                  <Input
+                    placeholder="Chọn Quận/Huyện"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Phường/Xã */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Phường/Xã</label>
+                  <Input
+                    placeholder="Chọn Phường/Xã"
+                    value={ward}
+                    onChange={(e) => setWard(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Địa chỉ */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Địa chỉ</label>
+                  <Input
+                    placeholder="Nhập địa chỉ"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Lưu ý */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-semibold text-muted-foreground">Lưu ý</label>
+                    <span className="text-[10px] text-muted-foreground">{note.length} / 50</span>
                   </div>
+                  <Input
+                    placeholder="Lưu ý ghi chú thêm"
+                    maxLength={50}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+
+                {/* Bottom Buttons: Huỷ bỏ & Xác nhận */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/40">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 rounded-xl font-bold border-[#93C453] text-[#4A7C59] dark:text-[#93C453] hover:bg-[#93C453]/10"
+                    onClick={() => router.back()}
+                  >
+                    Huỷ bỏ
+                  </Button>
 
                   <Button
-                    size="lg"
-                    className="w-full h-14 text-base font-extrabold rounded-2xl shadow-md"
-                    onClick={handleGeneratePayment}
+                    type="button"
+                    className="h-12 rounded-xl font-extrabold bg-[#93C453] hover:bg-[#82B342] text-slate-900 shadow-md flex items-center justify-center gap-2"
+                    onClick={handleConfirmAndPay}
                     disabled={isProcessing || timeLeft <= 0}
                   >
                     {isProcessing ? (
                       <>
-                        <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-                        Đang tạo mã thanh toán...
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Đang xử lý...
                       </>
                     ) : (
                       <>
-                        <QrCode className="mr-2 h-5 w-5" />
-                        Tạo mã QR thanh toán
+                        <ShieldCheck className="h-4 w-4" />
+                        Xác nhận và thanh toán
                       </>
                     )}
                   </Button>
+                </div>
 
-                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <ShieldCheck className="h-4 w-4 text-green-500" />
-                    Thanh toán an toàn, được mã hóa bởi PayOS
-                  </div>
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-1">
+                  <ShieldCheck className="h-4 w-4 text-green-500" />
+                  Hệ thống sẽ chuyển thẳng tới cổng thanh toán VietQR PayOS
                 </div>
               </div>
-            ) : (
-              /* Step 2: Show QR + redirect button */
-              <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="bg-green-500/10 border-b border-green-200/50 dark:border-green-900/30 p-6 text-center">
-                  <h3 className="text-lg font-extrabold text-green-700 dark:text-green-400">
-                    Mã QR đã sẵn sàng!
-                  </h3>
-                  <p className="text-sm text-green-600/80 dark:text-green-400/70 mt-1">
-                    Quét bằng app ngân hàng hoặc ví điện tử của bạn.
-                  </p>
-                </div>
-
-                <div className="p-6 flex flex-col items-center gap-6">
-                  {/* QR Code */}
-                  <div className="relative border-4 border-primary/20 rounded-2xl overflow-hidden shadow-lg">
-                    <Image
-                      src={qrData.qrCode}
-                      alt="Mã QR thanh toán"
-                      width={250}
-                      height={250}
-                      className="block"
-                      unoptimized
-                    />
-                  </div>
-
-                  <div className="text-center space-y-1">
-                    <p className="font-extrabold text-2xl text-primary">
-                      {qrData.amount.toLocaleString("vi-VN")} ₫
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Mã đơn: <span className="font-mono font-bold">{qrData.orderNumber}</span>
-                    </p>
-                  </div>
-
-                  <div className="w-full space-y-3">
-                    <Button
-                      size="lg"
-                      className="w-full h-12 text-base font-bold rounded-2xl"
-                      onClick={() => window.open(qrData.checkoutUrl, "_blank")}
-                    >
-                      Mở cổng thanh toán PayOS
-                      <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full h-12 rounded-2xl"
-                      onClick={() => router.push(`/checkout/${orderId}/status`)}
-                    >
-                      Tôi đã thanh toán xong →
-                    </Button>
-                  </div>
-
-                  <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4 flex gap-3 text-sm text-amber-700 dark:text-amber-400">
-                    <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                    <p>
-                      Đừng đóng trang này. Sau khi thanh toán thành công, hệ thống sẽ tự động xác
-                      nhận đơn hàng của bạn trong vài giây.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

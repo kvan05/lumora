@@ -7,7 +7,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import api from "@/lib/api";
-import QRCode from "qrcode";
+import { EventTicket } from "@/components/ticket/EventTicket";
 
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,52 +33,6 @@ import {
   RotateCcw,
   RefreshCw,
 } from "lucide-react";
-
-// Helper component for QR Code generation
-function QRCodeImage({ text, size = 160 }: { text: string; size?: number }) {
-  const [qrUrl, setQrUrl] = useState<string>("");
-
-  useEffect(() => {
-    if (text) {
-      QRCode.toDataURL(
-        text,
-        {
-          width: size,
-          margin: 1,
-          color: {
-            dark: "#5D4037", // Warm brown matching global text
-            light: "#FFFFFF",
-          },
-        },
-        (err: Error | null | undefined, url: string) => {
-          if (err) console.error("QR Code error:", err);
-          else setQrUrl(url);
-        }
-      );
-    }
-  }, [text, size]);
-
-  if (!qrUrl) {
-    return (
-      <div 
-        className="animate-pulse bg-muted rounded-xl flex items-center justify-center border"
-        style={{ width: size, height: size }}
-      >
-        <span className="text-[10px] text-muted-foreground">Đang tạo QR...</span>
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={qrUrl}
-      alt={`QR Code ${text}`}
-      width={size}
-      height={size}
-      className="mx-auto rounded-xl border-4 border-muted p-1 bg-white shadow-sm"
-    />
-  );
-}
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -272,7 +226,7 @@ export default function OrderDetailPage() {
       {/* Print Specific Styling Header */}
       <div className="hidden print:block text-center pb-6 border-b-2 border-dashed">
         <h1 className="text-3xl font-bold text-primary">LUMORA E-TICKET</h1>
-        <p className="text-muted-foreground text-sm mt-1">Vui lòng xuất trình mã QR dưới đây tại cổng kiểm soát vé</p>
+        <p className="text-muted-foreground text-sm mt-1">Vui lòng xuất trình mã vạch dưới đây tại cổng kiểm soát vé</p>
       </div>
 
       {/* Event Details Card */}
@@ -337,13 +291,9 @@ export default function OrderDetailPage() {
                   <span className="font-semibold">{Number(order.subtotal).toLocaleString("vi-VN")} ₫</span>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground block">Phí dịch vụ</span>
-                  <span className="font-semibold">{Number(order.fees).toLocaleString("vi-VN")} ₫</span>
-                </div>
-                <div>
                   <span className="text-xs text-muted-foreground block">Tổng cộng</span>
-                  <span className="font-extrabold text-primary text-lg">
-                    {Number(order.total).toLocaleString("vi-VN")} ₫
+                  <span className="font-extrabold text-[#4A7C59] dark:text-[#93C453] text-lg">
+                    {Math.max(0, Number(order.subtotal) - Number(order.discount || 0)).toLocaleString("vi-VN")} ₫
                   </span>
                 </div>
               </div>
@@ -359,88 +309,31 @@ export default function OrderDetailPage() {
             <ShieldCheck className="h-5 w-5 text-primary" /> Vé điện tử ({order.items.length})
           </h3>
           <p className="text-sm text-muted-foreground mt-1 no-print">
-            Mỗi vé có một mã QR riêng. Vui lòng quét mã QR tại quầy soát vé để vào cổng.
+            Mỗi vé có mã vạch soát vé riêng. Vui lòng đưa mã vạch tại quầy soát vé để vào cổng.
           </p>
         </div>
 
         {/* E-Ticket Display Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-1 print:gap-10">
-          {order.items.map((item: any, index: number) => {
-            const isItemCheckedIn = item.isCheckedIn;
+        <div className="flex flex-col gap-6">
+          {order.items.map((item: any) => {
+            const ticketTypeName = item.ticketType?.name || (item.seat ? "Vé Có Số Ghế" : "General Admission");
+            const seatLabel = item.seat ? `Hàng ${item.seat.row.rowLabel} — Ghế ${item.seat.seatLabel} (${item.seat.row.section.name})` : undefined;
             
             return (
-              <div 
+              <EventTicket
                 key={item.id}
-                className="relative bg-card border border-border/80 shadow-md rounded-2xl overflow-hidden flex flex-col justify-between min-h-[360px] print:break-inside-avoid print:shadow-none print:border-2"
-              >
-                {/* Visual Ticket Cutouts (semi-circles on sides for realistic ticket look) */}
-                <div className="absolute top-1/2 -left-3 w-6 h-6 rounded-full bg-background border-r border-border/80 -translate-y-1/2 z-10 no-print" />
-                <div className="absolute top-1/2 -right-3 w-6 h-6 rounded-full bg-background border-l border-border/80 -translate-y-1/2 z-10 no-print" />
-
-                {/* E-Ticket Header */}
-                <div className="p-5 bg-muted/30 border-b border-dashed flex justify-between items-start gap-4">
-                  <div className="space-y-1">
-                    <span className="text-[10px] tracking-wider uppercase font-extrabold text-muted-foreground">Vé số {index + 1}</span>
-                    <h4 className="font-extrabold text-base leading-tight text-foreground line-clamp-1">{order.event.title}</h4>
-                  </div>
-                  {isConfirmed && (
-                    isItemCheckedIn ? (
-                      <Badge className="bg-blue-100 hover:bg-blue-100 text-blue-800 border-blue-200 shrink-0">Đã soát vé</Badge>
-                    ) : (
-                      <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-800 border-emerald-200 shrink-0">Chưa sử dụng</Badge>
-                    )
-                  )}
-                  {isCancelled && <Badge variant="destructive" className="shrink-0">Đã hủy</Badge>}
-                  {isRefunded && <Badge className="bg-purple-100 text-purple-800 shrink-0">Hoàn tiền</Badge>}
-                  {isPending && <Badge className="bg-amber-100 text-amber-800 shrink-0">Chưa thanh toán</Badge>}
-                </div>
-
-                {/* E-Ticket Body */}
-                <div className="p-5 flex-1 flex flex-col items-center justify-center gap-4">
-                  {/* QR Code Container (if confirmed/checked-in/pending) */}
-                  {isConfirmed || isPending ? (
-                    <div className="relative">
-                      <QRCodeImage text={item.ticketCode || `PENDING-${item.id}`} size={160} />
-                      {isItemCheckedIn && (
-                        <div className="absolute inset-0 bg-white/80 backdrop-blur-xs flex items-center justify-center rounded-xl flex-col gap-1 select-none">
-                          <ShieldCheck className="h-10 w-10 text-blue-600 animate-bounce" />
-                          <span className="text-sm font-extrabold text-blue-800">Đã Soát Vé</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="w-[160px] h-[160px] rounded-xl bg-muted border border-dashed flex items-center justify-center text-center p-4">
-                      <p className="text-xs text-muted-foreground font-semibold">Vé không hoạt động hoặc đã bị hủy</p>
-                    </div>
-                  )}
-
-                  {/* Seat/Ticket Type Information */}
-                  <div className="text-center space-y-1 mt-1">
-                    <div className="flex items-center justify-center gap-1.5 font-extrabold text-foreground text-lg">
-                      {item.seat ? (
-                        <>
-                          <Armchair className="h-5 w-5 text-primary shrink-0" />
-                          <span>Hàng {item.seat.row.rowLabel} — Ghế {item.seat.seatLabel}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Tag className="h-5 w-5 text-primary shrink-0" />
-                          <span>{item.ticketType?.name || "General Admission"}</span>
-                        </>
-                      )}
-                    </div>
-                    {item.seat && (
-                      <p className="text-xs text-muted-foreground font-medium">Khu vực: {item.seat.row.section.name}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* E-Ticket Footer */}
-                <div className="p-4 bg-muted/20 border-t flex items-center justify-between text-xs text-muted-foreground font-mono">
-                  <span>MÃ VÉ:</span>
-                  <span className="font-bold text-foreground text-sm">{item.ticketCode || "PENDING"}</span>
-                </div>
-              </div>
+                ticketCode={item.ticketCode || `PENDING-${item.id}`}
+                eventTitle={order.event.title}
+                bannerUrl={order.event.bannerUrl}
+                category={order.event.category || "Sự kiện"}
+                ticketType={ticketTypeName}
+                startDate={order.event.startDate}
+                venue={order.event.venue}
+                city={order.event.city}
+                seatInfo={seatLabel}
+                status={order.status}
+                isCheckedIn={item.isCheckedIn}
+              />
             );
           })}
         </div>

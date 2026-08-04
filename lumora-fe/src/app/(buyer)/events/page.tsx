@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import api from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,13 +23,24 @@ const CITIES = ["Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Phan Thiết", "C
 
 export default function EventsPage() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [city, setCity] = useState("");
+  const searchParams = useSearchParams();
+
+  const [search, setSearch] = useState(() => searchParams.get("search") || "");
+  const [category, setCategory] = useState(() => searchParams.get("category") || "");
+  const [city, setCity] = useState(() => searchParams.get("city") || "");
   const [priceRange, setPriceRange] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [sortBy, setSortBy] = useState("latest");
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    const catParam = searchParams.get("category") || "";
+    const searchParam = searchParams.get("search") || "";
+    const cityParam = searchParams.get("city") || "";
+    setCategory(catParam);
+    setSearch(searchParam);
+    setCity(cityParam);
+  }, [searchParams]);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["events", search, category, city, priceRange, dateFilter, sortBy],
@@ -219,51 +230,36 @@ export default function EventsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {data?.map((event: any) => (
-            <Link key={event.id} href={`/events/${event.slug || event.id}`} className="group h-full flex">
-              <Card className="rounded-2xl border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg overflow-hidden flex flex-col w-full h-full">
-                <div className="relative aspect-[4/3] bg-muted overflow-hidden">
-                  {event.bannerUrl ? (
-                    <Image src={event.bannerUrl} alt={event.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-primary/5 group-hover:bg-primary/10 transition-colors duration-500">
-                      <span className="text-primary/40 font-bold uppercase tracking-widest">{event.category}</span>
-                    </div>
-                  )}
-                  <div className="absolute top-3 left-3 flex gap-2">
-                    <Badge className="bg-background/90 text-foreground backdrop-blur-sm hover:bg-background/90">
-                      {event.category}
-                    </Badge>
+            <Link key={event.id} href={`/events/${event.slug || event.id}`} className="group block">
+              <div className="relative aspect-[3/4] w-full rounded-3xl overflow-hidden shadow-md group-hover:shadow-2xl group-hover:-translate-y-1.5 transition-all duration-300 border border-slate-200/80 dark:border-slate-800 bg-slate-900">
+                {event.bannerUrl ? (
+                  <Image src={event.bannerUrl} alt={event.title} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-[#A8C7DC]/40 text-white font-black text-3xl">
+                    {event.title.substring(0, 2).toUpperCase()}
                   </div>
-                  <div className="absolute top-3 right-3 z-10">
-                    <FavoriteButton eventId={event.id} variant="outline" className="bg-background/80 backdrop-blur border border-border/60 shadow-sm h-8 w-8" />
+                )}
+
+                <div className="absolute top-3.5 left-3.5 flex gap-2 z-10">
+                  <Badge className="bg-[#93C453] text-slate-900 shadow-md text-xs px-3 py-1 rounded-full font-extrabold border-none">
+                    {event.category || "Sự kiện"}
+                  </Badge>
+                </div>
+
+                <div className="absolute top-3.5 right-3.5 z-10">
+                  <FavoriteButton eventId={event.id} variant="outline" className="bg-background/80 backdrop-blur border border-border/60 shadow-sm h-8 w-8" />
+                </div>
+
+                {/* Hover Overlay with CTA */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-5 z-10">
+                  <div className="text-white space-y-1.5">
+                    <h4 className="font-extrabold text-base leading-snug line-clamp-2 text-white">{event.title}</h4>
+                    <p className="text-xs text-[#93C453] font-black flex items-center gap-1">
+                      Bấm để xem chi tiết sự kiện <ChevronRight className="h-3.5 w-3.5" />
+                    </p>
                   </div>
                 </div>
-                <CardContent className="p-5 flex flex-col flex-1">
-                  <h3 className="font-bold text-lg leading-tight line-clamp-2 group-hover:text-primary transition-colors">{event.title}</h3>
-                  <div className="mt-3 space-y-2 text-sm text-muted-foreground flex-1">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 shrink-0 text-primary/70" />
-                      <span>{format(new Date(event.startDate), "EEEE, dd/MM/yyyy", { locale: vi })}</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 shrink-0 text-primary/70 mt-0.5" />
-                      <span className="line-clamp-1">{event.venue}, {event.city}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-5 pt-4 border-t border-border/50 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Từ</p>
-                      <p className="font-black text-primary">
-                          {event.minPrice ? `${Number(event.minPrice).toLocaleString("vi-VN")} ₫` : "Liên hệ"}
-                      </p>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary transition-colors">
-                      <ChevronRight className="h-4 w-4 text-primary group-hover:text-primary-foreground" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              </div>
             </Link>
           ))}
         </div>

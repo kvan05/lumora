@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as EventController from "../controllers/event.controller";
 import { authenticate, optionalAuth } from "../middleware/auth.middleware";
-import { requireSeller } from "../middleware/role.middleware";
+import { requireSeller, requireAdmin } from "../middleware/role.middleware";
 
 export const eventRoutes = Router();
 
@@ -15,5 +15,5 @@ eventRoutes.get("/:slug", optionalAuth, EventController.getEventBySlug);
 // ── Seller routes ──────────────────────────────────────────────────────
 eventRoutes.post("/", authenticate, requireSeller, EventController.createEvent);
 eventRoutes.put("/:id", authenticate, requireSeller, EventController.updateEvent);
-eventRoutes.patch("/:id/status", authenticate, requireSeller, EventController.updateEventStatus);
+eventRoutes.patch("/:id/status", authenticate, requireAdmin, EventController.updateEventStatus);
 eventRoutes.delete("/:id", authenticate, requireSeller, EventController.deleteEvent);

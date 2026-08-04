@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Session } from "next-auth";
 import { signOut } from "next-auth/react";
@@ -103,16 +104,20 @@ export default function AdminShell({ children, session }: { children: React.Reac
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={cn("flex items-center gap-3 px-4 py-5 border-b border-border/50", collapsed && "justify-center px-3")}>
-        <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/60 rounded-xl flex items-center justify-center shrink-0">
-          <ShieldCheck className="h-4 w-4 text-white" />
-        </div>
-        {!collapsed && (
-          <div>
-            <h1 className="font-black text-base tracking-tight leading-none">Lumora</h1>
-            <p className="text-[10px] text-muted-foreground font-medium tracking-widest uppercase mt-0.5">Admin Portal</p>
-          </div>
-        )}
+      <div className={cn("flex items-center gap-2 px-4 py-4 border-b border-border/50", collapsed && "justify-center px-2")}>
+        <Link href="/" className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="Lumora Admin"
+            className="h-8 w-auto object-contain"
+          />
+          {!collapsed && (
+            <span className="text-[10px] bg-[#EB5B95] text-white px-2 py-0.5 rounded-full font-black uppercase tracking-wider shrink-0">
+              Admin
+            </span>
+          )}
+        </Link>
       </div>
 
       {/* Navigation */}

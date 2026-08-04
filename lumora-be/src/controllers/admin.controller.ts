@@ -154,14 +154,62 @@ export async function getEvents(req: Request, res: Response, next: NextFunction)
 export async function approveEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { status } = req.body; // PUBLISHED or REJECTED
+    const { status, approvalNote } = req.body; // PUBLISHED or REJECTED
 
     const updated = await prisma.event.update({
       where: { id: id as string },
-      data: { status },
+      data: {
+        status,
+        approvalNote,
+        approvedAt: status === "PUBLISHED" ? new Date() : undefined,
+        approvedById: req.user?.userId,
+      },
     });
 
-    res.json({ success: true, message: `Cập nhật trạng thái sự kiện thành ${status}`, data: updated });
+    res.json({ success: true, message: `Đã cập nhật trạng thái sự kiện thành ${status === "PUBLISHED" ? "Đã duyệt" : "Từ chối"}`, data: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleEditRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { action, approvalNote } = req.body; // "ACCEPT" or "REJECT"
+
+    const event = await prisma.event.findUnique({ where: { id: id as string } });
+    if (!event) throw createError("Sự kiện không tồn tại", 404);
+
+    if (action === "ACCEPT") {
+      if (!event.pendingChanges) {
+        throw createError("Không có yêu cầu chỉnh sửa nào đang chờ duyệt", 400);
+      }
+
+      const changes = JSON.parse(event.pendingChanges);
+
+      const updated = await prisma.event.update({
+        where: { id: id as string },
+        data: {
+          ...changes,
+          pendingChanges: null,
+          editRequestStatus: "APPROVED",
+          approvalNote: approvalNote || "Đã duyệt yêu cầu chỉnh sửa thông tin sự kiện",
+        },
+      });
+
+      res.json({ success: true, message: "Đã duyệt và áp dụng thông tin chỉnh sửa mới cho sự kiện.", data: updated });
+    } else {
+      const updated = await prisma.event.update({
+        where: { id: id as string },
+        data: {
+          pendingChanges: null,
+          editRequestStatus: "REJECTED",
+          approvalNote: approvalNote || "Đã từ chối yêu cầu chỉnh sửa thông tin sự kiện",
+        },
+      });
+
+      res.json({ success: true, message: "Đã từ chối yêu cầu chỉnh sửa sự kiện.", data: updated });
+    }
   } catch (err) {
     next(err);
   }

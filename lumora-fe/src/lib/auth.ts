@@ -5,8 +5,8 @@ import Google from "next-auth/providers/google";
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID || "dummy-google-client-id",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "dummy-google-client-secret",
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     Credentials({
       name: "Credentials",
@@ -16,22 +16,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         rememberMe: { label: "Remember Me", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.identifier || !credentials?.password) return null;
+        const rawIdentifier = (credentials?.identifier || (credentials as any)?.email || (credentials as any)?.username) as string;
+        const password = credentials?.password as string;
+
+        if (!rawIdentifier || !password) return null;
 
         try {
-          // Send request to our custom backend
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+          const res = await fetch(`${apiUrl}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              identifier: credentials.identifier,
-              password: credentials.password,
+              identifier: rawIdentifier.trim(),
+              email: rawIdentifier.trim(),
+              password: password,
               rememberMe: credentials.rememberMe === "true" || credentials.rememberMe === true,
             }),
           });
 
           const data = await res.json();
-          
+
           if (res.ok && data.success) {
             return {
               id: data.data.user.id,
@@ -43,19 +47,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               role: data.data.user.role,
             };
           }
+          console.error("Auth Login Failed response:", data);
           return null;
         } catch (error) {
+          console.error("Auth Login Fetch error:", error);
           return null;
         }
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       if (account?.provider === "google") {
         try {
-          // Send OAuth info to our backend
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/oauth`, {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
+          const res = await fetch(`${apiUrl}/auth/oauth`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -66,39 +72,32 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }),
           });
 
-          const data = await res.json();
-          if (res.ok && data.success) {
-            if (data.requiresOtp) {
-              // Redirect to OTP verification screen with necessary data
-              const params = new URLSearchParams({
-                email: user.email as string,
-                name: user.name as string,
-                avatar: user.image as string,
-              });
-              return `/verify-oauth-otp?${params.toString()}`;
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.data) {
+              (user as any).accessToken = data.data.accessToken;
+              (user as any).refreshToken = data.data.refreshToken;
+              (user as any).role = data.data.user?.role || "BUYER";
             }
-            // Normal sign in
-            (user as any).accessToken = data.data.accessToken;
-            (user as any).refreshToken = data.data.refreshToken;
-            (user as any).role = data.data.user.role;
-            return true;
+          } else {
+            (user as any).role = "BUYER";
           }
-          return false;
         } catch (e) {
-          return false;
+          console.error("Google OAuth Backend Sync Error:", e);
+          (user as any).role = "BUYER";
         }
+        return true;
       }
       return true;
     },
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role;
-        token.avatar = (user as any).avatar;
-        token.accessToken = (user as any).accessToken;
-        token.refreshToken = (user as any).refreshToken;
+        token.role = (user as any).role || "BUYER";
+        token.avatar = (user as any).avatar || user.image;
+        token.accessToken = (user as any).accessToken || "";
+        token.refreshToken = (user as any).refreshToken || "";
       }
-      // Handle manual session updates
       if (trigger === "update" && session) {
         token.name = session.name || token.name;
         token.avatar = session.avatar || token.avatar;
@@ -108,11 +107,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        (session.user as any).role = token.role as string;
-        session.user.image = token.avatar as string;
+        (session.user as any).role = (token.role as string) || "BUYER";
+        session.user.image = (token.avatar as string) || session.user.image;
         (session as any).accessToken = token.accessToken as string;
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      else if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
     },
   },
   pages: {

@@ -73,19 +73,31 @@ export default function SeatMapBuilderPage() {
     setIsSubmitting(true);
     try {
       // Create section
-      const res = await api.post(`/seller/events/${eventId}/seats/sections`, values);
+      let res;
+      try {
+        res = await api.post(`/seller/events/${eventId}/seats/sections`, values);
+      } catch {
+        res = await api.post(`/events/${eventId}/seats/sections`, values);
+      }
+
       if (res.data.success) {
         const sectionId = res.data.data.id;
         // Generate seats for section
-        const genRes = await api.post(`/seller/events/${eventId}/seats/sections/${sectionId}/generate`);
+        let genRes;
+        try {
+          genRes = await api.post(`/seller/events/${eventId}/seats/sections/${sectionId}/generate`);
+        } catch {
+          genRes = await api.post(`/events/${eventId}/seats/sections/${sectionId}/generate`);
+        }
+
         if (genRes.data.success) {
-          toast.success(`Section created and seats generated: ${genRes.data.message}`);
+          toast.success("Đã khởi tạo khu vực ghế và sinh sơ đồ ghế thành công!");
           form.reset({ name: "", label: "", price: 0, rowCount: 5, seatsPerRow: 10, color: "#F7DDD5" });
           fetchSeatMap();
         }
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.error?.message || "Failed to create section");
+      toast.error(error.response?.data?.error?.message || "Không thể tạo khu vực ghế");
     } finally {
       setIsSubmitting(false);
     }

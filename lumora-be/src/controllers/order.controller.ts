@@ -123,8 +123,8 @@ export async function createOrder(
         }
       }
 
-      const serviceFee = Math.round(subtotal * 0.02); // 2% service fee
-      const total = subtotal + serviceFee;
+      const serviceFee = 0; // Phí dịch vụ cho khách hàng = 0đ (phí dịch vụ 2%-5% sẽ khấu trừ từ doanh thu nhà cung cấp Seller khi đối soát)
+      const total = subtotal;
 
       const newOrder = await tx.order.create({
         data: {

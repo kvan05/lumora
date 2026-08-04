@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -20,7 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff, Mail, Lock, User, AtSign, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, RefreshCw, MailCheck } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
   InputOTP,
@@ -29,60 +29,78 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 
-const step1Schema = z.object({
-  name: z.string().min(2, { message: "Tên phải có ít nhất 2 ký tự" }),
-  username: z.string().min(3, { message: "Username phải có ít nhất 3 ký tự" })
-    .regex(/^[a-zA-Z0-9_]+$/, { message: "Username chỉ được chứa chữ cái, số và dấu gạch dưới" }),
-  email: z.string().email({ message: "Email không hợp lệ" }),
-  password: z.string().min(6, { message: "Mật khẩu phải có ít nhất 6 ký tự" }),
+const registerSchema = z.object({
+  name: z.string().min(2, { message: "Họ và tên phải có ít nhất 2 ký tự" }),
+  email: z.string().email({ message: "Địa chỉ email không hợp lệ" }),
+  password: z
+    .string()
+    .min(8, { message: "Mật khẩu phải có tối thiểu 8 ký tự" })
+    .regex(/[A-Z]/, { message: "Mật khẩu phải chứa ít nhất 1 chữ hoa" })
+    .regex(/[a-z]/, { message: "Mật khẩu phải chứa ít nhất 1 chữ thường" })
+    .regex(/[0-9]/, { message: "Mật khẩu phải chứa ít nhất 1 chữ số" }),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Mật khẩu xác nhận không khớp",
   path: ["confirmPassword"],
 });
 
-type Step1Values = z.infer<typeof step1Schema>;
+type RegisterValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  const [otp, setOtp] = useState("");
-  const [formData, setFormData] = useState<Step1Values | null>(null);
+  const [countdown, setCountdown] = useState(60);
 
-  const form = useForm<Step1Values>({
-    resolver: zodResolver(step1Schema),
+  const form = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
       name: "",
-      username: "",
       email: "",
       password: "",
       confirmPassword: "",
     },
   });
 
-  async function onStep1Submit(values: Step1Values) {
+  // Countdown timer for 60s cooldown on resend OTP
+  useEffect(() => {
+    if (step !== 2 || countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [step, countdown]);
+
+  async function onRegisterSubmit(values: RegisterValues) {
     setIsLoading(true);
     try {
+      const email = values.email.trim();
       const res = await api.post("/auth/register", {
-        name: values.name,
-        username: values.username,
-        email: values.email,
+        name: values.name.trim(),
+        email,
         password: values.password,
-        role: "BUYER",
       });
 
-      if (res.data.requiresOtp) {
-        setFormData(values);
+      if (res.data.success) {
+        setRegisteredEmail(email);
         setStep(2);
-        toast.success(res.data.message || "Đã gửi mã xác thực tới email của bạn.");
+        setCountdown(60);
+        toast.success(res.data.message || "Đã gửi mã xác thực 6 số tới email của bạn.");
       }
     } catch (error: any) {
-      const message = error.response?.data?.error?.message || "Đăng ký thất bại. Vui lòng thử lại.";
+      console.error("Register Error Details:", error?.response?.data || error);
+      const message =
+        error.response?.data?.error?.message ||
+        error.response?.data?.message ||
+        (typeof error.response?.data?.error === "string" ? error.response.data.error : null) ||
+        error.message ||
+        "Đăng ký thất bại. Vui lòng thử lại.";
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -90,55 +108,94 @@ export default function RegisterPage() {
   }
 
   async function onVerifyOtp() {
-    if (otp.length !== 6 || !formData) return;
-    
+    if (!registeredEmail || otp.length !== 6) {
+      toast.error("Vui lòng nhập đầy đủ 6 chữ số OTP.");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const res = await api.post("/auth/register/verify", {
-        name: formData.name,
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        otp: otp,
-        role: "BUYER",
+      const res = await api.post("/auth/verify", {
+        email: registeredEmail,
+        otp,
       });
 
       if (res.data.success) {
-        toast.success("Tạo tài khoản thành công! Bạn có thể đăng nhập ngay.");
+        toast.success("Xác thực tài khoản thành công! Vui lòng đăng nhập.");
         router.push("/login");
       }
     } catch (error: any) {
-      const message = error.response?.data?.error?.message || "Xác thực OTP thất bại.";
+      console.error("Verify OTP Error Details:", error?.response?.data || error);
+      const message =
+        error.response?.data?.error?.message ||
+        error.response?.data?.message ||
+        (typeof error.response?.data?.error === "string" ? error.response.data.error : null) ||
+        "Mã OTP không hợp lệ hoặc đã hết hạn.";
       toast.error(message);
     } finally {
       setIsLoading(false);
     }
   }
 
-  const handleOAuthSignIn = async (provider: "google") => {
-    if (provider === "google") setIsGoogleLoading(true);
+  async function onResendOtp() {
+    if (countdown > 0 || isResending || !registeredEmail) return;
+
+    setIsResending(true);
     try {
-      await signIn(provider, { callbackUrl: "/" });
+      const res = await api.post("/auth/resend-otp", { email: registeredEmail });
+      if (res.data.success) {
+        toast.success(res.data.message || "Mã OTP mới đã được gửi về email.");
+        setCountdown(60);
+        setOtp("");
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.error?.message || error.response?.data?.message || "Không thể gửi lại mã OTP.";
+      toast.error(message);
+    } finally {
+      setIsResending(false);
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      await signIn("google", { callbackUrl: "/" });
     } catch (error) {
-      toast.error("Lỗi đăng ký bằng mạng xã hội.");
+      toast.error("Lỗi đăng nhập bằng tài khoản Google.");
       setIsGoogleLoading(false);
     }
   };
 
+  // STEP 2: SCREEN NHẬP MÃ OTP
   if (step === 2) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in duration-300">
         <div className="space-y-2">
-          <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="-ml-3 mb-2 h-8 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Quay lại
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setStep(1)}
+            className="-ml-3 mb-1 h-8 text-xs font-semibold text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Quay lại sửa thông tin
           </Button>
-          <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác thực Email ✉️</h2>
-          <p className="text-sm text-muted-foreground">
-            Nhập mã gồm 6 chữ số đã được gửi tới <strong>{formData?.email}</strong>.
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+              <MailCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác thực Email ✉️</h2>
+              <p className="text-xs text-muted-foreground">Mã OTP gồm 6 chữ số có hiệu lực trong 5 phút</p>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground pt-2">
+            Mã xác minh đã được gửi đến: <strong className="text-foreground font-bold">{registeredEmail}</strong>.
           </p>
         </div>
 
-        <div className="flex justify-center py-6">
+        {/* 6-DIGIT OTP INPUT */}
+        <div className="flex flex-col items-center justify-center py-4 space-y-4">
           <InputOTP
             maxLength={6}
             value={otp}
@@ -146,76 +203,81 @@ export default function RegisterPage() {
             disabled={isLoading}
           >
             <InputOTPGroup>
-              <InputOTPSlot index={0} className="w-12 h-14 text-lg" />
-              <InputOTPSlot index={1} className="w-12 h-14 text-lg" />
-              <InputOTPSlot index={2} className="w-12 h-14 text-lg" />
+              <InputOTPSlot index={0} className="w-12 h-14 text-xl font-bold font-mono" />
+              <InputOTPSlot index={1} className="w-12 h-14 text-xl font-bold font-mono" />
+              <InputOTPSlot index={2} className="w-12 h-14 text-xl font-bold font-mono" />
             </InputOTPGroup>
             <InputOTPSeparator />
             <InputOTPGroup>
-              <InputOTPSlot index={3} className="w-12 h-14 text-lg" />
-              <InputOTPSlot index={4} className="w-12 h-14 text-lg" />
-              <InputOTPSlot index={5} className="w-12 h-14 text-lg" />
+              <InputOTPSlot index={3} className="w-12 h-14 text-xl font-bold font-mono" />
+              <InputOTPSlot index={4} className="w-12 h-14 text-xl font-bold font-mono" />
+              <InputOTPSlot index={5} className="w-12 h-14 text-xl font-bold font-mono" />
             </InputOTPGroup>
           </InputOTP>
         </div>
 
         <Button
           onClick={onVerifyOtp}
-          className="w-full h-11 font-bold text-base rounded-xl shadow-sm"
           disabled={isLoading || otp.length !== 6}
+          className="w-full h-12 font-extrabold text-base rounded-xl shadow-md bg-primary hover:bg-primary/90 text-primary-foreground"
         >
-          {isLoading ? "Đang xác nhận..." : "Hoàn tất đăng ký"}
+          {isLoading ? "Đang kiểm tra mã..." : "Hoàn tất xác minh & Đăng ký"}
         </Button>
+
+        {/* RESEND OTP */}
+        <div className="pt-2 text-center text-sm">
+          <p className="text-muted-foreground text-xs">Chưa nhận được mã xác thực?</p>
+          <Button
+            type="button"
+            variant="link"
+            onClick={onResendOtp}
+            disabled={countdown > 0 || isResending}
+            className="font-bold text-primary text-xs mt-0.5"
+          >
+            {isResending ? (
+              <span className="flex items-center gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Đang gửi lại mã...
+              </span>
+            ) : countdown > 0 ? (
+              `Gửi lại mã sau (${countdown}s)`
+            ) : (
+              "Gửi lại mã OTP mới"
+            )}
+          </Button>
+        </div>
       </div>
     );
   }
 
+  // STEP 1: SCREEN ĐĂNG KÝ THÔNG TIN
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <div className="space-y-1">
         <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Tạo tài khoản mới 🎉</h2>
         <p className="text-sm text-muted-foreground">
-          Đăng ký để bắt đầu đặt vé cho các sự kiện yêu thích.
+          Đăng ký bằng email của bạn để trải nghiệm mua vé dễ dàng.
         </p>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onStep1Submit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-semibold">Họ và tên</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Nguyễn Văn A" className="pl-10" autoComplete="name" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-semibold">Username</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="nguyenvana" className="pl-10" autoComplete="username" {...field} />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          
+        <form onSubmit={form.handleSubmit(onRegisterSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-semibold">Họ và tên</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Nguyễn Văn A" className="pl-10" autoComplete="name" {...field} />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <FormField
             control={form.control}
             name="email"
@@ -238,6 +300,7 @@ export default function RegisterPage() {
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="password"
@@ -249,7 +312,7 @@ export default function RegisterPage() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Ít nhất 6 ký tự"
+                      placeholder="Tối thiểu 8 ký tự, có chữ hoa, thường & số"
                       className="pl-10 pr-10"
                       autoComplete="new-password"
                       {...field}
@@ -268,6 +331,7 @@ export default function RegisterPage() {
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="confirmPassword"
@@ -298,12 +362,13 @@ export default function RegisterPage() {
               </FormItem>
             )}
           />
+
           <Button
             type="submit"
-            className="w-full h-11 font-bold text-base rounded-xl shadow-sm mt-2"
+            className="w-full h-11 font-extrabold text-base rounded-xl shadow-sm mt-2"
             disabled={isLoading || isGoogleLoading}
           >
-            {isLoading ? "Đang xử lý..." : "Đăng ký"}
+            {isLoading ? "Đang gửi mã OTP..." : "Đăng ký & Nhận mã OTP"}
           </Button>
         </form>
       </Form>
@@ -321,7 +386,7 @@ export default function RegisterPage() {
         <Button 
           variant="outline" 
           className="w-full h-11 rounded-xl font-semibold bg-background hover:bg-muted"
-          onClick={() => handleOAuthSignIn("google")}
+          onClick={handleGoogleSignIn}
           disabled={isLoading || isGoogleLoading}
         >
           {isGoogleLoading ? (
@@ -334,14 +399,14 @@ export default function RegisterPage() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
             </svg>
           )}
-          Google
+          Đăng nhập bằng Google
         </Button>
       </div>
 
       <div className="text-center text-sm text-muted-foreground">
         Đã có tài khoản?{" "}
         <Link href="/login" className="text-primary font-semibold hover:underline">
-          Đăng nhập
+          Đăng nhập ngay
         </Link>
       </div>
     </div>

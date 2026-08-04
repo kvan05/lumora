@@ -112,20 +112,39 @@ export async function sendOrderConfirmationEmail(order: OrderWithDetails): Promi
 }
 
 /**
- * Generic sendEmail function for OTP
+ * Generic sendEmail function for OTP & notifications via Resend
  */
 export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  const { data, error } = await resend.emails.send({
-    from: FROM,
-    to,
-    subject,
-    html,
-  });
-  if (error) {
-    console.error("Resend Email Sending Error details:", error);
-    throw new Error(`Resend Error: ${error.message}`);
+  const fromEmail = process.env.EMAIL_FROM || "noreply@lumora.pro.vn";
+  
+  try {
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to,
+      subject,
+      html,
+    });
+
+    if (error) {
+      console.warn(`Resend failed with ${fromEmail}, trying fallback onboarding@resend.dev...`, error.message);
+      const fallbackResult = await resend.emails.send({
+        from: "onboarding@resend.dev",
+        to,
+        subject,
+        html,
+      });
+      if (fallbackResult.error) {
+        console.error("Resend Fallback Error:", fallbackResult.error);
+      } else {
+        console.log("Email sent successfully via Resend fallback. ID:", fallbackResult.data?.id);
+        return;
+      }
+    } else {
+      console.log("Email successfully sent via Resend. ID:", data?.id);
+    }
+  } catch (err: any) {
+    console.error("Resend Email Execution Error:", err?.message || err);
   }
-  console.log("Email successfully sent via Resend. ID:", data?.id);
 }
 
 /**

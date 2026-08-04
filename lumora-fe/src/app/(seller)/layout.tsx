@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -19,8 +20,10 @@ export default async function SellerLayout({ children }: { children: ReactNode }
     <div className="flex min-h-screen bg-muted/20">
       {/* Mobile Topbar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 border-b bg-background/95 backdrop-blur z-30 flex items-center justify-between px-4 shadow-sm">
-        <Link href="/" className="flex items-center gap-2 font-extrabold text-primary">
-          <span className="text-xl tracking-tight">Lumora Seller</span>
+        <Link href="/" className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Lumora Seller" className="h-8 w-auto object-contain" />
+          <span className="text-[10px] bg-[#93C453] text-slate-900 px-2 py-0.5 rounded-full font-black uppercase">Seller</span>
         </Link>
         <div className="flex items-center gap-2">
           <ThemeToggle />
@@ -32,8 +35,10 @@ export default async function SellerLayout({ children }: { children: ReactNode }
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-72 flex flex-col">
               <div className="flex h-16 items-center border-b px-6">
-                <Link href="/" className="font-extrabold text-primary text-2xl tracking-tight">
-                  Lumora
+                <Link href="/" className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/logo.png" alt="Lumora" className="h-8 w-auto object-contain" />
+                  <span className="text-[10px] bg-[#93C453] text-slate-900 px-2 py-0.5 rounded-full font-black uppercase">Seller</span>
                 </Link>
               </div>
               <SellerNav />
@@ -44,13 +49,11 @@ export default async function SellerLayout({ children }: { children: ReactNode }
 
       {/* Desktop Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 flex-col border-r bg-card/60 backdrop-blur-xl lg:flex shadow-sm">
-        <div className="flex h-20 items-center px-8 border-b border-border/40">
-          <Link href="/" className="flex items-center gap-2 font-extrabold text-primary transition-opacity hover:opacity-80">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <span className="text-lg">✨</span>
-            </div>
-            <span className="text-2xl tracking-tight">Lumora</span>
-            <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full ml-1">Seller</span>
+        <div className="flex h-20 items-center px-6 border-b border-border/40">
+          <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Lumora Seller" className="h-9 w-auto object-contain" />
+            <span className="text-[10px] bg-[#93C453] text-slate-900 px-2 py-0.5 rounded-full font-black uppercase shrink-0">Seller</span>
           </Link>
         </div>
         <SellerNav />

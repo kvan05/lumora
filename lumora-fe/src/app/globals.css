@@ -5,52 +5,52 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #FFF5F8; /* Soft cute pinkish-white */
-  --foreground: #5D4037; /* Warm soft brown text */
+  --background: #FAF7F2; /* Warm Cream Ivory Base */
+  --foreground: #0F172A; /* Slate Dark Text */
   --card: #FFFFFF;
-  --card-foreground: #5D4037;
+  --card-foreground: #0F172A;
   --popover: #FFFFFF;
-  --popover-foreground: #5D4037;
-  --primary: #FFA6C9; /* Carnation Pink - very cute */
-  --primary-foreground: #FFFFFF; /* White text on pink */
-  --secondary: #B5EAD7; /* Pastel Mint */
-  --secondary-foreground: #5D4037;
-  --muted: #FCE4EC; /* Light pink muted bg */
-  --muted-foreground: #8D6E63;
-  --accent: #FFF5BA; /* Pastel Yellow */
-  --accent-foreground: #5D4037;
-  --destructive: #FF9AA2; /* Soft pastel red */
-  --destructive-foreground: #5D4037;
-  --border: #F8BBD0; /* Soft pink border */
-  --input: #F8BBD0;
-  --ring: #FFA6C9;
-  --radius: 1rem; /* Bubbly, cute rounded corners */
-  --success: #C8E6C9; /* Cute light green */
-  --success-dark: #81C784;
+  --popover-foreground: #0F172A;
+  --primary: #93C453; /* Tone 1: Fresh Lime Green */
+  --primary-foreground: #0F172A;
+  --secondary: #A8C7DC; /* Tone 2: Sky Powder Blue */
+  --secondary-foreground: #0F172A;
+  --accent: #EB5B95; /* Tone 3: Candy Pop Pink */
+  --accent-foreground: #FFFFFF;
+  --muted: #EBF4FA; /* Soft Powder Blue Tint */
+  --muted-foreground: #475569;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #93C453;
+  --radius: 1rem;
+  --success: #93C453;
+  --success-dark: #4A7C59;
 }
 
 .dark {
-  --background: #2D1B19; /* Dark Cacao base */
-  --foreground: #FAF7F4;
-  --card: #3A2320;
-  --card-foreground: #FAF7F4;
-  --popover: #3A2320;
-  --popover-foreground: #FAF7F4;
-  --primary: #6B403B; /* Cacao */
-  --primary-foreground: #FAF7F4;
-  --secondary: #65613F; /* Jungle */
-  --secondary-foreground: #FAF7F4;
-  --muted: #4B5263; /* Darker Sky */
-  --muted-foreground: #CCC3D1;
-  --accent: #D8A4AF; /* Dusty Rose */
-  --accent-foreground: #FAF7F4;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #f8fafc;
-  --border: #4a3633;
-  --input: #4a3633;
-  --ring: #6B403B;
-  --success: #8D8B4C;
-  --success-dark: #65613F;
+  --background: #0F172A; /* Sleek Dark Charcoal */
+  --foreground: #F8FAFC;
+  --card: #1E293B; /* Slate Card Background */
+  --card-foreground: #F8FAFC;
+  --popover: #1E293B;
+  --popover-foreground: #F8FAFC;
+  --primary: #93C453; /* Vibrant Lime Green */
+  --primary-foreground: #0F172A;
+  --secondary: #2C4A60; /* Dark Sky Powder Blue */
+  --secondary-foreground: #F8FAFC;
+  --accent: #EB5B95; /* Candy Pop Pink */
+  --accent-foreground: #FFFFFF;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #334155;
+  --input: #334155;
+  --ring: #93C453;
+  --success: #93C453;
+  --success-dark: #4A7C59;
 }
 
 @theme inline {
@@ -90,4 +90,11 @@
     color: var(--foreground);
     font-family: Arial, Helvetica, sans-serif;
   }
+}
+
+/* Barcode scanner animation */
+@keyframes scan {
+  0% { transform: translateY(-60px); opacity: 0.8; }
+  50% { transform: translateY(60px); opacity: 1; }
+  100% { transform: translateY(-60px); opacity: 0.8; }
 }

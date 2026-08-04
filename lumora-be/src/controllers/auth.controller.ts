@@ -8,205 +8,269 @@ import {
   verifyRefreshToken,
   getExpiryDate,
 } from "../utils/jwt";
-import { sendOtpEmail, verifyOtp } from "../utils/otp";
+import { sendEmail } from "../utils/email";
 
-// ─── Register Step 1 (Send OTP) ─────────────────────────────────────────
+// Helper: Generate 6-digit numeric OTP
+function generate6DigitOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Helper: Validate password strength (min 8 chars, 1 upper, 1 lower, 1 number)
+function validatePasswordStrength(password: string): boolean {
+  const minLength = password.length >= 8;
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  return minLength && hasUpper && hasLower && hasNumber;
+}
+
+// ─── 1. Register (Step 1: Save EmailVerification & Send OTP via Resend) ─────
 export async function register(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const { email, username, password, name, role = "BUYER" } = req.body;
+    const { name, email, password } = req.body;
 
-    if (!email || !username || !password || !name) {
-      throw createError("Email, username, password and name are required", 400, "VALIDATION_ERROR");
+    if (!name || !email || !password) {
+      throw createError("Họ tên, email và mật khẩu là bắt buộc", 400, "VALIDATION_ERROR");
     }
 
-    // Only BUYER and SELLER roles allowed on self-register
-    const validRoles = ["BUYER", "SELLER"];
-    if (!validRoles.includes(role)) {
-      throw createError("Invalid role", 400, "INVALID_ROLE");
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw createError("Định dạng email không hợp lệ", 400, "INVALID_EMAIL");
     }
 
-    // Check email
-    const existingEmail = await prisma.user.findUnique({ where: { email } });
-    if (existingEmail) {
-      throw createError("Email đã tồn tại", 409, "EMAIL_EXISTS");
+    // Validate password strength
+    if (!validatePasswordStrength(password)) {
+      throw createError(
+        "Mật khẩu phải chứa tối thiểu 8 ký tự, bao gồm ít nhất 1 chữ hoa, 1 chữ thường và 1 chữ số",
+        400,
+        "WEAK_PASSWORD"
+      );
     }
 
-    // Check username
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
-    if (existingUsername) {
-      throw createError("Username đã tồn tại", 409, "USERNAME_EXISTS");
+    // Check if user with this email already exists and is verified
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser && existingUser.isVerified) {
+      throw createError("Email này đã được sử dụng. Vui lòng đăng nhập", 409, "EMAIL_EXISTS");
     }
 
-    // Generate verify token and send email
-    try {
-      await sendOtpEmail(email, "REGISTER");
-    } catch (e) {
-      console.error("Failed to send OTP email:", e);
-      throw createError("Lỗi khi gửi email xác thực.", 500);
-    }
+    // Generate 6-digit OTP & 5 minutes expiry
+    const otp = generate6DigitOtp();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    res.status(200).json({ 
-      success: true, 
-      requiresOtp: true,
-      message: "Đã gửi mã xác thực tới email. Vui lòng kiểm tra hộp thư." 
+    // Save or update in EmailVerification table
+    await prisma.emailVerification.upsert({
+      where: { email },
+      create: {
+        email,
+        otp,
+        password: hashedPassword,
+        name: name.trim(),
+        expiresAt,
+      },
+      update: {
+        otp,
+        password: hashedPassword,
+        name: name.trim(),
+        expiresAt,
+        createdAt: new Date(),
+      },
+    });
+
+    // Log to console for dev environment
+    console.log(`\n🔑 [RESEND OTP LOG] Email: ${email} | Mã OTP: ${otp}\n`);
+
+    // Send OTP via Resend API
+    const htmlTemplate = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #ffffff; border-radius: 16px; border: 1px solid #f0e8e6;">
+        <h2 style="color: #6B403B; text-align: center; margin-top: 0;">✨ Lumora</h2>
+        <p style="color: #333; font-size: 16px;">Xin chào <strong>${name}</strong>,</p>
+        <p style="color: #555; font-size: 15px;">Mã xác thực tài khoản của bạn là:</p>
+        <div style="text-align: center; margin: 28px 0;">
+          <span style="display: inline-block; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #E11D48; background-color: #FFE4E6; padding: 16px 36px; border-radius: 12px; font-family: monospace;">
+            ${otp}
+          </span>
+        </div>
+        <p style="color: #555; font-size: 14px;">Mã có hiệu lực trong <strong>5 phút</strong>.</p>
+        <p style="color: #888; font-size: 13px; margin-top: 24px; border-top: 1px solid #eee; pt-16px;">Если bạn không thực hiện thao tác này, vui lòng bỏ qua email này.</p>
+      </div>
+    `;
+
+    await sendEmail(email, "Xác thực tài khoản Lumora", htmlTemplate);
+
+    res.status(200).json({
+      success: true,
+      email,
+      message: "Mã OTP đã được gửi về email của bạn. Vui lòng xác thực trong 5 phút.",
     });
   } catch (err) {
     next(err);
   }
 }
 
-// ─── Register Step 2 (Verify OTP & Create User) ─────────────────────────
-export async function verifyRegisterOtp(
+// ─── 2. Verify Email OTP & Create User Account ────────────────────────────────
+export async function verifyEmailOtp(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const { email, otp, username, password, name, role = "BUYER" } = req.body;
+    const { email, otp } = req.body;
 
-    if (!email || !otp || !username || !password || !name) {
-      throw createError("Missing required fields", 400, "VALIDATION_ERROR");
+    if (!email || !otp) {
+      throw createError("Email và mã OTP là bắt buộc", 400, "VALIDATION_ERROR");
     }
 
-    // Verify OTP
-    const isValid = await verifyOtp(email, otp, "REGISTER");
-    if (!isValid) {
-      throw createError("Mã xác thực không đúng hoặc đã hết hạn.", 400, "INVALID_OTP");
+    const verificationRecord = await prisma.emailVerification.findUnique({ where: { email } });
+
+    if (!verificationRecord) {
+      throw createError("Yêu cầu xác thực không tồn tại hoặc đã hết hạn", 400, "INVALID_OTP");
     }
 
-    // Double check email/username existence before creating
-    const existing = await prisma.user.findFirst({
-      where: {
-        OR: [ { email }, { username } ]
-      }
-    });
-    if (existing) {
-      throw createError("Email hoặc Username đã được sử dụng.", 409, "USER_EXISTS");
+    if (new Date() > verificationRecord.expiresAt) {
+      throw createError("Mã OTP đã hết hạn. Vui lòng bấm gửi lại mã", 400, "OTP_EXPIRED");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const user = await prisma.user.create({
-      data: { email, username, password: hashedPassword, name, role, isVerified: true },
-      select: { id: true, email: true, username: true, name: true, role: true, avatar: true },
-    });
-
-    res.status(201).json({ 
-      success: true, 
-      message: "Tạo tài khoản thành công!", 
-      data: user 
-    });
-  } catch (err) {
-    next(err);
-  }
-}
-
-
-// ─── Become Organizer (Multi-step registration) ──────────────────────────
-export async function becomeOrganizer(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const userId = req.user!.userId;
-
-    // Check if already applied
-    const existing = await prisma.organizerProfile.findUnique({ where: { userId } });
-    if (existing) {
-      if (existing.verifyStatus === "APPROVED") {
-        throw createError("Tài khoản của bạn đã là Nhà tổ chức sự kiện.", 400);
-      }
-      if (existing.verifyStatus === "PENDING") {
-        throw createError("Đơn đăng ký của bạn đang chờ xét duyệt.", 400);
-      }
-      // If REJECTED — allow re-apply by deleting old one
-      await prisma.organizerProfile.delete({ where: { userId } });
+    if (verificationRecord.otp !== otp.trim()) {
+      throw createError("Mã OTP không chính xác. Vui lòng kiểm tra lại", 400, "WRONG_OTP");
     }
 
-    const {
-      orgName, orgLogo, orgBanner, orgDescription, website, facebook,
-      address, representative,
-      // Bank info
-      bankName, accountNumber, accountHolder,
-      // Documents
-      documents = [], // [{ docType: 'CCCD', docUrl: '...' }]
-      agreeTerms,
-    } = req.body;
+    // OTP Verified! Create or update User in DB
+    const existingUser = await prisma.user.findUnique({ where: { email } });
 
-    if (!orgName || !representative || !bankName || !accountNumber || !accountHolder) {
-      throw createError("Vui lòng điền đầy đủ thông tin bắt buộc", 400);
-    }
-    if (!agreeTerms) {
-      throw createError("Bạn cần đồng ý với Điều khoản bán vé của Lumora", 400);
-    }
-
-    const profile = await prisma.organizerProfile.create({
-      data: {
-        userId,
-        orgName, orgLogo, orgBanner, orgDescription, website, facebook,
-        address, representative,
-        verifyStatus: "PENDING",
-        bankInfo: {
-          create: { bankName, accountNumber, accountHolder },
+    let user;
+    if (existingUser) {
+      user = await prisma.user.update({
+        where: { email },
+        data: {
+          name: verificationRecord.name,
+          password: verificationRecord.password,
+          isVerified: true,
         },
-        documents: {
-          create: documents.map((doc: { docType: string; docUrl: string }) => ({
-            docType: doc.docType,
-            docUrl: doc.docUrl,
-          })),
+        select: { id: true, email: true, name: true, role: true, isVerified: true },
+      });
+    } else {
+      const defaultUsername = email.split("@")[0] + "_" + Math.floor(1000 + Math.random() * 9000);
+      user = await prisma.user.create({
+        data: {
+          email,
+          username: defaultUsername,
+          name: verificationRecord.name,
+          password: verificationRecord.password,
+          isVerified: true,
+          role: "BUYER",
         },
-      },
-      include: { bankInfo: true, documents: true },
-    });
+        select: { id: true, email: true, name: true, role: true, isVerified: true },
+      });
+    }
 
-    res.status(201).json({
+    // Delete EmailVerification record
+    await prisma.emailVerification.delete({ where: { email } });
+
+    res.status(200).json({
       success: true,
-      data: profile,
-      message: "Đã gửi đơn đăng ký. Admin sẽ xét duyệt trong 1-3 ngày làm việc.",
+      message: "Xác thực tài khoản thành công! Vui lòng đăng nhập.",
+      data: user,
     });
   } catch (err) {
     next(err);
   }
 }
 
-export async function getOrganizerStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+// ─── 3. Resend OTP ─────────────────────────────────────────────────────────────
+export async function resendOtp(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   try {
-    const userId = req.user!.userId;
-    const profile = await prisma.organizerProfile.findUnique({
-      where: { userId },
-      include: { bankInfo: true, documents: true },
+    const { email } = req.body;
+    if (!email) throw createError("Email là bắt buộc", 400);
+
+    const record = await prisma.emailVerification.findUnique({ where: { email } });
+    if (!record) {
+      throw createError("Không tìm thấy thông tin đăng ký cho email này. Vui lòng đăng ký lại", 404);
+    }
+
+    // Cooldown check (60 seconds)
+    const diff = Date.now() - new Date(record.createdAt).getTime();
+    if (diff < 60000) {
+      const remainingSeconds = Math.ceil((60000 - diff) / 1000);
+      throw createError(`Vui lòng đợi ${remainingSeconds} giây trước khi bấm gửi lại mã`, 429);
+    }
+
+    // Generate new OTP & refresh 5-minute expiry
+    const newOtp = generate6DigitOtp();
+    const newExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await prisma.emailVerification.update({
+      where: { email },
+      data: {
+        otp: newOtp,
+        expiresAt: newExpiresAt,
+        createdAt: new Date(),
+      },
     });
-    res.json({ success: true, data: profile });
+
+    console.log(`\n🔑 [RESEND NEW OTP LOG] Email: ${email} | Mã OTP Mới: ${newOtp}\n`);
+
+    const htmlTemplate = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #ffffff; border-radius: 16px; border: 1px solid #f0e8e6;">
+        <h2 style="color: #6B403B; text-align: center; margin-top: 0;">✨ Lumora</h2>
+        <p style="color: #333; font-size: 16px;">Xin chào <strong>${record.name}</strong>,</p>
+        <p style="color: #555; font-size: 15px;">Mã xác thực mới của bạn là:</p>
+        <div style="text-align: center; margin: 28px 0;">
+          <span style="display: inline-block; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #E11D48; background-color: #FFE4E6; padding: 16px 36px; border-radius: 12px; font-family: monospace;">
+            ${newOtp}
+          </span>
+        </div>
+        <p style="color: #555; font-size: 14px;">Mã có hiệu lực trong <strong>5 phút</strong>.</p>
+      </div>
+    `;
+
+    await sendEmail(email, "Xác thực tài khoản Lumora", htmlTemplate);
+
+    res.json({
+      success: true,
+      message: "Mã OTP mới đã được gửi về email của bạn.",
+    });
   } catch (err) {
     next(err);
   }
 }
-// ─── Login ─────────────────────────────────────────────────────────────
+
+// ─── 4. Login (Email + Password) ──────────────────────────────────────────────
 export async function login(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    // identifier can be email or username
-    const { identifier, password, rememberMe } = req.body;
+    const { password, rememberMe } = req.body;
+    const rawIdentifier = req.body.identifier || req.body.email || req.body.username;
 
-    if (!identifier || !password) {
-      throw createError("Email/Username and password are required", 400, "VALIDATION_ERROR");
+    if (!rawIdentifier || !password) {
+      throw createError("Vui lòng nhập email/tên đăng nhập và mật khẩu", 400, "VALIDATION_ERROR");
     }
 
-    const user = await prisma.user.findFirst({ 
+    const trimmedIdentifier = String(rawIdentifier).trim();
+    const user = await prisma.user.findFirst({
       where: {
-        OR: [
-          { email: identifier },
-          { username: identifier }
-        ]
-      }
+        OR: [{ email: trimmedIdentifier }, { username: trimmedIdentifier }],
+      },
     });
 
-    if (!user || !user.password) {
+    if (!user) {
       throw createError("Tài khoản hoặc mật khẩu không chính xác", 401, "INVALID_CREDENTIALS");
+    }
+
+    if (!user.password) {
+      throw createError("Tài khoản này được đăng ký bằng Google. Vui lòng bấm Đăng nhập bằng Google", 400, "OAUTH_USER");
     }
 
     const isValid = await bcrypt.compare(password, user.password);
@@ -214,11 +278,15 @@ export async function login(
       throw createError("Tài khoản hoặc mật khẩu không chính xác", 401, "INVALID_CREDENTIALS");
     }
 
+    // Check if email is verified
+    if (!user.isVerified) {
+      throw createError("Vui lòng xác minh email trước khi đăng nhập", 403, "EMAIL_NOT_VERIFIED");
+    }
+
     const payload = { userId: user.id, email: user.email, role: user.role };
     const accessToken = generateAccessToken(payload, rememberMe ? "30d" : "1d");
     const refreshToken = generateRefreshToken(payload);
 
-    // Persist session
     await prisma.userSession.create({
       data: {
         userId: user.id,
@@ -247,95 +315,45 @@ export async function login(
   }
 }
 
-// ─── OAuth Login (Google) ──────────────────────────────────────────────
+// ─── 5. Google OAuth Login (No OTP required for Google) ────────────────────────
 export async function oauth(
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const { email, name, avatar, provider } = req.body;
+    const { email, name, avatar } = req.body;
 
     if (!email || !name) {
-      throw createError("Email and name are required for OAuth", 400);
+      throw createError("Email và tên là bắt buộc cho Google OAuth", 400);
     }
 
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      // User doesn't exist -> Send OTP to their email and request verification
-      await sendOtpEmail(email, "REGISTER");
-      
-      res.json({
-        success: true,
-        requiresOtp: true,
-        message: "Cần xác thực email để tạo tài khoản bằng Google.",
+      // Create user immediately for Google OAuth with isVerified = true (No OTP!)
+      const rawPrefix = email.split("@")[0] || "user";
+      const sanitizedPrefix = rawPrefix.replace(/[^a-zA-Z0-9_]/g, "") || "user";
+      const defaultUsername = (sanitizedPrefix + "_" + Math.floor(1000 + Math.random() * 9000)).slice(0, 30);
+
+      user = await prisma.user.create({
+        data: {
+          email,
+          username: defaultUsername,
+          name: name || "Google User",
+          avatar: avatar || null,
+          role: "BUYER",
+          isVerified: true,
+          password: null,
+        },
       });
-      return;
+    } else if (!user.isVerified) {
+      // Mark verified if logged in via Google
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { isVerified: true },
+      });
     }
-
-    // User exists -> Login normally
-    const payload = { userId: user.id, email: user.email, role: user.role };
-    const accessToken = generateAccessToken(payload);
-    const refreshToken = generateRefreshToken(payload);
-
-    await prisma.userSession.create({
-      data: {
-        userId: user.id,
-        token: accessToken,
-        expiresAt: getExpiryDate("1d"),
-      },
-    });
-
-    res.json({
-      success: true,
-      data: {
-        accessToken,
-        refreshToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          name: user.name,
-          role: user.role,
-          avatar: user.avatar,
-        },
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
-}
-
-// ─── Verify OAuth OTP & Create User ──────────────────────────────────────
-export async function verifyOauthOtp(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const { email, otp, name, avatar, provider } = req.body;
-
-    if (!email || !otp || !name) {
-      throw createError("Missing required fields", 400, "VALIDATION_ERROR");
-    }
-
-    const isValid = await verifyOtp(email, otp, "REGISTER");
-    if (!isValid) {
-      throw createError("Mã xác thực không đúng hoặc đã hết hạn.", 400, "INVALID_OTP");
-    }
-
-    const user = await prisma.user.create({
-      data: {
-        email,
-        name,
-        avatar,
-        role: "BUYER",
-        isVerified: true,
-        // For OAuth users without username chosen, we can auto-generate one or leave null
-        username: email.split("@")[0] + "_" + Math.floor(Math.random() * 10000),
-      },
-    });
 
     const payload = { userId: user.id, email: user.email, role: user.role };
     const accessToken = generateAccessToken(payload);
@@ -369,70 +387,9 @@ export async function verifyOauthOtp(
   }
 }
 
-// ─── Forgot Password (Send OTP) ────────────────────────────────────────
-export async function forgotPassword(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const { email } = req.body;
-    if (!email) throw createError("Email is required", 400);
-
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      // Return success to prevent enumeration
-      res.json({ success: true, message: "Nếu email đã đăng ký, OTP sẽ được gửi." });
-      return;
-    }
-
-    try {
-      await sendOtpEmail(email, "FORGOT_PASSWORD");
-    } catch (e) {
-      console.error("Failed to send reset email:", e);
-      throw createError("Lỗi khi gửi email", 500);
-    }
-
-    res.json({ success: true, message: "Đã gửi mã OTP tới email của bạn." });
-  } catch (err) {
-    next(err);
-  }
-}
-
-// ─── Reset Password (Verify OTP & Change) ──────────────────────────────
-export async function resetPassword(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const { email, otp, newPassword } = req.body;
-    
-    if (!email || !otp || !newPassword) {
-      throw createError("Missing required fields", 400);
-    }
-
-    const isValid = await verifyOtp(email, otp, "FORGOT_PASSWORD");
-    if (!isValid) {
-      throw createError("Mã xác thực không đúng hoặc đã hết hạn.", 400, "INVALID_OTP");
-    }
-
-    const hashed = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({
-      where: { email },
-      data: { password: hashed },
-    });
-
-    res.json({ success: true, message: "Đặt lại mật khẩu thành công. Vui lòng đăng nhập." });
-  } catch (err) {
-    next(err);
-  }
-}
-
-// ─── Other Endpoints ───────────────────────────────────────────────────
+// ─── Other Endpoints ─────────────────────────────────────────────────────────
 
 export async function refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
-  // Logic remains same (omitted for brevity, assume implemented properly)
   try {
     const { refreshToken: token } = req.body;
     if (!token) throw createError("Refresh token required", 400);
@@ -550,3 +507,114 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
   }
 }
 
+export async function becomeOrganizer(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+    const existing = await prisma.organizerProfile.findUnique({ where: { userId } });
+    if (existing) {
+      if (existing.verifyStatus === "APPROVED") throw createError("Tài khoản của bạn đã là Nhà tổ chức sự kiện.", 400);
+      if (existing.verifyStatus === "PENDING") throw createError("Đơn đăng ký của bạn đang chờ xét duyệt.", 400);
+      await prisma.organizerProfile.delete({ where: { userId } });
+    }
+
+    const {
+      orgName, orgLogo, orgBanner, orgDescription, website, facebook,
+      address, representative, bankName, accountNumber, accountHolder,
+      documents = [], agreeTerms,
+    } = req.body;
+
+    if (!orgName || !representative || !bankName || !accountNumber || !accountHolder) {
+      throw createError("Vui lòng điền đầy đủ thông tin bắt buộc", 400);
+    }
+    if (!agreeTerms) throw createError("Bạn cần đồng ý với Điều khoản bán vé của Lumora", 400);
+
+    const profile = await prisma.organizerProfile.create({
+      data: {
+        userId,
+        orgName, orgLogo, orgBanner, orgDescription, website, facebook,
+        address, representative,
+        verifyStatus: "PENDING",
+        bankInfo: { create: { bankName, accountNumber, accountHolder } },
+        documents: {
+          create: documents.map((doc: { docType: string; docUrl: string }) => ({
+            docType: doc.docType, docUrl: doc.docUrl,
+          })),
+        },
+      },
+      include: { bankInfo: true, documents: true },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: profile,
+      message: "Đã gửi đơn đăng ký. Admin sẽ xét duyệt trong 1-3 ngày làm việc.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getOrganizerStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+    const profile = await prisma.organizerProfile.findUnique({
+      where: { userId },
+      include: { bankInfo: true, documents: true },
+    });
+    res.json({ success: true, data: profile });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body;
+    if (!email) throw createError("Email là bắt buộc", 400);
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      res.json({ success: true, message: "Nếu email tồn tại, OTP sẽ được gửi." });
+      return;
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await prisma.emailVerification.upsert({
+      where: { email },
+      create: { email, otp, password: "", name: user.name || "User", expiresAt },
+      update: { otp, expiresAt, createdAt: new Date() },
+    });
+
+    const htmlTemplate = `<div style="font-family: Arial; padding: 20px;"><h2>Đặt lại mật khẩu</h2><p>Mã OTP: <b>${otp}</b></p></div>`;
+    await sendEmail(email, "Đặt lại mật khẩu Lumora", htmlTemplate);
+
+    res.json({ success: true, message: "Đã gửi mã OTP tới email của bạn." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) throw createError("Thiếu thông tin bắt buộc", 400);
+
+    const record = await prisma.emailVerification.findUnique({ where: { email } });
+    if (!record || record.otp !== otp.trim() || new Date() > record.expiresAt) {
+      throw createError("Mã OTP không hợp lệ hoặc đã hết hạn", 400);
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { email },
+      data: { password: hashedPassword },
+    });
+
+    await prisma.emailVerification.delete({ where: { email } });
+    res.json({ success: true, message: "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại." });
+  } catch (err) {
+    next(err);
+  }
+}

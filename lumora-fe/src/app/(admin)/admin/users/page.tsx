@@ -229,7 +229,7 @@ export default function UsersPage() {
                   <span className="text-sm font-semibold">{user.orders}</span>
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
-                  <span className="text-sm font-semibold">{user.totalSpent.toLocaleString("vi-VN")}₫</span>
+                  <span className="text-sm font-semibold">{(user.totalSpent || 0).toLocaleString("vi-VN")}₫</span>
                 </TableCell>
                 <TableCell>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${user.isBlocked ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"}`}>
@@ -319,7 +319,7 @@ export default function UsersPage() {
                     { label: "Trạng thái", value: selectedUser.isBlocked ? "Đã khóa 🔒" : "Hoạt động ✅" },
                     { label: "Ngày tham gia", value: selectedUser.createdAt },
                     { label: "Tổng đơn hàng", value: `${selectedUser.orders} đơn` },
-                    { label: "Tổng chi tiêu", value: `${selectedUser.totalSpent.toLocaleString("vi-VN")} ₫` },
+                    { label: "Tổng chi tiêu", value: `${(selectedUser.totalSpent || 0).toLocaleString("vi-VN")} ₫` },
                   ].map(item => (
                     <div key={item.label} className="bg-muted/30 rounded-xl p-3">
                       <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
@@ -339,7 +339,7 @@ export default function UsersPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ORDER_STATUS[order.status]?.className}`}>{ORDER_STATUS[order.status]?.label}</span>
-                        <p className="text-sm font-bold">{order.amount.toLocaleString("vi-VN")}₫</p>
+                        <p className="text-sm font-bold">{(order.amount || 0).toLocaleString("vi-VN")}₫</p>
                       </div>
                     </div>
                   ))}

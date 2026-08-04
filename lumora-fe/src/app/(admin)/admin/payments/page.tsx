@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Search, CheckCircle2, XCircle, RefreshCw, TrendingUp, Clock } from "lucide-react";
+import { CreditCard, Search, CheckCircle2, XCircle, RefreshCw, TrendingUp, Clock, Eye, Barcode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ETicketModal } from "@/components/ticket/EventTicket";
 
 const MOCK_PAYMENTS = [
   { id: "p1", orderId: "ORD-2026-001", buyer: "Nguyễn Văn An", event: "Live Concert Sky Dec", amount: 2400000, platformFee: 120000, organizerNet: 2280000, method: "PayOS", status: "SUCCEEDED", paidAt: "2026-07-15 10:35:22" },
@@ -28,12 +29,30 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState(MOCK_PAYMENTS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filtered = payments.filter(p => {
     const matchSearch = !search || p.orderId.toLowerCase().includes(search.toLowerCase()) || p.buyer.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "ALL" || p.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const handleOpenTicket = (p: any) => {
+    setSelectedTicket({
+      ticketCode: `TKT-${p.orderId.replace("ORD-", "")}`,
+      eventTitle: p.event,
+      category: "Sự kiện",
+      ticketType: "Vé Tiêu Chuẩn",
+      startDate: p.paidAt || new Date(),
+      venue: "Trung tâm Sự kiện Lumora",
+      city: "Việt Nam",
+      status: p.status === "SUCCEEDED" ? "CONFIRMED" : p.status,
+      isCheckedIn: false,
+      holderName: p.buyer,
+    });
+    setIsModalOpen(true);
+  };
 
   const totalRevenue = payments.filter(p => p.status === "SUCCEEDED").reduce((sum, p) => sum + p.amount, 0);
   const totalFees = payments.filter(p => p.status === "SUCCEEDED").reduce((sum, p) => sum + p.platformFee, 0);
@@ -42,7 +61,7 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight">Quản lý thanh toán 💳</h1>
-        <p className="text-sm text-muted-foreground mt-1">Theo dõi tất cả giao dịch thanh toán trên hệ thống.</p>
+        <p className="text-sm text-muted-foreground mt-1">Theo dõi tất cả giao dịch thanh toán và đối soát phôi vé có mã vạch.</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -92,18 +111,18 @@ export default function PaymentsPage() {
               <TableHead className="font-bold text-xs uppercase tracking-wider hidden md:table-cell">Phí sàn</TableHead>
               <TableHead className="font-bold text-xs uppercase tracking-wider hidden lg:table-cell">NTC nhận</TableHead>
               <TableHead className="font-bold text-xs uppercase tracking-wider">Trạng thái</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider hidden lg:table-cell">Thời gian</TableHead>
+              <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Xem Phôi Vé</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map(p => (
               <TableRow key={p.id} className="hover:bg-muted/20">
                 <TableCell>
-                  <p className="font-mono font-bold text-sm">{p.orderId}</p>
+                  <p className="font-mono font-bold text-sm text-primary">{p.orderId}</p>
                   <p className="text-xs text-muted-foreground">{p.method}</p>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
-                  <p className="text-sm">{p.buyer}</p>
+                  <p className="text-sm font-medium">{p.buyer}</p>
                   <p className="text-xs text-muted-foreground">{p.event}</p>
                 </TableCell>
                 <TableCell><span className="font-bold text-sm">{p.amount.toLocaleString("vi-VN")}₫</span></TableCell>
@@ -112,14 +131,24 @@ export default function PaymentsPage() {
                 <TableCell>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[p.status]?.className}`}>{STATUS_CONFIG[p.status]?.label}</span>
                 </TableCell>
-                <TableCell className="hidden lg:table-cell">
-                  <p className="text-xs text-muted-foreground">{p.paidAt || "–"}</p>
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl text-xs font-bold gap-1.5 border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={() => handleOpenTicket(p)}
+                  >
+                    <Barcode className="h-3.5 w-3.5" /> Xem Phôi Vé
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
+
+      <ETicketModal open={isModalOpen} onOpenChange={setIsModalOpen} ticket={selectedTicket} />
     </div>
   );
 }
+
