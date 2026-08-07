@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resendApiKey = process.env.RESEND_API_KEY;
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
 const FROM = process.env.EMAIL_FROM || "noreply@lumora.vn";
 
 interface OrderWithDetails {
@@ -21,6 +22,11 @@ interface OrderWithDetails {
  * Send booking confirmation email with ticket details via Resend
  */
 export async function sendOrderConfirmationEmail(order: OrderWithDetails): Promise<void> {
+  if (!resend) {
+    console.warn("⚠️ Skipping sendOrderConfirmationEmail: RESEND_API_KEY is not configured in .env");
+    return;
+  }
+
   const ticketRows = order.items
     .map((item) => {
       const name = item.ticketType?.name || item.seat?.seatLabel || "Ticket";
@@ -115,6 +121,10 @@ export async function sendOrderConfirmationEmail(order: OrderWithDetails): Promi
  * Generic sendEmail function for OTP & notifications via Resend
  */
 export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (!resend) {
+    console.warn("⚠️ Skipping sendEmail: RESEND_API_KEY is not configured in .env");
+    return;
+  }
   const fromEmail = process.env.EMAIL_FROM || "noreply@lumora.pro.vn";
   
   try {
@@ -151,6 +161,10 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
  * Send email verification link
  */
 export async function sendVerificationEmail(email: string, name: string, token: string): Promise<void> {
+  if (!resend) {
+    console.warn("⚠️ Skipping sendVerificationEmail: RESEND_API_KEY is not configured in .env");
+    return;
+  }
   const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
   const html = `
@@ -195,6 +209,10 @@ export async function sendVerificationEmail(email: string, name: string, token: 
  * Send password reset link
  */
 export async function sendPasswordResetEmail(email: string, name: string, token: string): Promise<void> {
+  if (!resend) {
+    console.warn("⚠️ Skipping sendPasswordResetEmail: RESEND_API_KEY is not configured in .env");
+    return;
+  }
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
   const html = `
@@ -234,4 +252,3 @@ export async function sendPasswordResetEmail(email: string, name: string, token:
     html,
   });
 }
-

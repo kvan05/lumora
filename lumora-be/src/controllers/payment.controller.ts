@@ -9,11 +9,13 @@ import { releaseInventory } from "./order.controller";
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 // ─── PayOS Client (Official SDK) ─────────────────────────────────────────
-const payos = new PayOS({
-  clientId: process.env.PAYOS_CLIENT_ID!,
-  apiKey: process.env.PAYOS_API_KEY!,
-  checksumKey: process.env.PAYOS_CHECKSUM_KEY!
-});
+const payos = (process.env.PAYOS_CLIENT_ID && process.env.PAYOS_API_KEY && process.env.PAYOS_CHECKSUM_KEY)
+  ? new PayOS({
+      clientId: process.env.PAYOS_CLIENT_ID,
+      apiKey: process.env.PAYOS_API_KEY,
+      checksumKey: process.env.PAYOS_CHECKSUM_KEY
+    })
+  : null;
 
 // ─── Create VietQR Payment ───────────────────────────────────────────────
 export async function createPayment(
@@ -22,6 +24,9 @@ export async function createPayment(
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!payos) {
+      throw createError("Hệ thống thanh toán PayOS chưa được cấu hình API Key trên Server", 500);
+    }
     const { orderId } = req.body;
     const buyerId = req.user!.userId;
 
@@ -168,6 +173,10 @@ export async function handleWebhook(
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!payos) {
+      res.status(400).json({ error: "PayOS not configured" });
+      return;
+    }
     // Use official SDK to verify signature — throws if invalid
     let webhookData: any;
     try {
@@ -310,10 +319,12 @@ export async function cancelPayment(
     }
 
     // Cancel on PayOS using official SDK
-    try {
-      await payos.paymentRequests.cancel(payment.payosOrderCode.toString());
-    } catch (e) {
-      console.warn("PayOS cancel failed, releasing locally:", e);
+    if (payos) {
+      try {
+        await payos.paymentRequests.cancel(payment.payosOrderCode.toString());
+      } catch (e) {
+        console.warn("PayOS cancel failed, releasing locally:", e);
+      }
     }
 
     // Release inventory + cancel order

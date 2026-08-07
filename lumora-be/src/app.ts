@@ -1,8 +1,10 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { createServer } from "http";
-import dotenv from "dotenv";
 import { initializeSocket } from "./socket";
 import { errorHandler } from "./middleware/errorHandler";
 import { authRoutes } from "./routes/auth.routes";
@@ -75,7 +77,7 @@ initializeSocket(httpServer);
 startOrderTimeoutJob();
 
 // ─── Start Server ─────────────────────────────────────────────────────
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 httpServer.listen(PORT, () => {
   console.log(`🚀 Lumora API running on http://localhost:${PORT}`);
 });

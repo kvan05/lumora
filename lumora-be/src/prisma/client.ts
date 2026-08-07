@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 // @ts-ignore - VS Code TS Server cache issue, the client is generated correctly
 import { PrismaClient } from "@prisma/client";
 
