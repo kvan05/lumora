@@ -8,7 +8,7 @@ import { Session } from "next-auth";
 import { signOut } from "next-auth/react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import {
-  LayoutDashboard, Users, Calendar, Ticket, ShoppingCart, QrCode,
+  LayoutDashboard, Users, Calendar, Ticket, ShoppingCart, Barcode,
   CreditCard, TrendingUp, RefreshCw, Star, Tags, Megaphone, FileText,
   Flag, ShieldCheck, ChevronRight, Menu, X, Bell, LogOut, Settings,
   ChevronDown, User, BarChart3, AlertCircle, Cog, BookOpen, Tag
@@ -37,7 +37,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/events", icon: Calendar, label: "Quản lý sự kiện" },
       { href: "/admin/tickets", icon: Ticket, label: "Quản lý vé" },
-      { href: "/admin/checkin", icon: QrCode, label: "E-ticket & Check-in" },
+      { href: "/admin/checkin", icon: Barcode, label: "E-ticket & Check-in" },
     ],
   },
   {

@@ -50,3 +50,7 @@ adminRoutes.patch("/settlements/:id", AdminController.processSettlement);
 adminRoutes.get("/withdrawals", AdminController.getWithdrawalRequests);
 adminRoutes.patch("/withdrawals/:id", AdminController.processWithdrawal);
 
+// E-ticket & Check-in (Mã vạch Barcode)
+adminRoutes.get("/checkin", AdminController.getCheckinTickets);
+adminRoutes.post("/checkin/verify", AdminController.verifyCheckinTicket);
+

@@ -558,3 +558,130 @@ export async function processWithdrawal(req: Request, res: Response, next: NextF
   }
 }
 
+// ─── E-Ticket & Check-in (Mã vạch Barcode) ─────────────────────────────────
+export async function getCheckinTickets(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { search, eventId } = req.query as Record<string, string>;
+
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        order: {
+          status: "PAID",
+          ...(eventId && { eventId }),
+        },
+        ...(search && {
+          OR: [
+            { ticketCode: { contains: search } },
+            { order: { orderNumber: { contains: search } } },
+            { order: { buyer: { name: { contains: search } } } },
+            { order: { buyer: { email: { contains: search } } } },
+            { order: { event: { title: { contains: search } } } },
+          ],
+        }),
+      },
+      include: {
+        order: {
+          include: {
+            buyer: { select: { name: true, email: true, phone: true } },
+            event: { select: { id: true, title: true, bannerUrl: true, category: true, venue: true, city: true, startDate: true } },
+          },
+        },
+        ticketType: { select: { name: true, price: true } },
+        seat: { select: { seatLabel: true, row: { select: { section: { select: { name: true } } } } } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    const tickets = orderItems.map((item) => ({
+      id: item.ticketCode || item.id,
+      itemId: item.id,
+      orderNumber: item.order.orderNumber,
+      event: item.order.event.title,
+      eventId: item.order.event.id,
+      bannerUrl: item.order.event.bannerUrl,
+      category: item.order.event.category,
+      venue: item.order.event.venue,
+      city: item.order.event.city,
+      startDate: item.order.event.startDate,
+      holder: item.order.buyer.name || item.order.buyer.email,
+      email: item.order.buyer.email,
+      phone: item.order.buyer.phone,
+      type: item.ticketType?.name || (item.seat ? `Ghế ${item.seat.seatLabel}` : "Vé xem sự kiện"),
+      price: Number(item.unitPrice),
+      isCheckedIn: !!item.order.checkedInAt,
+      checkedInAt: item.order.checkedInAt ? item.order.checkedInAt.toISOString() : null,
+      isLocked: false,
+      issuedAt: item.createdAt.toISOString(),
+    }));
+
+    res.json({ success: true, data: tickets });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyCheckinTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { ticketCode } = req.body;
+    if (!ticketCode) throw createError("Mã vé (Barcode) là bắt buộc", 400);
+
+    const item = await prisma.orderItem.findFirst({
+      where: {
+        OR: [{ ticketCode: ticketCode.trim() }, { id: ticketCode.trim() }],
+      },
+      include: {
+        order: {
+          include: {
+            buyer: { select: { name: true, email: true, phone: true } },
+            event: { select: { id: true, title: true, bannerUrl: true, category: true, venue: true, city: true, startDate: true } },
+          },
+        },
+        ticketType: { select: { name: true, price: true } },
+        seat: { select: { seatLabel: true } },
+      },
+    });
+
+    if (!item) {
+      throw createError("Không tìm thấy mã vé trong hệ thống Lumora", 404);
+    }
+
+    if (item.order.status !== "PAID") {
+      throw createError(`Đơn hàng chưa thanh toán (Trạng thái: ${item.order.status})`, 400);
+    }
+
+    const alreadyCheckedIn = !!item.order.checkedInAt;
+    const now = new Date();
+
+    if (!alreadyCheckedIn) {
+      await prisma.order.update({
+        where: { id: item.orderId },
+        data: { checkedInAt: now },
+      });
+    }
+
+    res.json({
+      success: true,
+      message: alreadyCheckedIn ? "Vé này ĐÃ ĐƯỢC CHÉCK-IN trước đó" : "Check-in mã vé thành công!",
+      alreadyCheckedIn,
+      data: {
+        id: item.ticketCode || item.id,
+        orderNumber: item.order.orderNumber,
+        event: item.order.event.title,
+        bannerUrl: item.order.event.bannerUrl,
+        category: item.order.event.category,
+        venue: item.order.event.venue,
+        city: item.order.event.city,
+        startDate: item.order.event.startDate,
+        holder: item.order.buyer.name || item.order.buyer.email,
+        email: item.order.buyer.email,
+        type: item.ticketType?.name || (item.seat ? `Ghế ${item.seat.seatLabel}` : "Vé sự kiện"),
+        isCheckedIn: true,
+        checkedInAt: alreadyCheckedIn ? item.order.checkedInAt!.toISOString() : now.toISOString(),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
