@@ -1,134 +1,228 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+// prisma/seed.js
+// Lumora Database Seed — Idempotent (safe to run multiple times)
+// Uses CommonJS (project type: "commonjs")
+
+"use strict";
+
+const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
+require("dotenv").config();
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('🌱 Bắt đầu seeding dữ liệu...');
+// ─── Admin config ──────────────────────────────────────────────────────────────
+const ADMIN_EMAIL    = process.env.ADMIN_EMAIL || "admin@lumora.pro.vn";
+const ADMIN_NAME     = "Lumora Admin";
+const ADMIN_USERNAME = "lumora_admin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-  // ─── Admin Account ───────────────────────────────────────────────────────────
-  const adminPasswordHash = await bcrypt.hash('Admin@123456', 10);
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@lumora.vn' },
-    update: {
-      password: adminPasswordHash,
-      role: 'ADMIN',
-      isVerified: true,
-    },
-    create: {
-      email: 'admin@lumora.vn',
-      name: 'Admin Lumora',
-      role: 'ADMIN',
-      isVerified: true,
-      username: 'admin',
-      password: adminPasswordHash,
-    },
-  });
-  console.log(`✅ Admin tạo thành công: ${admin.email}`);
+// ─── Seller config ─────────────────────────────────────────────────────────────
+const SELLER_EMAIL    = process.env.SELLER_EMAIL || "seller@lumora.pro.vn";
+const SELLER_NAME     = "Lumora Seller";
+const SELLER_USERNAME = "lumora_seller";
+const SELLER_PASSWORD = process.env.SELLER_PASSWORD;
 
-  // ─── Seller/Organizer Demo Account ───────────────────────────────────────────
-  const sellerPasswordHash = await bcrypt.hash('Seller@123456', 10);
-  const seller = await prisma.user.upsert({
-    where: { email: 'seller@lumora.vn' },
-    update: {
-      password: sellerPasswordHash,
-      role: 'SELLER',
-      isVerified: true,
-    },
-    create: {
-      email: 'seller@lumora.vn',
-      name: 'Lumora Events',
-      role: 'SELLER',
-      isVerified: true,
-      username: 'lumora_events',
-      password: sellerPasswordHash,
-    },
-  });
-  console.log(`✅ Seller tạo thành công: ${seller.email}`);
+// ─── Default categories (Ticketing & Experience Platform) ──────────────────────
+const DEFAULT_CATEGORIES = [
+  // 🎵 Âm nhạc & Giải trí
+  { name: "Concert & Live Show",       slug: "concert-live-show" },
+  { name: "Music Festival",            slug: "music-festival" },
+  { name: "Nightlife & Party",         slug: "nightlife" },
+  { name: "Sân khấu & Kịch",           slug: "san-khau-kich" },
+  { name: "Hài kịch & Stand-up",       slug: "comedy" },
+  { name: "Phim ảnh & Cinema",         slug: "cinema" },
+  { name: "Âm nhạc",                   slug: "am-nhac" }, // Legacy support
 
-  // ─── Buyer Demo Account ───────────────────────────────────────────────────────
-  const buyerPasswordHash = await bcrypt.hash('Buyer@123456', 10);
-  const buyer = await prisma.user.upsert({
-    where: { email: 'buyer@lumora.vn' },
-    update: {
-      password: buyerPasswordHash,
-      isVerified: true,
-    },
-    create: {
-      email: 'buyer@lumora.vn',
-      name: 'Người dùng Demo',
-      role: 'BUYER',
-      isVerified: true,
-      username: 'demo_buyer',
-      password: buyerPasswordHash,
-    },
-  });
-  console.log(`✅ Buyer tạo thành công: ${buyer.email}`);
+  // 🎨 Nghệ thuật & Văn hóa
+  { name: "Triển lãm & Nghệ thuật",    slug: "trien-lam-nghe-thuat" },
+  { name: "Bảo tàng & Di sản",         slug: "bao-tang-di-san" },
+  { name: "Trải nghiệm văn hóa",       slug: "trai-nghiem-van-hoa" },
+  { name: "Creative Workshop",         slug: "creative-workshop" },
+  { name: "Nghệ thuật",                slug: "nghe-thuat" }, // Legacy support
 
-  // ─── Sample Events ────────────────────────────────────────────────────────────
-  const eventsData = [
-    {
-      title: 'Live Concert Sky Dec',
-      slug: 'live-concert-sky-dec-2026',
-      description: 'Đêm nhạc cuối năm với những ca khúc bất hủ.',
-      category: 'Âm nhạc',
-      venue: 'Sân vận động Phú Thọ',
-      address: 'Quận 11',
-      city: 'TP. HCM',
-      startDate: new Date('2026-08-15T19:00:00.000Z'),
-      endDate: new Date('2026-08-15T23:00:00.000Z'),
-      status: 'PENDING',
-      sellerId: seller.id,
-    },
-    {
-      title: 'Tech Summit Vietnam 2026',
-      slug: 'tech-summit-vn-2026',
-      description: 'Sự kiện công nghệ lớn nhất miền Bắc.',
-      category: 'Workshop',
-      venue: 'Trung tâm Hội nghị quốc gia',
-      address: 'Nam Từ Liêm',
-      city: 'Hà Nội',
-      startDate: new Date('2026-09-01T08:00:00.000Z'),
-      endDate: new Date('2026-09-02T17:00:00.000Z'),
-      status: 'PENDING',
-      sellerId: seller.id,
-    },
-    {
-      title: 'Marathon TP.HCM 2026',
-      slug: 'marathon-tphcm-2026',
-      description: 'Giải chạy marathon thường niên của thành phố.',
-      category: 'Thể thao',
-      venue: 'Nhà Hát Lớn',
-      address: 'Quận 1',
-      city: 'TP. HCM',
-      startDate: new Date('2026-11-15T05:00:00.000Z'),
-      endDate: new Date('2026-11-15T10:00:00.000Z'),
-      status: 'APPROVED',
-      sellerId: seller.id,
-    },
-  ];
+  // ⚽ Thể thao & Sức khỏe
+  { name: "Thể thao & Giải đấu",       slug: "the-thao" },
+  { name: "Fitness & Yoga",            slug: "fitness-wellness" },
+  { name: "Hoạt động ngoài trời",      slug: "outdoor-activities" },
 
-  for (const data of eventsData) {
-    await prisma.event.upsert({
-      where: { slug: data.slug },
-      update: {},
-      create: data,
-    });
+  // 🎓 Học tập & Doanh nghiệp
+  { name: "Workshop & Lớp học",        slug: "workshop" },
+  { name: "Hội thảo & Summit",         slug: "hoi-thao-summit" },
+  { name: "Networking & Kết nối",      slug: "networking" },
+  { name: "Cộng đồng & Xã hội",        slug: "community" },
+  { name: "Công nghệ",                 slug: "cong-nghe" }, // Legacy support
+  { name: "Giáo dục",                  slug: "giao-duc" }, // Legacy support
+  { name: "Hội nghị",                  slug: "hoi-nghi" }, // Legacy support
+
+  // ✈️ Du lịch & Trải nghiệm
+  { name: "City Tour & Bus 2 tầng",    slug: "city-tour" },
+  { name: "Tham quan địa điểm",        slug: "sightseeing" },
+  { name: "Tour & Trải nghiệm du lịch", slug: "travel-experience" },
+  { name: "Water Bus & Du thuyền",     slug: "water-bus-cruise" },
+  { name: "Tour tham quan",            slug: "tour" },
+  { name: "Địa điểm du lịch",          slug: "attraction" },
+
+  // 🎢 Vui chơi & Giải trí gia đình
+  { name: "Công viên chủ đề",          slug: "theme-park" },
+  { name: "Khu vui chơi giải trí",     slug: "amusement-park" },
+  { name: "Hoạt động gia đình",        slug: "family-activities" },
+  { name: "Vui chơi trẻ em",           slug: "kids-activities" },
+  { name: "Giải trí tổng hợp",         slug: "entertainment" },
+
+  // 🍽️ Ẩm thực
+  { name: "Lễ hội Ẩm thực",            slug: "food-drink" },
+  { name: "Food Tour & Khám phá",      slug: "food-tour" },
+  { name: "Trải nghiệm ăn uống",       slug: "dining-experience" },
+  { name: "Lớp học nấu ăn",            slug: "cooking-class" },
+  { name: "Ẩm thực",                   slug: "am-thuc" }, // Legacy support
+
+  // ❤️ Lifestyle & Sống đẹp
+  { name: "Lifestyle & Phong cách sống", slug: "lifestyle" },
+  { name: "Làm đẹp & Spa",             slug: "beauty-spa" },
+  { name: "Sức khỏe & Wellness",       slug: "wellness" },
+  { name: "Trải nghiệm xã hội",        slug: "social-experience" },
+
+  // 📌 Khác
+  { name: "Khác",                      slug: "khac" },
+];
+
+async function seedAdmin() {
+  // Check if Admin already exists
+  const existing = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
+
+  if (existing) {
+    console.log("ℹ️  Admin already exists. Skipping creation.");
+    console.log(`   Email : ${existing.email}`);
+    console.log(`   Role  : ${existing.role}`);
+    return existing;
   }
-  console.log(`✅ ${eventsData.length} sự kiện mẫu đã được tạo.`);
 
-  console.log('\n🎉 Seeding hoàn tất!');
-  console.log('─────────────────────────────────────────');
-  console.log('📋 Thông tin đăng nhập:');
-  console.log('  Admin   → admin@lumora.vn   / Admin@123456');
-  console.log('  Seller  → seller@lumora.vn  / Seller@123456');
-  console.log('  Buyer   → buyer@lumora.vn   / Buyer@123456');
-  console.log('─────────────────────────────────────────');
+  if (!ADMIN_PASSWORD) {
+    throw new Error("Missing ADMIN_PASSWORD in environment variables. Please set ADMIN_PASSWORD in .env before running seed.");
+  }
+
+  // Hash password using bcryptjs (same lib as auth.controller.ts)
+  const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 12);
+
+  const admin = await prisma.user.create({
+    data: {
+      email:      ADMIN_EMAIL,
+      username:   ADMIN_USERNAME,
+      name:       ADMIN_NAME,
+      password:   hashedPassword,
+      role:       "ADMIN",
+      isVerified: true,
+      locale:     "vi",
+    },
+  });
+
+  console.log("✅ Admin created:");
+  console.log(`   Email    : ${admin.email}`);
+  console.log(`   Username : ${admin.username}`);
+  console.log(`   Role     : ${admin.role}`);
+  console.log(`   Verified : ${admin.isVerified}`);
+  console.log(`   Password : Configured from environment (hashed with bcryptjs)`);
+  return admin;
+}
+
+async function seedSeller() {
+  const existing = await prisma.user.findUnique({ where: { email: SELLER_EMAIL } });
+
+  let seller;
+  if (existing) {
+    console.log("ℹ️  Seller user already exists.");
+    console.log(`   Email : ${existing.email}`);
+    console.log(`   Role  : ${existing.role}`);
+    seller = existing;
+    if (existing.role !== "SELLER") {
+      seller = await prisma.user.update({
+        where: { email: SELLER_EMAIL },
+        data: { role: "SELLER" },
+      });
+      console.log(`   Updated role to SELLER`);
+    }
+  } else {
+    if (!SELLER_PASSWORD) {
+      throw new Error("Missing SELLER_PASSWORD in environment variables. Please set SELLER_PASSWORD in .env before running seed.");
+    }
+
+    const hashedPassword = await bcrypt.hash(SELLER_PASSWORD, 12);
+    seller = await prisma.user.create({
+      data: {
+        email:      SELLER_EMAIL,
+        username:   SELLER_USERNAME,
+        name:       SELLER_NAME,
+        password:   hashedPassword,
+        role:       "SELLER",
+        isVerified: true,
+        locale:     "vi",
+      },
+    });
+
+    console.log("✅ Seller created:");
+    console.log(`   Email    : ${seller.email}`);
+    console.log(`   Username : ${seller.username}`);
+    console.log(`   Role     : ${seller.role}`);
+    console.log(`   Verified : ${seller.isVerified}`);
+    console.log(`   Password : Configured from environment (hashed with bcryptjs)`);
+  }
+
+  // Seed or update OrganizerProfile for seller
+  const profile = await prisma.organizerProfile.upsert({
+    where: { userId: seller.id },
+    create: {
+      userId: seller.id,
+      orgName: SELLER_NAME,
+      orgDescription: "Tài khoản Seller dùng cho môi trường test Lumora.",
+      verifyStatus: "APPROVED",
+    },
+    update: {
+      verifyStatus: "APPROVED",
+    },
+  });
+
+  console.log(`   OrganizerProfile: ID ${profile.id} (verifyStatus: ${profile.verifyStatus})`);
+  return seller;
+}
+
+async function seedCategories() {
+  let created = 0;
+  let updated = 0;
+
+  for (const cat of DEFAULT_CATEGORIES) {
+    const existing = await prisma.category.findUnique({ where: { slug: cat.slug } });
+    if (existing) {
+      await prisma.category.update({
+        where: { slug: cat.slug },
+        data: { name: cat.name },
+      });
+      updated++;
+    } else {
+      await prisma.category.create({ data: { name: cat.name, slug: cat.slug } });
+      created++;
+    }
+  }
+
+  console.log(`✅ Categories seeded: ${created} created, ${updated} confirmed/updated (${DEFAULT_CATEGORIES.length} total)`);
+}
+
+async function main() {
+  console.log("\n🌱 Starting Lumora database seed...\n");
+  console.log(`   DB: ${process.env.DATABASE_URL?.split("@")[1]?.split("/")[0] ?? "unknown host"}`);
+  console.log("");
+
+  await seedAdmin();
+  console.log("");
+  await seedSeller();
+  console.log("");
+  await seedCategories();
+
+  console.log("\n🌱 Database seed completed successfully.\n");
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Lỗi seeding:', e);
+  .catch((err) => {
+    console.error("\n❌ Seed failed:", err.message);
     process.exit(1);
   })
   .finally(async () => {

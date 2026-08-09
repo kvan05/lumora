@@ -3,43 +3,35 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlserver"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// Enums converted to Strings for SQL Server compatibility
-
-// ========================
-// USER & AUTH
-// ========================
-
 model User {
-  id         String   @id @default(cuid())
-  username   String?  @unique
-  email      String   @unique
-  name       String?
-  password   String? // null if using OAuth
-  avatar     String?
-  phone      String?
-  role       String   @default("BUYER") // BUYER, SELLER, ADMIN
-  isVerified Boolean  @default(false)
-  locale     String   @default("vi") // "en" | "vi"
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  events               Event[]              @relation("SellerEvents")
-  orders               Order[]
-  notifications        Notification[]
-  sessions             UserSession[]
-  favorites            Favorite[]
-  Review               Review[]
-  RefundRequest        RefundRequest[]
-  Report               Report[]
-  AdminLog             AdminLog[]
-  OrganizerProfile     OrganizerProfile?
-  Withdrawal           Withdrawal[]
-  approvedEvents       Event[]              @relation("EventApprover")
+  id               String            @id @default(cuid())
+  username         String?           @unique
+  email            String            @unique
+  name             String?
+  password         String?
+  avatar           String?
+  phone            String?
+  role             String            @default("BUYER")
+  isVerified       Boolean           @default(false)
+  locale           String            @default("vi")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  AdminLog         AdminLog[]
+  approvedEvents   Event[]           @relation("EventApprover")
+  events           Event[]           @relation("SellerEvents")
+  favorites        Favorite[]
+  notifications    Notification[]
+  orders           Order[]
+  OrganizerProfile OrganizerProfile?
+  RefundRequest    RefundRequest[]
+  Report           Report[]
+  Review           Review[]
+  sessions         UserSession[]
+  Withdrawal       Withdrawal[]
 
   @@map("users")
 }
@@ -50,8 +42,7 @@ model UserSession {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_sessions")
 }
@@ -60,7 +51,7 @@ model Otp {
   id        String   @id @default(cuid())
   email     String
   code      String
-  type      String // REGISTER, FORGOT_PASSWORD
+  type      String
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -72,7 +63,7 @@ model EmailVerification {
   id        String   @id @default(cuid())
   email     String   @unique
   otp       String
-  password  String   @db.NVarChar(Max)
+  password  String
   name      String
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -80,175 +71,148 @@ model EmailVerification {
   @@map("email_verifications")
 }
 
-// ========================
-// EVENT
-// ========================
-
 model Event {
-  id          String   @id @default(cuid())
-  sellerId    String
-  title       String
-  slug        String   @unique
-  description String   @db.NVarChar(Max)
-  bannerUrl   String?  @db.NVarChar(Max)
-  imageUrls   String?  @db.NVarChar(Max) // JSON array
-  category    String
-  venue       String
-  address     String
-  city        String
-  latitude    Float?
-  longitude   Float?
-  startDate       DateTime
-  endDate         DateTime
-  status          String   @default("DRAFT") // DRAFT, PENDING_APPROVAL, PUBLISHED, PAUSED, CANCELLED, COMPLETED, REJECTED
-  approvalNote    String?  @db.NVarChar(Max) // Admin note when approving/rejecting
-  approvedAt      DateTime?
-  approvedById    String?
-  pendingChanges  String?  @db.NVarChar(Max) // JSON proposed changes submitted by Seller for published event
-  editRequestStatus String? // PENDING_REVIEW, APPROVED, REJECTED
-  isFeatured      Boolean  @default(false)
-  hasSeatMap      Boolean  @default(false) // True if fixed seating
-  refundPolicy    String?  @db.NVarChar(Max) // Chính sách hoàn tiền
-  termsConditions String?  @db.NVarChar(Max) // Điều khoản tham gia
-  tags            String?  @db.NVarChar(Max) // JSON array
-  metaTitle       String?
-  metaDesc        String?  @db.NVarChar(500)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  seller          User              @relation("SellerEvents", fields: [sellerId], references: [id])
-  approvedBy      User?             @relation("EventApprover", fields: [approvedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  ticketTypes     TicketType[]
-  seatSections    SeatSection[]
-  orders          Order[]
-  favorites       Favorite[]
-  Review          Review[]
-  Settlement      Settlement?
-  EventApprovalLog EventApprovalLog[]
+  id                String             @id @default(cuid())
+  sellerId          String
+  title             String
+  slug              String             @unique
+  description       String
+  bannerUrl         String?
+  imageUrls         String?
+  category          String
+  venue             String
+  address           String
+  city              String
+  latitude          Float?
+  longitude         Float?
+  startDate         DateTime
+  endDate           DateTime
+  status            String             @default("DRAFT")
+  approvalNote      String?
+  approvedAt        DateTime?
+  approvedById      String?
+  pendingChanges    String?
+  editRequestStatus String?
+  isFeatured        Boolean            @default(false)
+  hasSeatMap        Boolean            @default(false)
+  refundPolicy      String?
+  termsConditions   String?
+  tags              String?
+  metaTitle         String?
+  metaDesc          String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  EventApprovalLog  EventApprovalLog[]
+  approvedBy        User?              @relation("EventApprover", fields: [approvedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  seller            User               @relation("SellerEvents", fields: [sellerId], references: [id])
+  favorites         Favorite[]
+  orders            Order[]
+  Review            Review[]
+  seatSections      SeatSection[]
+  Settlement        Settlement?
+  ticketTypes       TicketType[]
 
   @@map("events")
 }
 
-// ========================
-// TICKET TYPES (for non-seat events)
-// ========================
-
 model TicketType {
-  id            String    @id @default(cuid())
+  id            String           @id @default(cuid())
   eventId       String
-  name          String // VIP, Standard, Early Bird...
+  name          String
   description   String?
-  price         Decimal   @db.Decimal(12, 2)
-  originalPrice Decimal?  @db.Decimal(12, 2)
+  price         Decimal          @db.Decimal(12, 2)
+  originalPrice Decimal?         @db.Decimal(12, 2)
   quantity      Int
-  maxPerOrder   Int       @default(10)
+  maxPerOrder   Int              @default(10)
   saleStart     DateTime?
   saleEnd       DateTime?
-  status        String    @default("ACTIVE") // ACTIVE, PAUSED, SOLD_OUT, EXPIRED
-  sortOrder     Int       @default(0)
-  color         String? // hex color for UI badge
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relations
-  event      Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  inventory  TicketInventory?
-  orderItems OrderItem[]
+  status        String           @default("ACTIVE")
+  sortOrder     Int              @default(0)
+  color         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  orderItems    OrderItem[]
+  inventory     TicketInventory?
+  event         Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("ticket_types")
 }
 
 model TicketInventory {
-  id           String   @id @default(cuid())
-  ticketTypeId String   @unique
+  id           String     @id @default(cuid())
+  ticketTypeId String     @unique
   totalQty     Int
-  reservedQty  Int      @default(0) // Held for pending orders
-  soldQty      Int      @default(0)
-  updatedAt    DateTime @updatedAt
-
-  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  reservedQty  Int        @default(0)
+  soldQty      Int        @default(0)
+  updatedAt    DateTime   @updatedAt
+  ticketType   TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
 
   @@map("ticket_inventories")
 }
 
-// ========================
-// SEAT MAP (Fixed seating)
-// ========================
-
 model SeatSection {
-  id          String  @id @default(cuid())
+  id          String    @id @default(cuid())
   eventId     String
-  name        String // "Section A", "VIP Zone", "Balcony"
-  label       String // Short label: "A", "VIP", "B"
-  color       String? // Hex color for map rendering
-  price       Decimal @db.Decimal(12, 2)
-  rowCount    Int     @default(0)
-  seatsPerRow Int     @default(0)
-  sortOrder   Int     @default(0)
-
-  // Relations
-  event Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  rows  SeatRow[]
+  name        String
+  label       String
+  color       String?
+  price       Decimal   @db.Decimal(12, 2)
+  rowCount    Int       @default(0)
+  seatsPerRow Int       @default(0)
+  sortOrder   Int       @default(0)
+  rows        SeatRow[]
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("seat_sections")
 }
 
 model SeatRow {
-  id        String @id @default(cuid())
+  id        String      @id @default(cuid())
   sectionId String
-  rowLabel  String // "A", "B", "C"
-  sortOrder Int    @default(0)
-
-  section SeatSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  seats   Seat[]
+  rowLabel  String
+  sortOrder Int         @default(0)
+  section   SeatSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  seats     Seat[]
 
   @@map("seat_rows")
 }
 
 model Seat {
-  id         String    @id @default(cuid())
+  id         String      @id @default(cuid())
   rowId      String
-  seatNumber String // "1", "2", "A1"
-  seatLabel  String // Display label: "A-1"
-  status     String    @default("AVAILABLE") // AVAILABLE, RESERVED, SOLD, BLOCKED
-  reservedBy String? // userId
+  seatNumber String
+  seatLabel  String
+  status     String      @default("AVAILABLE")
+  reservedBy String?
   reservedAt DateTime?
-  expiresAt  DateTime? // Reservation timeout
-
-  row        SeatRow     @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime?
   orderItems OrderItem[]
+  row        SeatRow     @relation(fields: [rowId], references: [id], onDelete: Cascade)
 
   @@map("seats")
 }
 
-// ========================
-// ORDER
-// ========================
-
 model Order {
-  id          String    @id @default(cuid())
-  orderNumber String    @unique // ORD-XXXXXXXX
-  buyerId     String
-  eventId     String
-  status      String    @default("PENDING") // PENDING, CONFIRMED, CANCELLED, REFUNDED, CHECKED_IN
-  subtotal    Decimal   @db.Decimal(12, 2)
-  fees        Decimal   @default(0) @db.Decimal(12, 2)
-  discount    Decimal   @default(0) @db.Decimal(12, 2)
-  total       Decimal   @db.Decimal(12, 2)
-  currency    String    @default("VND")
-  voucherCode String?
-  notes       String?
-  expiresAt   DateTime // Timeout: now() + 15 mins
-  confirmedAt DateTime?
-  checkedInAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
+  id            String         @id @default(cuid())
+  orderNumber   String         @unique
+  buyerId       String
+  eventId       String
+  status        String         @default("PENDING")
+  subtotal      Decimal        @db.Decimal(12, 2)
+  fees          Decimal        @default(0) @db.Decimal(12, 2)
+  discount      Decimal        @default(0) @db.Decimal(12, 2)
+  total         Decimal        @db.Decimal(12, 2)
+  currency      String         @default("VND")
+  voucherCode   String?
+  notes         String?
+  expiresAt     DateTime
+  confirmedAt   DateTime?
+  checkedInAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  items         OrderItem[]
   buyer         User           @relation(fields: [buyerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   event         Event          @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  items         OrderItem[]
   payment       Payment?
   RefundRequest RefundRequest?
 
@@ -256,47 +220,41 @@ model Order {
 }
 
 model OrderItem {
-  id           String    @id @default(cuid())
+  id           String      @id @default(cuid())
   orderId      String
-  ticketTypeId String? // null if seat-based
-  seatId       String? // null if ticket-type based
-  quantity     Int       @default(1)
-  unitPrice    Decimal   @db.Decimal(12, 2)
-  subtotal     Decimal   @db.Decimal(12, 2)
-  qrCode       String?   @db.NVarChar(Max) // QR data per ticket
-  ticketCode   String?   @unique // Unique ticket code
-  isCheckedIn  Boolean   @default(false)
+  ticketTypeId String?
+  seatId       String?
+  quantity     Int         @default(1)
+  unitPrice    Decimal     @db.Decimal(12, 2)
+  subtotal     Decimal     @db.Decimal(12, 2)
+  qrCode       String?
+  ticketCode   String?     @unique
+  isCheckedIn  Boolean     @default(false)
   checkedInAt  DateTime?
-  createdAt    DateTime  @default(now())
-
-  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  ticketType TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  seat       Seat?       @relation(fields: [seatId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdAt    DateTime    @default(now())
+  order        Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seat         Seat?       @relation(fields: [seatId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ticketType   TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("order_items")
 }
 
-// ========================
-// PAYMENT (VietQR / PayOS)
-// ========================
-
 model Payment {
-  id             String    @id @default(cuid())
-  orderId        String    @unique
-  payosOrderCode BigInt    @unique // PayOS order code (numeric)
-  payosPaymentId String?   @unique // PayOS payment ID after success
-  checkoutUrl    String    @db.NVarChar(Max) // QR payment URL
-  qrCode         String?   @db.NVarChar(Max) // QR code image data
-  amount         Decimal   @db.Decimal(12, 2)
-  currency       String    @default("VND")
-  status         String    @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
+  id             String        @id @default(cuid())
+  orderId        String        @unique
+  payosOrderCode BigInt        @unique
+  payosPaymentId String?       @unique
+  checkoutUrl    String
+  qrCode         String?
+  amount         Decimal       @db.Decimal(12, 2)
+  currency       String        @default("VND")
+  status         String        @default("PENDING")
   failureReason  String?
   paidAt         DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  order        Order         @relation(fields: [orderId], references: [id])
-  transactions Transaction[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  order          Order         @relation(fields: [orderId], references: [id])
+  transactions   Transaction[]
 
   @@map("payments")
 }
@@ -304,44 +262,37 @@ model Payment {
 model Transaction {
   id           String   @id @default(cuid())
   paymentId    String
-  payosEventId String   @unique // PayOS webhook event ID (idempotency)
-  type         String // PAYMENT_SUCCESS, PAYMENT_FAILED, REFUND
+  payosEventId String   @unique
+  type         String
   amount       Decimal  @db.Decimal(12, 2)
   status       String
-  rawPayload   String   @db.NVarChar(Max) // Raw PayOS event JSON
+  rawPayload   String
   createdAt    DateTime @default(now())
-
-  payment Payment @relation(fields: [paymentId], references: [id])
+  payment      Payment  @relation(fields: [paymentId], references: [id])
 
   @@map("transactions")
 }
-
-// ========================
-// NOTIFICATION
-// ========================
 
 model Notification {
   id        String   @id @default(cuid())
   userId    String
   title     String
-  message   String   @db.NVarChar(Max)
-  type      String // ORDER_CONFIRMED, SEAT_RESERVED, EVENT_CANCELLED, REVENUE_UPDATE
+  message   String
+  type      String
   isRead    Boolean  @default(false)
-  metadata  String?  @db.NVarChar(Max) // JSON: orderId, eventId, etc.
+  metadata  String?
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  parentId  String?
-  createdAt DateTime @default(now())
-
+  id            String     @id @default(cuid())
+  name          String
+  slug          String     @unique
+  parentId      String?
+  createdAt     DateTime   @default(now())
   parent        Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subcategories Category[] @relation("SubCategories")
 
@@ -353,9 +304,8 @@ model Favorite {
   userId    String
   eventId   String
   createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event Event @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventId])
   @@map("favorites")
@@ -364,7 +314,7 @@ model Favorite {
 model Voucher {
   id            String   @id @default(cuid())
   code          String   @unique
-  discountType  String // PERCENTAGE, FIXED
+  discountType  String
   discountValue Decimal  @db.Decimal(12, 2)
   maxDiscount   Decimal? @db.Decimal(12, 2)
   minOrderValue Decimal? @db.Decimal(12, 2)
@@ -372,28 +322,23 @@ model Voucher {
   endDate       DateTime
   usageLimit    Int?
   usedCount     Int      @default(0)
-  status        String   @default("ACTIVE") // ACTIVE, INACTIVE, EXPIRED
+  status        String   @default("ACTIVE")
   createdAt     DateTime @default(now())
 
   @@map("vouchers")
 }
 
-// ========================
-// ADMIN & CMS FEATURES
-// ========================
-
 model Review {
   id        String   @id @default(cuid())
   userId    String
   eventId   String
-  rating    Int // 1-5
-  content   String   @db.NVarChar(Max)
-  isHidden  Boolean  @default(false) // Admin can hide inappropriate reviews
+  rating    Int
+  content   String
+  isHidden  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  event Event @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("reviews")
 }
@@ -402,15 +347,14 @@ model RefundRequest {
   id        String   @id @default(cuid())
   orderId   String   @unique
   userId    String
-  reason    String   @db.NVarChar(Max)
+  reason    String
   amount    Decimal  @db.Decimal(12, 2)
-  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  adminNote String?  @db.NVarChar(Max)
+  status    String   @default("PENDING")
+  adminNote String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  user  User  @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("refund_requests")
 }
@@ -418,14 +362,13 @@ model RefundRequest {
 model Report {
   id         String   @id @default(cuid())
   reporterId String
-  targetType String // EVENT, USER, REVIEW
+  targetType String
   targetId   String
-  reason     String   @db.NVarChar(Max)
-  status     String   @default("PENDING") // PENDING, RESOLVED, REJECTED
+  reason     String
+  status     String   @default("PENDING")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@map("reports")
 }
@@ -433,11 +376,11 @@ model Report {
 model Content {
   id          String   @id @default(cuid())
   title       String
-  slug        String   @unique // /terms, /privacy, or 'home-banner'
-  type        String // PAGE, BANNER
-  contentHtml String?  @db.NVarChar(Max)
-  imageUrl    String?  @db.NVarChar(Max)
-  status      String   @default("DRAFT") // DRAFT, PUBLISHED, ACTIVE
+  slug        String   @unique
+  type        String
+  contentHtml String?
+  imageUrl    String?
+  status      String   @default("DRAFT")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -447,109 +390,95 @@ model Content {
 model AdminLog {
   id        String   @id @default(cuid())
   adminId   String
-  action    String   @db.NVarChar(255) // e.g. "APPROVED_EVENT", "BLOCKED_USER"
-  details   String?  @db.NVarChar(Max) // JSON details
+  action    String
+  details   String?
   ipAddress String?
   createdAt DateTime @default(now())
-
-  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@map("admin_logs")
 }
 
-// ========================
-// ORGANIZER
-// ========================
-
 model OrganizerProfile {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  orgName        String   // Tên tổ chức
-  orgLogo        String?  // URL logo
-  orgBanner      String?  // URL banner
-  orgDescription String?  @db.NVarChar(Max)
+  id             String              @id @default(cuid())
+  userId         String              @unique
+  orgName        String
+  orgLogo        String?
+  orgBanner      String?
+  orgDescription String?
   website        String?
   facebook       String?
   address        String?
-  representative String?  // Người đại diện
-  verifyStatus   String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  rejectReason   String?  @db.NVarChar(Max)
+  representative String?
+  verifyStatus   String              @default("PENDING")
+  rejectReason   String?
   reviewedAt     DateTime?
   reviewedBy     String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  documents     OrganizerDocument[]
-  bankInfo      OrganizerBankInfo?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  bankInfo       OrganizerBankInfo?
+  documents      OrganizerDocument[]
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("organizer_profiles")
 }
 
 model OrganizerDocument {
-  id          String   @id @default(cuid())
-  profileId   String
-  docType     String   // CCCD, BUSINESS_LICENSE, SELFIE
-  docUrl      String   @db.NVarChar(Max)
-  createdAt   DateTime @default(now())
-
-  profile OrganizerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id        String           @id @default(cuid())
+  profileId String
+  docType   String
+  docUrl    String
+  createdAt DateTime         @default(now())
+  profile   OrganizerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@map("organizer_documents")
 }
 
 model OrganizerBankInfo {
-  id            String   @id @default(cuid())
-  profileId     String   @unique
+  id            String           @id @default(cuid())
+  profileId     String           @unique
   bankName      String
   accountNumber String
   accountHolder String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  profile OrganizerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  profile       OrganizerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@map("organizer_bank_info")
 }
 
-// ========================
-// FINANCE (Escrow / Settlement / Withdrawal)
-// ========================
-
 model Settlement {
-  id              String    @id @default(cuid())
-  eventId         String    @unique
-  sellerId        String
-  grossRevenue    Decimal   @db.Decimal(14, 2) // Tổng doanh thu vé bán được
-  commissionRate  Decimal   @db.Decimal(5, 4)  // Tỷ lệ hoa hồng (e.g. 0.07 = 7%)
-  commissionFee   Decimal   @db.Decimal(14, 2) // Số tiền hoa hồng
-  perTicketFee    Decimal   @default(0) @db.Decimal(14, 2) // Phí cố định / vé
-  netAmount       Decimal   @db.Decimal(14, 2) // Số tiền Organizer nhận
-  status          String    @default("PENDING") // PENDING, PROCESSING, COMPLETED
-  note            String?   @db.NVarChar(Max)
-  processedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  event Event @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id             String    @id @default(cuid())
+  eventId        String    @unique
+  sellerId       String
+  grossRevenue   Decimal   @db.Decimal(14, 2)
+  commissionRate Decimal   @db.Decimal(5, 4)
+  commissionFee  Decimal   @db.Decimal(14, 2)
+  perTicketFee   Decimal   @default(0) @db.Decimal(14, 2)
+  netAmount      Decimal   @db.Decimal(14, 2)
+  status         String    @default("PENDING")
+  note           String?
+  processedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  event          Event     @relation(fields: [eventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("settlements")
 }
 
 model Withdrawal {
-  id          String    @id @default(cuid())
-  sellerId    String
-  amount      Decimal   @db.Decimal(14, 2)
-  bankName    String
+  id            String    @id @default(cuid())
+  sellerId      String
+  amount        Decimal   @db.Decimal(14, 2)
+  bankName      String
   accountNumber String
   accountHolder String
-  status      String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, REJECTED
-  adminNote   String?   @db.NVarChar(Max)
-  processedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  seller User @relation(fields: [sellerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status        String    @default("PENDING")
+  adminNote     String?
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  seller        User      @relation(fields: [sellerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("withdrawals")
 }
@@ -558,11 +487,10 @@ model EventApprovalLog {
   id        String   @id @default(cuid())
   eventId   String
   adminId   String
-  action    String   // APPROVED, REJECTED, REQUESTED_CHANGES
-  note      String?  @db.NVarChar(Max)
+  action    String
+  note      String?
   createdAt DateTime @default(now())
-
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("event_approval_logs")
 }

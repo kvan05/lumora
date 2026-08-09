@@ -1,10 +1,17 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
+require("dotenv").config();
+
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = "admin@lumora.vn";
-  const adminPassword = "Admin123456@";
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@lumora.vn";
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminPassword) {
+    throw new Error("Missing ADMIN_PASSWORD in environment variables. Please configure ADMIN_PASSWORD in .env before running seed.");
+  }
+
   const hashedPassword = await bcrypt.hash(adminPassword, 12);
 
   const existingAdmin = await prisma.user.findUnique({
@@ -39,13 +46,16 @@ async function main() {
 🔑 THÔNG TIN ĐĂNG NHẬP TRANG ADMIN:
 - ĐƯỜNG DẪN: http://localhost:3000/login
 - EMAIL: ${adminEmail}
-- MẬT KHẨU: ${adminPassword}
+- MẬT KHẨU: [Cấu hình trong file .env]
 - VÀO TRANG ADMIN: http://localhost:3000/admin
   `);
 }
 
 main()
-  .catch((e) => console.error(e))
+  .catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+  })
   .finally(async () => {
     await prisma.$disconnect();
   });

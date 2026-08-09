@@ -18,8 +18,29 @@ import { Badge } from "@/components/ui/badge";
 import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const CATEGORIES = ["Âm nhạc", "Thể thao", "Workshop", "Lễ hội", "Triển lãm", "Sân khấu", "Nghệ thuật", "Ẩm thực", "Hội thảo"];
-const CITIES = ["Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Phan Thiết", "Cần Thơ", "Hải Phòng"];
+interface CategoryOption {
+  id?: string;
+  name: string;
+  slug?: string;
+  count?: number;
+}
+
+const DEFAULT_CATEGORIES: string[] = [
+  "Concert & Live Show",
+  "City Tour & Bus 2 tầng",
+  "Water Bus & Du thuyền",
+  "Tham quan địa điểm",
+  "Music Festival",
+  "Workshop & Lớp học",
+  "Triển lãm & Nghệ thuật",
+  "Thể thao & Giải đấu",
+  "Công viên chủ đề",
+  "Bảo tàng & Di sản",
+  "Lễ hội Ẩm thực",
+  "Sân khấu & Kịch",
+  "Khác",
+];
+const CITIES: string[] = ["Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Nha Trang", "Cần Thơ", "Hải Phòng", "Đà Lạt", "Vũng Tàu"];
 
 export default function EventsPage() {
   const router = useRouter();
@@ -32,6 +53,20 @@ export default function EventsPage() {
   const [dateFilter, setDateFilter] = useState("");
   const [sortBy, setSortBy] = useState("latest");
   const [showFilters, setShowFilters] = useState(false);
+
+  // Dynamic categories from API
+  const { data: dbCategories } = useQuery<string[]>({
+    queryKey: ["api-categories"],
+    queryFn: async () => {
+      const res = await api.get("/events/categories").catch(() => null);
+      if (res?.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+        return res.data.data.map((c: CategoryOption) => c.name);
+      }
+      return [];
+    },
+  });
+
+  const categoriesList: string[] = dbCategories && dbCategories.length > 0 ? dbCategories : DEFAULT_CATEGORIES;
 
   useEffect(() => {
     const catParam = searchParams.get("category") || "";
@@ -136,7 +171,7 @@ export default function EventsPage() {
                   <Button size="sm" variant={category === "" ? "default" : "outline"} className="rounded-full text-xs h-8" onClick={() => setCategory("")}>
                     Tất cả
                   </Button>
-                  {CATEGORIES.map((cat) => (
+                  {categoriesList.map((cat: string) => (
                     <Button key={cat} size="sm" variant={category === cat ? "default" : "outline"} className="rounded-full text-xs h-8" onClick={() => setCategory(category === cat ? "" : cat)}>
                       {cat}
                     </Button>

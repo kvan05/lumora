@@ -1,11 +1,42 @@
+# =========================
 # Frontend
+# =========================
 lumora-fe/node_modules/
 lumora-fe/.next/
+lumora-fe/out/
 lumora-fe/.env.local
+lumora-fe/.env.*.local
 
+# =========================
 # Backend
+# =========================
 lumora-be/node_modules/
+lumora-be/dist/
 lumora-be/.env
+lumora-be/.env.*.local
 
+# =========================
+# Environment
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# =========================
 # Mac
+# =========================
 .DS_Store
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/

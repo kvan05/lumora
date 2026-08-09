@@ -220,8 +220,21 @@ export async function getCategories(req: Request, res: Response, next: NextFunct
   try {
     const categories = await prisma.category.findMany({
       include: { subcategories: true },
+      orderBy: { name: "asc" },
     });
-    res.json({ success: true, data: categories });
+
+    const eventCounts = await prisma.event.groupBy({
+      by: ["category"],
+      _count: { category: true },
+    });
+    const countMap = new Map(eventCounts.map((e) => [e.category, e._count.category]));
+
+    const result = categories.map((cat) => ({
+      ...cat,
+      eventsCount: countMap.get(cat.name) || countMap.get(cat.slug) || 0,
+    }));
+
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }

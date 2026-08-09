@@ -31,7 +31,6 @@ import {
   Save,
   RefreshCw,
   Lock,
-  Facebook,
   Award
 } from "lucide-react";
 

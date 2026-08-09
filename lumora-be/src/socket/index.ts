@@ -2,15 +2,24 @@ import { Server as HttpServer } from "http";
 import { Server as SocketServer } from "socket.io";
 import jwt from "jsonwebtoken";
 import { JwtPayload } from "../middleware/auth.middleware";
+import { isAllowedOrigin } from "../app";
 
 let io: SocketServer;
 
 export function initializeSocket(httpServer: HttpServer): SocketServer {
   io = new SocketServer(httpServer, {
     cors: {
-      origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
+      // Reuse the same origin-validation logic as Express CORS middleware
+      origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error(`Socket.io CORS: origin '${origin}' is not allowed`));
+        }
+      },
       credentials: true,
       methods: ["GET", "POST"],
+      allowedHeaders: ["Content-Type", "Authorization"],
     },
     pingTimeout: 60000,
   });

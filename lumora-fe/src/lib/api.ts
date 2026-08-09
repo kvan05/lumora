@@ -31,4 +31,24 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+export function setMemoryAccessToken(token: string | null, _user?: any) {
+  cachedToken = token;
+  tokenExpiry = Date.now() + 3600000;
+}
+
+export function getMemoryAccessToken(): string | null {
+  return cachedToken;
+}
+
+export function clearMemoryAuth() {
+  cachedToken = null;
+  tokenExpiry = 0;
+}
+
+export function broadcastSessionEvent(event: string) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("session_event", { detail: { event } }));
+  }
+}
+
 export default api;

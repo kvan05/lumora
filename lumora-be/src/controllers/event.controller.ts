@@ -211,16 +211,29 @@ export async function getCategories(
   next: NextFunction
 ): Promise<void> {
   try {
-    const result = await prisma.event.groupBy({
+    const categories = await prisma.category.findMany({
+      orderBy: { name: "asc" },
+    });
+
+    const eventCounts = await prisma.event.groupBy({
       by: ["category"],
       where: { status: "PUBLISHED" },
       _count: { category: true },
-      orderBy: { _count: { category: "desc" } },
     });
+
+    const countMap = new Map(eventCounts.map((r) => [r.category, r._count.category]));
+
+    const data = categories.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      parentId: cat.parentId,
+      count: countMap.get(cat.name) || countMap.get(cat.slug) || 0,
+    }));
 
     res.json({
       success: true,
-      data: result.map((r: any) => ({ name: r.category, count: r._count.category })),
+      data,
     });
   } catch (err) {
     next(err);

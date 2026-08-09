@@ -38,14 +38,17 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const categories = [
-    { name: "Âm nhạc", href: "/events?category=" + encodeURIComponent("Nhạc") },
-    { name: "Sân khấu & Nghệ thuật", href: "/events?category=" + encodeURIComponent("Sân khấu") },
-    { name: "Thể Thao", href: "/events?category=" + encodeURIComponent("Thể thao") },
-    { name: "Hội thảo & Workshop", href: "/events?category=" + encodeURIComponent("Workshop") },
-    { name: "Tham quan & Trải nghiệm", href: "/events?category=" + encodeURIComponent("Trải nghiệm") },
+    { name: "Tất cả", href: "/events" },
+    { name: "Concert & Âm nhạc", href: "/events?category=" + encodeURIComponent("Concert & Live Show") },
+    { name: "City Tour & Bus 2 tầng", href: "/events?category=" + encodeURIComponent("City Tour & Bus 2 tầng") },
+    { name: "Water Bus & Du thuyền", href: "/events?category=" + encodeURIComponent("Water Bus & Du thuyền") },
+    { name: "Tham quan & Di sản", href: "/events?category=" + encodeURIComponent("Tham quan địa điểm") },
+    { name: "Sân khấu & Kịch", href: "/events?category=" + encodeURIComponent("Sân khấu & Kịch") },
+    { name: "Thể Thao", href: "/events?category=" + encodeURIComponent("Thể thao & Giải đấu") },
+    { name: "Workshop", href: "/events?category=" + encodeURIComponent("Workshop & Lớp học") },
+    { name: "Công viên & Giải trí", href: "/events?category=" + encodeURIComponent("Công viên chủ đề") },
+    { name: "Ẩm thực", href: "/events?category=" + encodeURIComponent("Lễ hội Ẩm thực") },
     { name: "Khác", href: "/events?category=" + encodeURIComponent("Khác") },
-    { name: "Vé bán lại", href: "/events?category=" + encodeURIComponent("Vé") },
-    { name: "Blog", href: "/events" },
   ];
 
   const handleSearchSubmit = (e: React.FormEvent) => {
