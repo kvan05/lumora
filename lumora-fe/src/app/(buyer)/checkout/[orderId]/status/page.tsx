@@ -27,7 +27,8 @@ export default function PaymentStatusPage() {
       return;
     }
 
-    let attempts = 0;
+    // Use ref so the counter persists across interval ticks without re-renders
+    const attemptsRef = { current: 0 };
     const maxAttempts = 30; // 30 × 2s = 60s
 
     const checkStatus = async () => {
@@ -44,16 +45,29 @@ export default function PaymentStatusPage() {
             setStatus("FAILED");
             if (pollRef.current) clearInterval(pollRef.current);
           } else {
-            attempts++;
-            if (attempts >= maxAttempts) {
+            // Still PENDING — keep polling until maxAttempts
+            attemptsRef.current++;
+            if (attemptsRef.current >= maxAttempts) {
               setStatus("FAILED");
               if (pollRef.current) clearInterval(pollRef.current);
             }
           }
+        } else {
+          // API returned but success = false — count as a soft failure
+          attemptsRef.current++;
+          if (attemptsRef.current >= maxAttempts) {
+            setStatus("FAILED");
+            if (pollRef.current) clearInterval(pollRef.current);
+          }
         }
       } catch {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setStatus("FAILED");
+        // 401 / network error (session not ready yet after PayOS redirect) →
+        // do NOT fail immediately; just count the attempt and keep polling.
+        attemptsRef.current++;
+        if (attemptsRef.current >= maxAttempts) {
+          setStatus("FAILED");
+          if (pollRef.current) clearInterval(pollRef.current);
+        }
       }
     };
 
