@@ -1521,7 +1521,7 @@ export async function getRiskAlerts(req: Request, res: Response, next: NextFunct
       });
     });
 
-    const allAlerts = [...storedAlerts.map((sa) => ({
+    const allAlerts = [...storedAlerts.map((sa: any) => ({
       ...sa,
       reasons: JSON.parse(sa.reasons || "[]"),
     })), ...generatedAlerts];

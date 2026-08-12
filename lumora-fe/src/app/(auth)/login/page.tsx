@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api, { setMemoryAccessToken } from "@/lib/api";
@@ -34,9 +34,41 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const authError = searchParams.get("error");
+  const { data: session, status } = useSession();
+
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Handle NextAuth OAuth errors (e.g. invalid Google client credentials)
+  useEffect(() => {
+    if (authError) {
+      if (authError === "Configuration" || authError === "AccessDenied") {
+        toast.error("Cấu hình Đăng nhập Google chưa chính xác hoặc bị từ chối truy cập.");
+      } else if (authError === "OAuthAccountNotLinked") {
+        toast.error("Email này đã được sử dụng với phương thức đăng nhập khác.");
+      } else {
+        toast.error("Lỗi đăng nhập bằng mạng xã hội. Vui lòng thử lại.");
+      }
+    }
+  }, [authError]);
+
+  // Auto-redirect to dashboard when authenticated (Google OAuth return or logged in session)
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      const userRole = (session.user as any)?.role || "BUYER";
+      if (userRole === "ADMIN") {
+        window.location.href = "/admin";
+      } else if (userRole === "SELLER") {
+        window.location.href = "/seller/dashboard";
+      } else if (callbackUrl && callbackUrl !== "/login") {
+        window.location.href = callbackUrl;
+      } else {
+        window.location.href = "/";
+      }
+    }
+  }, [status, session, callbackUrl]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
