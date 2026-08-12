@@ -115,6 +115,9 @@ export default function PaymentStatusPage() {
               <p className="text-muted-foreground mt-1 text-sm">
                 Vé của bạn đã được xác nhận. Dưới đây là phôi vé điện tử chính thức của bạn:
               </p>
+              <div className="inline-flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-3.5 py-1.5 rounded-xl border border-amber-500/20 text-xs mt-3">
+                <span>Đây là giao dịch mô phỏng phục vụ mục đích trình diễn đồ án.</span>
+              </div>
             </div>
 
             {/* Display Ticket Card */}

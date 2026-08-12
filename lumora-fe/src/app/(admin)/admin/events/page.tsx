@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar, Search, CheckCircle, X, Eye, Edit, AlertTriangle,
-  RefreshCw, Filter, Clock, AlertCircle, MapPin, User, FileEdit, Check, ArrowRight, LayoutGrid
+  RefreshCw, Filter, Clock, AlertCircle, MapPin, User, FileEdit, Check, ArrowRight, LayoutGrid, Activity
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -270,6 +270,19 @@ export default function EventsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 rounded-xl text-xs font-bold gap-1 border-emerald-500/30 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10"
+                            title="Xem Event Health Score"
+                            onClick={() => {
+                              setSelectedEvent(event);
+                              setDetailOpen(true);
+                            }}
+                          >
+                            <Activity className="h-3.5 w-3.5" /> Health Score
+                          </Button>
+
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" title="Xem chi tiết" onClick={() => { setSelectedEvent(event); setDetailOpen(true); setApprovalNote(""); }}>
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -394,7 +407,7 @@ export default function EventsPage() {
                     {/* Proposed Changes */}
                     <div className="p-4 rounded-xl border border-purple-200 bg-purple-50/50 dark:bg-purple-950/20 dark:border-purple-900 space-y-3">
                       <h4 className="font-bold text-sm text-purple-700 dark:text-purple-300 pb-2 border-b border-purple-200">
-                        ✨ Đề Xuất Thay Đổi Mới
+                        Đề Xuất Thay Đổi Mới
                       </h4>
                       <div>
                         <p className="text-xs text-muted-foreground font-semibold">Tên sự kiện</p>

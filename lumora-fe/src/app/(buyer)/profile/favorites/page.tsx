@@ -79,7 +79,7 @@ function FavoritesContent() {
           <Heart className="h-16 w-16 mx-auto mb-4 text-muted-foreground/30" />
           <h2 className="text-2xl font-bold text-muted-foreground">Chưa có sự kiện yêu thích</h2>
           <p className="text-muted-foreground mt-2 text-sm">
-            Bấm vào ❤️ trên các sự kiện bạn quan tâm để lưu lại tại đây.
+            Bấm vào biểu tượng trái tim trên các sự kiện bạn quan tâm để lưu lại tại đây.
           </p>
           <Button className="mt-8 rounded-full font-semibold shadow-md" asChild>
             <Link href="/events">

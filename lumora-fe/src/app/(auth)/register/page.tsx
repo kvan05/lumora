@@ -185,7 +185,7 @@ export default function RegisterPage() {
               <MailCheck className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác thực Email ✉️</h2>
+              <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác thực Email</h2>
               <p className="text-xs text-muted-foreground">Mã OTP gồm 6 chữ số có hiệu lực trong 5 phút</p>
             </div>
           </div>
@@ -253,7 +253,7 @@ export default function RegisterPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="space-y-1">
-        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Tạo tài khoản mới 🎉</h2>
+        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Tạo tài khoản mới</h2>
         <p className="text-sm text-muted-foreground">
           Đăng ký bằng email của bạn để trải nghiệm mua vé dễ dàng.
         </p>

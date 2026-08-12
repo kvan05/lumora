@@ -47,7 +47,7 @@ export default function ReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight">Đánh giá & Phản hồi ⭐</h1>
+        <h1 className="text-2xl font-black tracking-tight">Đánh giá & Phản hồi</h1>
         <p className="text-sm text-muted-foreground mt-1">Quản lý và kiểm duyệt các đánh giá của người dùng về sự kiện.</p>
       </div>
 

@@ -27,7 +27,7 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Báo cáo vi phạm 🚩</h1>
+          <h1 className="text-2xl font-black tracking-tight">Báo cáo vi phạm</h1>
           <p className="text-sm text-muted-foreground mt-1">Xử lý các báo cáo từ cộng đồng về sự kiện, người dùng, đánh giá vi phạm.</p>
         </div>
       </div>

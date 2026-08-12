@@ -7,11 +7,13 @@ import { usePathname } from "next/navigation";
 import { Session } from "next-auth";
 import { signOut } from "next-auth/react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import {
   LayoutDashboard, Users, Calendar, Ticket, ShoppingCart, Barcode,
   CreditCard, TrendingUp, RefreshCw, Star, Tags, Megaphone, FileText,
   Flag, ShieldCheck, ChevronRight, Menu, X, Bell, LogOut, Settings,
-  ChevronDown, User, BarChart3, AlertCircle, Cog, BookOpen, Tag
+  ChevronDown, User, BarChart3, AlertCircle, Cog, BookOpen, Tag,
+  AlertTriangle, Scale, History, HeartPulse, ShieldAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,7 +24,15 @@ const NAV_GROUPS = [
   {
     label: "Tổng quan",
     items: [
-      { href: "/admin", icon: LayoutDashboard, label: "Dashboard", exact: true },
+      { href: "/admin", icon: LayoutDashboard, label: "Control Center", exact: true },
+    ],
+  },
+  {
+    label: "Điều hành & Giám sát",
+    items: [
+      { href: "/admin/risk-alerts", icon: ShieldAlert, label: "Phát hiện rủi ro (Risk)" },
+      { href: "/admin/reconciliation", icon: Scale, label: "Đối soát tài chính" },
+      { href: "/admin/audit-logs", icon: History, label: "System Audit Logs" },
     ],
   },
   {
@@ -45,23 +55,15 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/orders", icon: ShoppingCart, label: "Đơn mua vé" },
       { href: "/admin/payments", icon: CreditCard, label: "Thanh toán" },
-      { href: "/admin/revenue", icon: TrendingUp, label: "Doanh thu & Hoa hồng" },
+      { href: "/admin/revenue", icon: TrendingUp, label: "Doanh thu & Phí sàn" },
       { href: "/admin/refunds", icon: RefreshCw, label: "Hoàn tiền & Khiếu nại" },
     ],
   },
   {
-    label: "Nội dung",
+    label: "Nội dung & Hệ thống",
     items: [
       { href: "/admin/reviews", icon: Star, label: "Đánh giá & Phản hồi" },
       { href: "/admin/categories", icon: Tags, label: "Danh mục sự kiện" },
-      { href: "/admin/promotions", icon: Tag, label: "Khuyến mãi" },
-      { href: "/admin/content", icon: Megaphone, label: "Nội dung website" },
-    ],
-  },
-  {
-    label: "Hệ thống",
-    items: [
-      { href: "/admin/reports", icon: Flag, label: "Báo cáo vi phạm" },
       { href: "/admin/staff", icon: BarChart3, label: "Quản trị & Phân quyền" },
     ],
   },
@@ -218,10 +220,7 @@ export default function AdminShell({ children, session }: { children: React.Reac
 
           {/* Right side actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="rounded-xl relative">
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-destructive rounded-full" />
-            </Button>
+            <NotificationBell />
             <ThemeToggle />
             <Link href="/" target="_blank">
               <Button variant="outline" size="sm" className="rounded-xl text-xs gap-1.5 h-8">

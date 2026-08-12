@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { AlertTriangle } from "lucide-react";
 
 export function Footer() {
   return (
@@ -98,8 +99,17 @@ export function Footer() {
           </div>
         </div>
 
+        {/* Disclaimer Callout */}
+        <div className="mt-10 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs leading-relaxed flex items-start gap-2.5">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <span>
+            <strong className="font-bold text-amber-600 dark:text-amber-400 mr-1">Vui lòng không mua vé:</strong>
+            Thông tin sự kiện được tổng hợp từ các nguồn công khai và sử dụng cho mục đích học tập, nghiên cứu và mô phỏng hệ thống. Lumora không đại diện cho đơn vị tổ chức sự kiện.
+          </span>
+        </div>
+
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-border/60 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-muted-foreground">
+        <div className="mt-8 pt-6 border-t border-border/60 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-muted-foreground">
           <span>© {new Date().getFullYear()} Lumora. Tất cả các quyền được bảo lưu.</span>
           <div className="flex gap-4">
             <Link href="#" className="hover:text-primary transition-colors">Điều khoản dịch vụ</Link>

@@ -453,9 +453,9 @@ export default function AdminFinancePage() {
                   onChange={e => setProcessStatus(e.target.value)}
                   className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm font-semibold focus:outline-none"
                 >
-                  <option value="COMPLETED">✅ Hoàn thành (Đã chuyển khoản)</option>
-                  <option value="PROCESSING">⏳ Đang xử lý chuyển tiền</option>
-                  <option value="REJECTED">❌ Từ chối yêu cầu</option>
+                  <option value="COMPLETED">Hoàn thành (Đã chuyển khoản)</option>
+                  <option value="PROCESSING">Đang xử lý chuyển tiền</option>
+                  <option value="REJECTED">Từ chối yêu cầu</option>
                 </select>
               </div>
 

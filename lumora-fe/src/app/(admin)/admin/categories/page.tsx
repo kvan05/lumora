@@ -107,7 +107,7 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Quản lý danh mục 🏷️</h1>
+          <h1 className="text-2xl font-black tracking-tight">Quản lý danh mục</h1>
           <p className="text-sm text-muted-foreground mt-1">Phân loại và cấu hình danh mục sự kiện trên hệ thống.</p>
         </div>
         <Button className="rounded-xl gap-2 h-9" onClick={handleOpenAdd}>

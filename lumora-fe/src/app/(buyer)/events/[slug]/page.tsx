@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MapPin, Info, Tag, Armchair, Plus, Minus, ZoomIn, ZoomOut, Maximize, Lock, ShoppingCart, Star, Flag, Send } from "lucide-react";
+import { Calendar, MapPin, Info, Tag, Armchair, Plus, Minus, ZoomIn, ZoomOut, Maximize, Lock, ShoppingCart, Star, Flag, Send, Image as ImageIcon } from "lucide-react";
 import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -279,6 +279,44 @@ export default function EventDetailPage() {
             </p>
           </section>
 
+          {/* Event Detail Images & Gallery Section */}
+          {(() => {
+            let parsedImages: string[] = [];
+            if (Array.isArray(event.imageUrls)) {
+              parsedImages = event.imageUrls;
+            } else if (typeof event.imageUrls === "string" && event.imageUrls.trim()) {
+              try {
+                parsedImages = JSON.parse(event.imageUrls);
+              } catch {
+                parsedImages = event.imageUrls.split(",").map((s: string) => s.trim());
+              }
+            }
+
+            if (!parsedImages || parsedImages.length === 0) return null;
+
+            return (
+              <section className="bg-card rounded-2xl p-6 shadow-sm border border-border/60 space-y-4">
+                <h2 className="text-2xl font-extrabold flex items-center gap-2">
+                  <ImageIcon className="h-6 w-6 text-primary" /> Sơ đồ khán đài & Thông tin chi tiết
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Hình ảnh bản đồ khán đài, sơ đồ chỗ ngồi, quy định và lưu ý trực quan từ Nhà tổ chức.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  {parsedImages.map((url: string, i: number) => (
+                    <div key={i} className="relative rounded-2xl overflow-hidden border border-border/60 shadow-xs bg-slate-900 group">
+                      <img
+                        src={url}
+                        alt={`Ảnh chi tiết ${i + 1}`}
+                        className="w-full h-auto max-h-[350px] object-contain mx-auto"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
+
           {/* Map Section */}
           <section className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
             <h2 className="text-2xl font-extrabold flex items-center gap-2 mb-4">
@@ -310,7 +348,7 @@ export default function EventDetailPage() {
               <p>• Vé đã mua không thể hoàn trả hoặc đổi trả trong bất kỳ trường hợp nào trừ khi sự kiện bị hủy từ phía nhà tổ chức.</p>
               <p>• Trẻ em dưới độ tuổi quy định sẽ không được phép tham gia sự kiện (Vui lòng xem kỹ độ tuổi giới hạn nếu có).</p>
               <p>• Vui lòng đến trước giờ bắt đầu 30 phút để thực hiện các thủ tục check-in.</p>
-              <p>• Mã QR code của vé chỉ có giá trị cho một lần quét duy nhất. Vui lòng bảo mật mã QR của bạn.</p>
+              <p>• Vé mã vạch chỉ có giá trị cho một lần quét duy nhất. Vui lòng bảo mật vé mã vạch của bạn.</p>
               <p>• Ban tổ chức có quyền từ chối sự tham gia của bất kỳ cá nhân nào vi phạm nội quy sự kiện.</p>
             </div>
           </section>
@@ -354,9 +392,14 @@ export default function EventDetailPage() {
 
                       <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
                         <div className="flex flex-col items-end">
-                          <span className="text-xl font-extrabold text-primary">
-                            {Number(ticketType.price).toLocaleString("vi-VN")} ₫
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xl font-extrabold text-primary">
+                              {Number(ticketType.price).toLocaleString("vi-VN")} ₫
+                            </span>
+                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 font-bold">
+                              Giá tham khảo
+                            </Badge>
+                          </div>
                           {ticketType.originalPrice && Number(ticketType.originalPrice) > Number(ticketType.price) && (
                             <span className="text-sm text-muted-foreground line-through font-medium">
                               {Number(ticketType.originalPrice).toLocaleString("vi-VN")} ₫
@@ -423,10 +466,10 @@ export default function EventDetailPage() {
               {/* Sections Legend */}
               <div className="flex flex-wrap gap-3 mb-6 justify-center">
                 {sections.map(sec => (
-                  <div key={sec.id} className="flex items-center gap-1.5 bg-background border px-2 py-1 rounded-full shadow-sm">
+                  <div key={sec.id} className="flex items-center gap-1.5 bg-background border px-2.5 py-1 rounded-full shadow-sm">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sec.color }} />
                     <span className="text-xs font-bold text-foreground">{sec.name}</span>
-                    <span className="text-xs text-muted-foreground">• {Number(sec.price).toLocaleString("vi-VN")} ₫</span>
+                    <span className="text-xs text-muted-foreground">• {Number(sec.price).toLocaleString("vi-VN")} ₫ <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">(Giá tham khảo)</span></span>
                   </div>
                 ))}
               </div>
@@ -835,7 +878,7 @@ function ReviewSection({ eventId, eventSlug }: { eventId: string; eventSlug: str
       {/* Write review form */}
       {session ? (
         <div className="bg-card border border-primary/20 rounded-2xl p-6 shadow-sm">
-          <h3 className="font-extrabold text-base mb-4">✍️ Viết đánh giá của bạn</h3>
+          <h3 className="font-extrabold text-base mb-4">Viết đánh giá của bạn</h3>
           <div className="space-y-4">
             <div>
               <p className="text-sm font-semibold text-muted-foreground mb-2">Chọn số sao</p>

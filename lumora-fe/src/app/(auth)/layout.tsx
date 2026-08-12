@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { Sparkles, Ticket, CreditCard, Clock } from "lucide-react";
 
 export default async function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -33,7 +34,7 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
 
         <div className="z-10 text-center space-y-5 max-w-sm">
           <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-2">
-            <span className="text-3xl">✨</span>
+            <Sparkles className="h-8 w-8 text-primary" />
           </div>
           <h2 className="text-4xl font-extrabold text-foreground leading-tight">
             Thắp Sáng Những Khoảnh Khắc Đẹp Nhất
@@ -44,12 +45,12 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
 
           <div className="pt-4 space-y-3">
             {[
-              { icon: "🎟️", text: "Vé điện tử QR tiện lợi" },
-              { icon: "🏦", text: "Thanh toán VietQR an toàn" },
-              { icon: "⚡", text: "Giữ chỗ tự động 15 phút" },
+              { icon: Ticket, text: "Vé điện tử mã vạch tiện lợi" },
+              { icon: CreditCard, text: "Thanh toán VietQR an toàn" },
+              { icon: Clock, text: "Giữ chỗ tự động 15 phút" },
             ].map((item) => (
               <div key={item.text} className="flex items-center gap-3 text-sm bg-background/60 backdrop-blur-sm rounded-xl px-4 py-3 text-left shadow-xs border border-border/40">
-                <span className="text-xl">{item.icon}</span>
+                <item.icon className="h-5 w-5 text-primary shrink-0" />
                 <span className="font-medium text-foreground">{item.text}</span>
               </div>
             ))}

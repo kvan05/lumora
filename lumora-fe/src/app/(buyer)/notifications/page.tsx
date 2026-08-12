@@ -66,6 +66,18 @@ export default function NotificationsPage() {
     },
   });
 
+  // Delete notification mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/notifications/${id}`);
+    },
+    onSuccess: () => {
+      toast.success("Đã xóa thông báo.");
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications-preview"] });
+    },
+  });
+
   const handleNotificationClick = (item: any) => {
     if (!item.isRead) {
       markReadMutation.mutate(item.id);
@@ -78,8 +90,24 @@ export default function NotificationsPage() {
           router.push(`/orders/${meta.orderId}`);
           return;
         }
+        if (meta.withdrawalId) {
+          const userRole = (session?.user as any)?.role;
+          if (userRole === "ADMIN") {
+            router.push("/admin/reconciliation");
+          } else {
+            router.push("/seller/finance");
+          }
+          return;
+        }
         if (meta.eventId) {
-          router.push(`/events/${meta.eventId}`);
+          const userRole = (session?.user as any)?.role;
+          if (userRole === "SELLER") {
+            router.push(`/seller/events/${meta.eventId}`);
+          } else if (userRole === "ADMIN") {
+            router.push("/admin/events");
+          } else {
+            router.push(`/events/${meta.eventId}`);
+          }
           return;
         }
       } catch (e) {
@@ -90,9 +118,17 @@ export default function NotificationsPage() {
 
   // Helper to render type-specific icons
   const getNotificationIcon = (type: string) => {
+    if (type.includes("WITHDRAWAL") || type.includes("FINANCE")) {
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+          <Ticket className="h-5 w-5" />
+        </div>
+      );
+    }
     switch (type) {
       case "ORDER_CONFIRMED":
       case "TICKET_ISSUED":
+      case "SELLER_NEW_ORDER":
         return (
           <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
             <Ticket className="h-5 w-5" />

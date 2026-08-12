@@ -284,6 +284,8 @@ model Notification {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
   @@map("notifications")
 }
 
@@ -494,3 +496,44 @@ model EventApprovalLog {
 
   @@map("event_approval_logs")
 }
+
+model RiskAlert {
+  id              String    @id @default(cuid())
+  entityType      String
+  entityId        String
+  riskScore       Int
+  riskLevel       String
+  reasons         String
+  status          String    @default("OPEN")
+  assignedAdminId String?
+  adminNote       String?
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("risk_alerts")
+}
+
+model Reconciliation {
+  id                String    @id @default(cuid())
+  periodName        String?
+  startDate         DateTime
+  endDate           DateTime
+  totalOrdersCount  Int
+  grossRevenue      Decimal   @db.Decimal(14, 2)
+  refundedAmount    Decimal   @db.Decimal(14, 2)
+  platformFee       Decimal   @db.Decimal(14, 2)
+  sellerPayout      Decimal   @db.Decimal(14, 2)
+  outstandingAmount Decimal   @db.Decimal(14, 2)
+  expectedAmount    Decimal   @db.Decimal(14, 2)
+  actualAmount      Decimal   @db.Decimal(14, 2)
+  discrepancy       Decimal   @db.Decimal(14, 2)
+  status            String    @default("BALANCED")
+  createdById       String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("reconciliations")
+}
+

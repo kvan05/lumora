@@ -88,6 +88,69 @@ export default function ProfilePage() {
     }
   }, [session, profileForm, router]);
 
+  const avatarInputRef = useState<any>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // Compress Avatar Image Client-side
+  const compressImage = (file: File, maxWidth = 400, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Dung lượng ảnh đại diện quá 10MB. Vui lòng chọn tệp nhỏ hơn.");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    toast.loading("Đang xử lý và tải lên ảnh đại diện mới...", { id: "avatar-upload" });
+    try {
+      const compressedDataUrl = await compressImage(file, 400, 0.85);
+      const res = await api.put("/auth/profile", {
+        name: profile?.name || session?.user?.name,
+        phone: profile?.phone,
+        avatar: compressedDataUrl,
+      });
+
+      if (res.data.success) {
+        toast.success("Cập nhật ảnh đại diện thành công!", { id: "avatar-upload" });
+        await update({ name: profile?.name, image: compressedDataUrl });
+        setProfile((prev: any) => ({ ...prev, avatar: compressedDataUrl }));
+        profileForm.setValue("avatar", compressedDataUrl);
+      }
+    } catch {
+      toast.error("Lỗi khi tải ảnh đại diện lên CSDL.", { id: "avatar-upload" });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   async function onProfileSubmit(values: z.infer<typeof profileSchema>) {
     setIsSavingProfile(true);
     try {
@@ -146,16 +209,43 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-3xl space-y-8">
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        id="buyer-avatar-file-input"
+        accept="image/*"
+        onChange={handleAvatarFileUpload}
+        className="hidden"
+      />
+
       {/* Header */}
       <div className="flex items-center gap-6 p-6 bg-card rounded-2xl border border-border/60 shadow-sm">
-        <Avatar className="h-16 w-16 ring-2 ring-primary/30">
-          <AvatarImage src={profile?.avatar || ""} alt={profile?.name || ""} />
-          <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">
-            {profile?.name?.[0]?.toUpperCase() || "U"}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative group cursor-pointer" onClick={() => document.getElementById("buyer-avatar-file-input")?.click()}>
+          <Avatar className="h-20 w-20 ring-4 ring-primary/20 shadow-md">
+            <AvatarImage src={profile?.avatar || session?.user?.image || ""} alt={profile?.name || ""} />
+            <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
+              {profile?.name?.[0]?.toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+            <Camera className="h-6 w-6" />
+          </div>
+        </div>
+
         <div className="flex-1">
-          <h1 className="text-2xl font-extrabold text-foreground">{profile?.name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-foreground">{profile?.name}</h1>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2.5 rounded-full text-xs font-semibold gap-1 text-primary border-primary/30"
+              onClick={() => document.getElementById("buyer-avatar-file-input")?.click()}
+              disabled={isUploadingAvatar}
+            >
+              <Camera className="h-3.5 w-3.5" />
+              {isUploadingAvatar ? "Đang tải..." : "Đổi ảnh đại diện"}
+            </Button>
+          </div>
           <div className="flex items-center gap-1.5 text-muted-foreground text-sm mt-1">
             <Mail className="h-4 w-4" />
             <span>{profile?.email}</span>

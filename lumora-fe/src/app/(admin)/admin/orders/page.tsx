@@ -1,279 +1,368 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ShoppingCart, Search, Eye, X, RefreshCw, Download, Clock, CheckCircle2, Ticket, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { ShoppingCart, Search, Eye, RefreshCw, CheckCircle2, Ticket, XCircle, CreditCard, ShieldCheck, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
-import api from "@/lib/api";
 import { EventTicket } from "@/components/ticket/EventTicket";
 
-const MOCK_ORDERS = [
-  { id: "o1", orderNumber: "ORD-2026-001", buyer: "Nguyễn Văn An", buyerEmail: "vanan@gmail.com", event: "Live Concert Sky Dec", ticketType: "VIP", quantity: 2, amount: 2400000, status: "CONFIRMED", paymentMethod: "PayOS", createdAt: "2026-07-15 10:30:00" },
-  { id: "o2", orderNumber: "ORD-2026-002", buyer: "Trần Thị Bích", buyerEmail: "tbich@gmail.com", event: "Workshop Kỹ năng mềm", ticketType: "Standard", quantity: 1, amount: 350000, status: "PENDING", paymentMethod: "PayOS", createdAt: "2026-07-15 09:15:00" },
-  { id: "o3", orderNumber: "ORD-2026-003", buyer: "Lê Minh Cường", buyerEmail: "mcuong@gmail.com", event: "Marathon TP.HCM", ticketType: "Regular", quantity: 1, amount: 500000, status: "CANCELLED", paymentMethod: "PayOS", createdAt: "2026-07-14 14:20:00" },
-  { id: "o4", orderNumber: "ORD-2026-004", buyer: "Phạm Thị Dung", buyerEmail: "tdung@gmail.com", event: "Hà Anh Tuấn Concert", ticketType: "Premium", quantity: 4, amount: 6000000, status: "CONFIRMED", paymentMethod: "PayOS", createdAt: "2026-07-14 11:05:00" },
-  { id: "o5", orderNumber: "ORD-2026-005", buyer: "Vũ Hoàng Gia", buyerEmail: "hgia@gmail.com", event: "Food Festival Đà Nẵng", ticketType: "Standard", quantity: 3, amount: 900000, status: "REFUNDED", paymentMethod: "PayOS", createdAt: "2026-07-13 16:45:00" },
-];
-
-const STATUS_CONFIG: Record<string, { label: string; className: string; icon: any }> = {
-  PENDING: { label: "Chờ thanh toán", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400", icon: Clock },
-  CONFIRMED: { label: "Đã thanh toán", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", icon: CheckCircle2 },
-  ISSUED: { label: "Đã phát hành vé", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", icon: Ticket },
-  USED: { label: "Đã sử dụng", className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400", icon: CheckCircle2 },
-  CANCELLED: { label: "Đã hủy", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", icon: X },
-  REFUNDED: { label: "Đã hoàn tiền", className: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", icon: RefreshCw },
-};
-
-export default function OrdersPage() {
-  const [orders, setOrders] = useState<any[]>(MOCK_ORDERS);
-  const [loading, setLoading] = useState(false);
+export default function AdminOrdersAndPaymentsPage() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("ALL");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState("ALL");
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
 
-  const loadOrders = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get("/admin/orders").catch(() => null);
-      if (res?.data?.success && Array.isArray(res.data.data)) {
-        const normalized = res.data.data.map((o: any) => ({
-          ...o,
-          buyerName: typeof o.buyer === "object" ? (o.buyer?.name || o.buyer?.email || "N/A") : (o.buyer || "N/A"),
-          buyerEmail: typeof o.buyer === "object" ? o.buyer?.email : (o.buyerEmail || ""),
-          eventTitle: typeof o.event === "object" ? o.event?.title : (o.event || "N/A"),
-          ticketType: o.items?.[0]?.ticketType?.name || o.items?.[0]?.seat?.seatLabel || o.ticketType || "Vé",
-          quantity: o.items ? o.items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) : (o.quantity || 1),
-          amount: Number(o.total || o.amount || 0),
-          createdAtStr: typeof o.createdAt === "string" ? o.createdAt.split("T")[0] : "",
-        }));
-        setOrders(normalized);
-      }
-    } catch { } finally { setLoading(false); }
-  };
-
-  useEffect(() => { loadOrders(); }, []);
-
-  const filtered = orders.filter(o => {
-    const buyerStr = (o.buyerName || "").toLowerCase();
-    const eventStr = (o.eventTitle || "").toLowerCase();
-    const searchLower = search.toLowerCase();
-    const matchSearch = !search || o.orderNumber?.toLowerCase().includes(searchLower) || buyerStr.includes(searchLower) || eventStr.includes(searchLower);
-    const matchStatus = statusFilter === "ALL" || o.status === statusFilter;
-    return matchSearch && matchStatus;
+  // Fetch real Orders & Payments from Backend API
+  const { data: ordersData, isLoading: isLoadingOrders, refetch: refetchOrders, isFetching } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: async () => {
+      const res = await api.get("/admin/orders");
+      return res.data.success ? res.data.data : [];
+    },
   });
 
-  const handleCancelOrder = async (orderId: string) => {
-    if (!confirm("Bạn có chắc muốn hủy đơn hàng này?")) return;
-    try {
-      const res = await api.patch(`/admin/orders/${orderId}/status`, { status: "CANCELLED" }).catch(() => null);
-      if (res?.data?.success) {
-        toast.success(res.data.message); loadOrders();
-      } else {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "CANCELLED" } : o));
-        toast.success("Đã hủy đơn hàng.");
-      }
-    } catch { toast.error("Có lỗi xảy ra."); }
-  };
+  const { data: paymentsData } = useQuery({
+    queryKey: ["admin-payments"],
+    queryFn: async () => {
+      const res = await api.get("/admin/payments");
+      return res.data.success ? res.data.data : [];
+    },
+  });
 
-  const totalRevenue = orders.filter(o => o.status === "CONFIRMED").reduce((sum, o) => sum + (o.amount || 0), 0);
-  const pendingCount = orders.filter(o => o.status === "PENDING").length;
+  const orders = Array.isArray(ordersData) ? ordersData : [];
+  const payments = Array.isArray(paymentsData) ? paymentsData : [];
+
+  // Map payments to orders for easy lookup
+  const paymentMap = new Map();
+  payments.forEach((p: any) => {
+    paymentMap.set(p.orderId, p);
+  });
+
+  const filteredOrders = orders.filter((o: any) => {
+    const buyerName = o.buyer?.name || o.buyer?.email || "";
+    const eventTitle = o.event?.title || "";
+    const orderNumber = o.orderNumber || "";
+
+    const matchSearch =
+      !search ||
+      orderNumber.toLowerCase().includes(search.toLowerCase()) ||
+      buyerName.toLowerCase().includes(search.toLowerCase()) ||
+      eventTitle.toLowerCase().includes(search.toLowerCase());
+
+    const matchOrderStatus = orderStatusFilter === "ALL" || o.status === orderStatusFilter;
+    const payment = paymentMap.get(o.id);
+    const pStatus = payment?.status || (["CONFIRMED", "PAID"].includes(o.status) ? "SUCCEEDED" : o.status);
+    const matchPaymentStatus = paymentStatusFilter === "ALL" || pStatus === paymentStatusFilter;
+
+    return matchSearch && matchOrderStatus && matchPaymentStatus;
+  });
+
+  const totalGMV = orders.filter((o: any) => ["CONFIRMED", "PAID"].includes(o.status)).reduce((sum: number, o: any) => sum + Number(o.total || 0), 0);
+  const platformFee = totalGMV * 0.05; // 5% platform fee
+  const sellerRevenue = totalGMV * 0.95; // 95% seller revenue
+  const pendingCount = orders.filter((o: any) => o.status === "PENDING").length;
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Quản lý đơn mua vé 🛒</h1>
-          <p className="text-sm text-muted-foreground mt-1">Theo dõi và xử lý tất cả đơn đặt vé trên hệ thống.</p>
+          <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+            <ShoppingCart className="h-7 w-7 text-primary" /> Quản Lý Đơn Hàng & Thanh Toán
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Module quản lý hợp nhất tất cả đơn hàng, giao dịch PayOS VietQR, phí sàn 5% và doanh thu Seller.
+          </p>
         </div>
-        <Button variant="outline" className="rounded-xl gap-2 h-9 text-sm" onClick={loadOrders} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Làm mới
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-xl gap-2 h-10 border-border/60"
+          onClick={() => refetchOrders()}
+          disabled={isFetching}
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          Làm mới
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Tổng đơn", value: orders.length, color: "text-foreground" },
-          { label: "Chờ thanh toán", value: pendingCount, color: "text-yellow-500" },
-          { label: "Đã xác nhận", value: orders.filter(o => o.status === "CONFIRMED").length, color: "text-emerald-500" },
-          { label: "Doanh thu (TT)", value: `${(totalRevenue / 1000000).toFixed(1)}M ₫`, color: "text-blue-500" },
-        ].map((s) => (
-          <Card key={s.label} className="rounded-xl border-border/50">
-            <CardContent className="pt-4 pb-3 px-4">
-              <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
-              <p className={`text-xl font-black mt-1 ${s.color}`}>{s.value}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Real Stats Overview */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs text-muted-foreground font-semibold uppercase">Tổng Đơn Hàng</p>
+            <p className="text-2xl font-black text-foreground mt-1">{orders.length}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 shadow-xs">
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold uppercase">Đơn Chờ Thanh Toán</p>
+            <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{pendingCount}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-emerald-500/20 bg-emerald-500/5 shadow-xs">
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Tổng Doanh Thu Sàn (GMV)</p>
+            <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+              {totalGMV.toLocaleString("vi-VN")} ₫
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-xs">
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs text-primary font-semibold uppercase">Phí Sàn Thu Được (5%)</p>
+            <p className="text-xl font-black text-primary mt-1">
+              {platformFee.toLocaleString("vi-VN")} ₫
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      <Card className="rounded-2xl border-border/50">
-        <CardContent className="p-4 flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Tìm theo mã đơn, người mua, sự kiện..." className="pl-9 h-9 rounded-xl" value={search} onChange={e => setSearch(e.target.value)} />
+      {/* Filters Bar */}
+      <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Tìm theo Mã đơn (ORD-x), Tên người mua, Tên sự kiện..."
+              className="pl-9 h-10 rounded-xl"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-44 h-9 rounded-xl">
-              <SelectValue placeholder="Trạng thái" />
+
+          <Select value={orderStatusFilter} onValueChange={setOrderStatusFilter}>
+            <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl">
+              <SelectValue placeholder="Trạng thái đơn" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
-              <SelectItem value="PENDING">Chờ thanh toán</SelectItem>
-              <SelectItem value="CONFIRMED">Đã thanh toán</SelectItem>
-              <SelectItem value="CANCELLED">Đã hủy</SelectItem>
-              <SelectItem value="REFUNDED">Đã hoàn tiền</SelectItem>
+              <SelectItem value="ALL">Tất cả đơn hàng</SelectItem>
+              <SelectItem value="CONFIRMED">Đã xác nhận (CONFIRMED)</SelectItem>
+              <SelectItem value="PENDING">Chờ thanh toán (PENDING)</SelectItem>
+              <SelectItem value="REFUNDED">Đã hoàn tiền (REFUNDED)</SelectItem>
+              <SelectItem value="CANCELLED">Đã hủy (CANCELLED)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+            <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl">
+              <SelectValue placeholder="Trạng thái PayOS" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Tất cả thanh toán</SelectItem>
+              <SelectItem value="SUCCEEDED">Thành công (SUCCEEDED)</SelectItem>
+              <SelectItem value="PENDING">Chờ chuyển khoản</SelectItem>
+              <SelectItem value="REFUNDED">Đã hoàn lại tiền</SelectItem>
+              <SelectItem value="FAILED">Thất bại</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border-border/50 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30 hover:bg-muted/30">
-              <TableHead className="font-bold text-xs uppercase tracking-wider">Mã đơn</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider hidden sm:table-cell">Người mua</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider hidden md:table-cell">Sự kiện</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider hidden lg:table-cell">Số vé</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider">Tổng tiền</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider">Trạng thái</TableHead>
-              <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Hành động</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Không tìm thấy đơn hàng nào.</TableCell></TableRow>
-            ) : filtered.map((order) => {
-              const conf = STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING;
-              return (
-                <TableRow key={order.id} className="hover:bg-muted/20">
-                  <TableCell>
-                    <p className="font-mono text-sm font-bold">{order.orderNumber}</p>
-                    <p className="text-xs text-muted-foreground">{order.createdAtStr || (typeof order.createdAt === "string" ? order.createdAt.split("T")[0] : "")}</p>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <p className="text-sm font-medium">{order.buyerName || order.buyer}</p>
-                    <p className="text-xs text-muted-foreground">{order.buyerEmail}</p>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <p className="text-sm">{order.eventTitle || order.event}</p>
-                    <p className="text-xs text-muted-foreground">{order.ticketType}</p>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <span className="text-sm font-semibold">{order.quantity}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-bold">{order.amount.toLocaleString("vi-VN")}₫</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${conf.className}`}>{conf.label}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => { setSelectedOrder(order); setDetailOpen(true); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {order.status === "PENDING" && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10" onClick={() => handleCancelOrder(order.id)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+      {/* Orders Table */}
+      <Card className="rounded-2xl border-border/50 bg-card shadow-xs overflow-hidden">
+        {isLoadingOrders ? (
+          <div className="p-6 space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="text-center py-16 px-4">
+            <ShoppingCart className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-base font-bold text-foreground">Không tìm thấy đơn hàng nào</p>
+            <p className="text-xs text-muted-foreground mt-1">Dữ liệu đơn hàng thực tế từ cơ sở dữ liệu Neon đang trống hoặc không khớp bộ lọc.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="font-bold text-xs uppercase tracking-wider">Mã đơn hàng</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider">Người mua (Buyer)</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider">Sự kiện</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Tổng tiền</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Phí sàn (5%)</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Doanh thu Seller</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider">Cổng Thanh Toán</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider">Trạng thái</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Chi tiết</TableHead>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.map((o: any) => {
+                  const payment = paymentMap.get(o.id);
+                  const total = Number(o.total || 0);
+                  const fee = total * 0.05;
+                  const sellerRev = total * 0.95;
+
+                  return (
+                    <TableRow key={o.id} className="hover:bg-muted/20">
+                      <TableCell className="font-mono text-xs font-bold text-primary">
+                        {o.orderNumber}
+                        <p className="text-[10px] text-muted-foreground font-normal">
+                          {new Date(o.createdAt).toLocaleDateString("vi-VN")}
+                        </p>
+                      </TableCell>
+
+                      <TableCell>
+                        <p className="font-semibold text-sm">{o.buyer?.name || "Khách hàng"}</p>
+                        <p className="text-xs text-muted-foreground">{o.buyer?.email}</p>
+                      </TableCell>
+
+                      <TableCell className="max-w-[180px]">
+                        <p className="font-bold text-sm truncate">{o.event?.title || "Sự kiện Lumora"}</p>
+                      </TableCell>
+
+                      <TableCell className="text-right font-black text-sm">
+                        {total.toLocaleString("vi-VN")} ₫
+                      </TableCell>
+
+                      <TableCell className="text-right text-xs font-bold text-primary">
+                        {fee.toLocaleString("vi-VN")} ₫
+                      </TableCell>
+
+                      <TableCell className="text-right text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {sellerRev.toLocaleString("vi-VN")} ₫
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 text-xs font-semibold">
+                          <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>PayOS VietQR</span>
+                        </div>
+                        {payment?.payosOrderCode && (
+                          <p className="text-[10px] text-muted-foreground font-mono">Code: {payment.payosOrderCode.toString()}</p>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        {o.status === "CONFIRMED" || o.status === "PAID" ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                            ✓ Đã thanh toán
+                          </Badge>
+                        ) : o.status === "REFUNDED" ? (
+                          <Badge variant="destructive">Đã hoàn tiền</Badge>
+                        ) : o.status === "CANCELLED" ? (
+                          <Badge variant="outline" className="text-red-500 border-red-500/30">
+                            Đã hủy
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                            Chờ chuyển khoản
+                          </Badge>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 rounded-xl"
+                          onClick={() => setSelectedOrder(o)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
 
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-2xl rounded-3xl p-6">
+      {/* Order & Payment Details Dialog */}
+      <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
+        <DialogContent className="max-w-3xl rounded-3xl p-6">
           <DialogHeader>
             <DialogTitle className="font-bold text-lg flex items-center gap-2">
-              <Ticket className="h-5 w-5 text-primary" /> Chi tiết đơn hàng #{selectedOrder?.orderNumber}
+              <ShoppingCart className="h-5 w-5 text-primary" /> Chi Tiết Đơn Hàng #{selectedOrder?.orderNumber}
             </DialogTitle>
+            <DialogDescription className="text-xs">
+              Thông tin giao dịch từ CSDL PostgreSQL Neon và cổng PayOS.
+            </DialogDescription>
           </DialogHeader>
+
           {selectedOrder && (
-            <div className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                {[
-                  { label: "Mã đơn", value: selectedOrder.orderNumber },
-                  { label: "Người mua", value: selectedOrder.buyerName || selectedOrder.buyer },
-                  { label: "Email", value: selectedOrder.buyerEmail || "N/A" },
-                  { label: "Sự kiện", value: selectedOrder.eventTitle || selectedOrder.event },
-                  { label: "Loại vé", value: selectedOrder.ticketType },
-                  { label: "Số lượng", value: `${selectedOrder.quantity} vé` },
-                  { label: "Phương thức TT", value: selectedOrder.paymentMethod || "PayOS" },
-                  { label: "Thời gian", value: selectedOrder.createdAtStr || selectedOrder.createdAt },
-                ].map(item => (
-                  <div key={item.label} className="bg-muted/30 rounded-xl p-2.5">
-                    <p className="text-[11px] text-muted-foreground font-medium">{item.label}</p>
-                    <p className="font-semibold mt-0.5 text-xs truncate">{item.value}</p>
-                  </div>
-                ))}
+            <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="bg-muted/30 p-2.5 rounded-xl border">
+                  <p className="text-muted-foreground font-semibold">Khách Hàng (Buyer)</p>
+                  <p className="font-bold text-foreground mt-0.5">{selectedOrder.buyer?.name || "N/A"}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{selectedOrder.buyer?.email}</p>
+                </div>
+
+                <div className="bg-muted/30 p-2.5 rounded-xl border">
+                  <p className="text-muted-foreground font-semibold">Sự Kiện</p>
+                  <p className="font-bold text-foreground mt-0.5 truncate">{selectedOrder.event?.title}</p>
+                </div>
+
+                <div className="bg-muted/30 p-2.5 rounded-xl border">
+                  <p className="text-muted-foreground font-semibold">Trạng Thái Đơn</p>
+                  <p className="font-bold text-primary mt-0.5">{selectedOrder.status}</p>
+                </div>
+
+                <div className="bg-muted/30 p-2.5 rounded-xl border">
+                  <p className="text-muted-foreground font-semibold">Thời Gian Tạo</p>
+                  <p className="font-bold text-foreground mt-0.5">{new Date(selectedOrder.createdAt).toLocaleString("vi-VN")}</p>
+                </div>
               </div>
 
-              <div className="bg-primary/5 rounded-xl p-3 flex justify-between items-center border border-primary/10">
-                <span className="font-bold text-sm">Tổng tiền thanh toán</span>
-                <span className="text-xl font-black text-primary">{selectedOrder.amount.toLocaleString("vi-VN")} ₫</span>
+              {/* Financial Calculation Breakdown */}
+              <div className="bg-muted/20 border rounded-2xl p-4 space-y-2 text-xs">
+                <div className="flex justify-between font-medium">
+                  <span>Tổng tiền thanh toán (GMV)</span>
+                  <span className="font-bold text-sm">{Number(selectedOrder.total || 0).toLocaleString("vi-VN")} ₫</span>
+                </div>
+                <div className="flex justify-between text-primary">
+                  <span>Phí sàn thu được (5%)</span>
+                  <span className="font-bold">+ {(Number(selectedOrder.total || 0) * 0.05).toLocaleString("vi-VN")} ₫</span>
+                </div>
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                  <span>Doanh thu Seller nhận được (95%)</span>
+                  <span className="font-bold">{(Number(selectedOrder.total || 0) * 0.95).toLocaleString("vi-VN")} ₫</span>
+                </div>
               </div>
 
               <Separator />
 
-              {/* Phôi vé Barcode preview */}
+              {/* Barcode Tickets in this Order */}
               <div className="space-y-3">
                 <h4 className="text-xs uppercase font-extrabold tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Ticket className="h-4 w-4 text-primary" /> Phôi vé Điện tử có Mã Vạch (Barcode)
+                  <Ticket className="h-4 w-4 text-primary" /> Vé Mã Vạch Đã Cấp Phát
                 </h4>
-                <div className="space-y-4">
-                  {selectedOrder.items && selectedOrder.items.length > 0 ? (
-                    selectedOrder.items.map((item: any) => (
-                      <EventTicket
-                        key={item.id}
-                        ticketCode={item.ticketCode || `TKT-${item.id.slice(-8).toUpperCase()}`}
-                        eventTitle={selectedOrder.eventTitle || selectedOrder.event}
-                        bannerUrl={selectedOrder.event?.bannerUrl}
-                        category={selectedOrder.event?.category || "Sự kiện"}
-                        ticketType={item.ticketType?.name || selectedOrder.ticketType}
-                        startDate={selectedOrder.event?.startDate || new Date()}
-                        venue={selectedOrder.event?.venue || "Địa điểm Lumora"}
-                        city={selectedOrder.event?.city || "Việt Nam"}
-                        status={selectedOrder.status}
-                        isCheckedIn={item.isCheckedIn}
-                      />
-                    ))
-                  ) : (
+                <div className="space-y-3">
+                  {selectedOrder.items?.map((item: any) => (
                     <EventTicket
-                      ticketCode={selectedOrder.orderNumber ? `TKT-${selectedOrder.orderNumber}` : "LM20268888"}
-                      eventTitle={selectedOrder.eventTitle || selectedOrder.event || "Sự kiện Lumora"}
-                      category="Sự kiện"
-                      ticketType={selectedOrder.ticketType || "Vé Tiêu Chuẩn"}
-                      startDate={new Date()}
-                      venue="Trung tâm Hội nghị Lumora"
-                      city="TP. Hồ Chí Minh"
-                      status={selectedOrder.status === "CONFIRMED" ? "CONFIRMED" : selectedOrder.status}
+                      key={item.id}
+                      ticketCode={item.ticketCode || `TKT-${item.id.slice(-8).toUpperCase()}`}
+                      eventTitle={selectedOrder.event?.title || "Sự kiện Lumora"}
+                      bannerUrl={selectedOrder.event?.bannerUrl}
+                      category={selectedOrder.event?.category || "Sự kiện"}
+                      ticketType={item.ticketType?.name || (item.seat ? `Ghế ${item.seat.seatLabel}` : "Vé Sự Kiện")}
+                      startDate={selectedOrder.event?.startDate || new Date()}
+                      venue={selectedOrder.event?.venue || "Địa điểm Lumora"}
+                      city={selectedOrder.event?.city || "Việt Nam"}
+                      status={selectedOrder.status}
+                      isCheckedIn={item.isCheckedIn}
+                      holderName={selectedOrder.buyer?.name || selectedOrder.buyer?.email}
                     />
-                  )}
+                  ))}
                 </div>
-              </div>
-
-              <div className="flex justify-between pt-2 border-t">
-                <div className="flex gap-2">
-                  {selectedOrder.status === "PENDING" && (
-                    <Button variant="outline" className="rounded-xl text-destructive border-destructive/30" onClick={() => { handleCancelOrder(selectedOrder.id); setDetailOpen(false); }}>
-                      Hủy đơn
-                    </Button>
-                  )}
-                </div>
-                <Button className="rounded-xl font-bold" onClick={() => setDetailOpen(false)}>Đóng</Button>
               </div>
             </div>
           )}

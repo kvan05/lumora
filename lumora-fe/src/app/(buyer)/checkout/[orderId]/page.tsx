@@ -471,9 +471,15 @@ export default function CheckoutPage() {
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-1">
-                  <ShieldCheck className="h-4 w-4 text-green-500" />
-                  Hệ thống sẽ chuyển thẳng tới cổng thanh toán VietQR PayOS
+                <div className="flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground pt-2">
+                  <div className="flex items-center justify-center gap-1.5 font-bold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-3 py-2 rounded-xl border border-amber-500/20 w-full text-center">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>Đây là giao dịch mô phỏng phục vụ mục đích trình diễn đồ án.</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-4 w-4 text-green-500" />
+                    Hệ thống sẽ chuyển thẳng tới cổng thanh toán VietQR PayOS
+                  </div>
                 </div>
               </div>
             </div>

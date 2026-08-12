@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SellerNav } from "@/components/layout/SellerNav";
@@ -26,6 +27,7 @@ export default async function SellerLayout({ children }: { children: ReactNode }
           <span className="text-[10px] bg-[#93C453] text-slate-900 px-2 py-0.5 rounded-full font-black uppercase">Seller</span>
         </Link>
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <ThemeToggle />
           <Sheet>
             <SheetTrigger asChild>

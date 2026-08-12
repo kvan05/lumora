@@ -96,13 +96,6 @@ const CITIES = [
   "Vũng Tàu"
 ];
 
-const PRESET_BANNERS = [
-  { label: "Concert Âm Nhạc", url: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1200&q=80" },
-  { label: "Sân Khấu & Kịch", url: "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&w=1200&q=80" },
-  { label: "Hội Thảo Công Nghệ", url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80" },
-  { label: "Giải Chạy Marathon", url: "https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=1200&q=80" },
-];
-
 export default function CreateEventPage() {
   const router = useRouter();
   const [step, setStep] = useState<number>(1);
@@ -123,9 +116,11 @@ export default function CreateEventPage() {
   const [bannerFileName, setBannerFileName] = useState<string>("");
   const [venueMapUrl, setVenueMapUrl] = useState<string>("");
   const [venueMapFileName, setVenueMapFileName] = useState<string>("");
+  const [detailImages, setDetailImages] = useState<{ url: string; name: string }[]>([]);
 
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
   const mapFileInputRef = useRef<HTMLInputElement>(null);
+  const detailFilesInputRef = useRef<HTMLInputElement>(null);
 
   // Ticket & Seat Map State
   const [hasSeatMap, setHasSeatMap] = useState<boolean>(false);
@@ -202,12 +197,37 @@ export default function CreateEventPage() {
     try {
       toast.loading("Đang nén ảnh sơ đồ...", { id: "upload-map" });
       const compressedDataUrl = await compressImage(file, 900, 0.75);
-      setVenueMapUrl(compressedDataUrl);
-      setVenueMapFileName(file.name);
       toast.success(`Đã tải ảnh sơ đồ địa điểm "${file.name}" thành công!`, { id: "upload-map" });
     } catch {
       toast.error("Không thể xử lý tệp ảnh này.", { id: "upload-map" });
     }
+  };
+
+  // Handle Multiple Detail Images Upload from Computer
+  const handleDetailImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    toast.loading(`Đang xử lý ${files.length} ảnh chi tiết...`, { id: "upload-details" });
+    try {
+      const newImages: { url: string; name: string }[] = [];
+      for (const file of files) {
+        if (file.size > 15 * 1024 * 1024) {
+          toast.error(`Tệp ${file.name} quá 15MB, đã bỏ qua.`);
+          continue;
+        }
+        const compressed = await compressImage(file, 900, 0.75);
+        newImages.push({ url: compressed, name: file.name });
+      }
+      setDetailImages((prev) => [...prev, ...newImages]);
+      toast.success(`Đã tải lên ${newImages.length} ảnh chi tiết thành công!`, { id: "upload-details" });
+    } catch {
+      toast.error("Lỗi khi tải ảnh chi tiết", { id: "upload-details" });
+    }
+  };
+
+  const handleRemoveDetailImage = (index: number) => {
+    setDetailImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Add Ticket Type
@@ -262,9 +282,19 @@ export default function CreateEventPage() {
     if (!address.trim()) { toast.error("Vui lòng nhập Địa chỉ"); return; }
     if (!startDate) { toast.error("Vui lòng chọn Thời gian bắt đầu"); return; }
     if (!endDate) { toast.error("Vui lòng chọn Thời gian kết thúc"); return; }
+    if (!bannerUrl) {
+      toast.error("Vui lòng tải lên ảnh bìa cho sự kiện từ máy tính");
+      setStep(2);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      const allDetailUrls = [
+        ...(venueMapUrl ? [venueMapUrl] : []),
+        ...detailImages.map((img) => img.url),
+      ];
+
       // Create Event Payload
       const payload = {
         title: title.trim(),
@@ -275,8 +305,8 @@ export default function CreateEventPage() {
         city,
         startDate,
         endDate,
-        bannerUrl: bannerUrl || PRESET_BANNERS[0].url,
-        imageUrls: venueMapUrl ? [venueMapUrl] : [],
+        bannerUrl,
+        imageUrls: allDetailUrls,
         hasSeatMap,
       };
 
@@ -330,7 +360,7 @@ export default function CreateEventPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-6">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-            <Sparkles className="h-7 w-7 text-primary animate-pulse" /> Tạo Sự Kiện Mới 🎟️
+            <Sparkles className="h-7 w-7 text-primary animate-pulse" /> Tạo Sự Kiện Mới
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Đăng tải sự kiện, tải ảnh bìa từ máy tính và thiết kế sơ đồ ghế ngồi trực quan cho khách hàng mua vé.
@@ -539,82 +569,74 @@ export default function CreateEventPage() {
                       </Button>
                     </div>
                   )}
-
-                  {/* Sample Banner Presets */}
-                  <div className="pt-2">
-                    <p className="text-[11px] font-bold uppercase text-muted-foreground mb-2">Hoặc chọn ảnh mẫu nhanh:</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {PRESET_BANNERS.map((preset, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => { setBannerUrl(preset.url); setBannerFileName("Ảnh mẫu hệ thống"); }}
-                          className="relative h-16 rounded-xl overflow-hidden border cursor-pointer hover:border-primary transition-all group"
-                        >
-                          <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 flex items-center justify-center p-1 text-center">
-                            <span className="text-[10px] font-extrabold text-white">{preset.label}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
-                {/* UPLOAD VENUE MAP FROM PC */}
+                {/* UPLOAD MULTIPLE DETAIL IMAGES FROM PC */}
                 <div className="space-y-3 border-t border-border/40 pt-6">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-purple-500" /> Sơ đồ / Bản đồ khu vực (Venue Map)
-                    </label>
-                    <span className="text-[11px] text-muted-foreground">Tùy chọn tải lên cho khách hàng xem</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-purple-500" /> Ảnh chi tiết sự kiện & Sơ đồ thông tin
+                      </label>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Có thể tải lên nhiều ảnh về bản đồ khán đài, quy định, lưu ý và thông tin sự kiện.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl font-bold gap-2 self-start sm:self-auto shrink-0"
+                      onClick={() => detailFilesInputRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4 text-primary" /> + Thêm ảnh chi tiết
+                    </Button>
                   </div>
 
                   <input
                     type="file"
-                    ref={mapFileInputRef}
-                    onChange={handleVenueMapFileUpload}
+                    multiple
+                    ref={detailFilesInputRef}
+                    onChange={handleDetailImagesUpload}
                     accept="image/*"
                     className="hidden"
                   />
 
-                  {venueMapUrl ? (
-                    <div className="relative rounded-2xl overflow-hidden border-2 border-purple-300 dark:border-purple-800 shadow-md group">
-                      <img src={venueMapUrl} alt="Venue Map Preview" className="w-full h-48 object-contain bg-slate-900 p-2" />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="rounded-xl font-bold gap-2"
-                          onClick={() => mapFileInputRef.current?.click()}
-                        >
-                          <Upload className="h-4 w-4" /> Đổi Sơ Đồ Khác
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="rounded-xl font-bold gap-2"
-                          onClick={() => { setVenueMapUrl(""); setVenueMapFileName(""); }}
-                        >
-                          <X className="h-4 w-4" /> Xóa
-                        </Button>
-                      </div>
-                      {venueMapFileName && (
-                        <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-md px-3 py-1 rounded-lg text-white text-xs font-mono">
-                          🗺️ {venueMapFileName}
+                  {detailImages.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
+                      {detailImages.map((img, idx) => (
+                        <div key={idx} className="relative rounded-2xl overflow-hidden border border-border/60 bg-slate-900 group h-32">
+                          <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              className="h-8 rounded-xl font-bold gap-1 text-xs"
+                              onClick={() => handleRemoveDetailImage(idx)}
+                            >
+                              <X className="h-3.5 w-3.5" /> Xóa ảnh
+                            </Button>
+                          </div>
+                          <div className="absolute bottom-1 left-1 right-1 bg-black/70 backdrop-blur-xs px-2 py-0.5 rounded text-[10px] text-white font-mono truncate">
+                            {img.name}
+                          </div>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ) : (
+                  )}
+
+                  {detailImages.length === 0 && (
                     <div
-                      onClick={() => mapFileInputRef.current?.click()}
-                      className="border-2 border-dashed border-purple-300 dark:border-purple-900 rounded-2xl p-6 text-center bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/50 transition-all cursor-pointer flex flex-col items-center justify-center gap-2"
+                      onClick={() => detailFilesInputRef.current?.click()}
+                      className="border-2 border-dashed border-border/60 rounded-2xl p-6 text-center bg-muted/20 hover:bg-muted/40 transition-all cursor-pointer flex flex-col items-center justify-center gap-2"
                     >
-                      <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 dark:bg-purple-900/40 flex items-center justify-center">
-                        <Layers className="h-6 w-6" />
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                        <Upload className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="font-extrabold text-sm text-foreground">Tải ảnh bản đồ / sơ đồ khán đài từ máy tính</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Giúp người mua dễ quan sát vị trí khu vực sân khấu</p>
+                        <p className="font-extrabold text-xs text-foreground">Tải ảnh chi tiết từ máy tính (Có thể chọn nhiều tệp)</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Sơ đồ chỗ ngồi, quy định, lưu ý và hướng dẫn tham dự</p>
                       </div>
                     </div>
                   )}

@@ -31,16 +31,8 @@ import {
   Save,
   RefreshCw,
   Lock,
-  Award
+  Award,
 } from "lucide-react";
-
-const AVATAR_PRESETS = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
-];
 
 const BANKS = [
   "Vietcombank (VCB)",
@@ -61,6 +53,7 @@ const BANKS = [
 
 export default function SellerProfilePage() {
   const { data: session, update: updateSession } = useSession();
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Tab 1 & General Profile State
   const [name, setName] = useState("");
@@ -72,6 +65,64 @@ export default function SellerProfilePage() {
   const [website, setWebsite] = useState("");
   const [facebook, setFacebook] = useState("");
   const [address, setAddress] = useState("");
+
+  // Compress Avatar Image Client-side
+  const compressImage = (file: File, maxWidth = 400, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleSellerAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Dung lượng ảnh đại diện vượt quá 10MB. Vui lòng chọn tệp nhỏ hơn.");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    toast.loading("Đang nén và lưu ảnh đại diện...", { id: "seller-avatar-upload" });
+    try {
+      const compressedDataUrl = await compressImage(file, 400, 0.85);
+      const res = await api.put("/auth/profile", {
+        name: session?.user?.name,
+        avatar: compressedDataUrl,
+      });
+
+      if (res.data.success) {
+        toast.success("Cập nhật ảnh đại diện Nhà tổ chức thành công!", { id: "seller-avatar-upload" });
+        await updateSession({ image: compressedDataUrl });
+        setAvatar(compressedDataUrl);
+      }
+    } catch {
+      toast.error("Lỗi khi tải ảnh đại diện lên CSDL.", { id: "seller-avatar-upload" });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   // Tab 2: Bank State
   const [bankName, setBankName] = useState("");
@@ -104,7 +155,7 @@ export default function SellerProfilePage() {
 
       setName(u.name || "");
       setPhone(u.phone || "");
-      setAvatar(u.avatar || AVATAR_PRESETS[0]);
+      setAvatar(u.avatar || "");
 
       setOrgName(p.orgName || u.name || "");
       setRepresentative(p.representative || u.name || "");
@@ -225,17 +276,33 @@ export default function SellerProfilePage() {
         </Button>
       </div>
 
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        id="seller-avatar-file-input"
+        accept="image/*"
+        onChange={handleSellerAvatarUpload}
+        className="hidden"
+      />
+
       {/* Main Profile Summary Banner Card */}
       <Card className="rounded-3xl border border-border/80 shadow-sm bg-gradient-to-r from-card via-muted/30 to-primary/5 p-6 md:p-8 relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
           {/* Avatar Preview */}
-          <div className="relative group shrink-0">
+          <div
+            className="relative group shrink-0 cursor-pointer"
+            onClick={() => document.getElementById("seller-avatar-file-input")?.click()}
+          >
             <Avatar className="h-24 w-24 md:h-28 md:w-28 border-4 border-background shadow-xl">
-              <AvatarImage src={avatar} alt={orgName} />
+              <AvatarImage src={avatar || (session?.user as any)?.image} alt={orgName} />
               <AvatarFallback className="text-2xl font-black bg-primary text-primary-foreground">
                 {orgName ? orgName.substring(0, 2).toUpperCase() : "NT"}
               </AvatarFallback>
             </Avatar>
+            <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-bold gap-1">
+              <Camera className="h-6 w-6" />
+              <span>{isUploadingAvatar ? "..." : "Đổi ảnh"}</span>
+            </div>
             <div className="absolute -bottom-1 -right-1 p-2 bg-card rounded-full border border-border shadow-md">
               <Sparkles className="h-4 w-4 text-[#93C453]" />
             </div>
@@ -263,28 +330,18 @@ export default function SellerProfilePage() {
               )}
             </p>
 
-            {/* Avatar Preset Picker Bar */}
-            <div className="pt-2">
-              <p className="text-xs font-bold text-muted-foreground mb-2 flex items-center justify-center md:justify-start gap-1">
-                <Camera className="h-3.5 w-3.5 text-primary" /> Chọn ảnh đại diện có sẵn:
-              </p>
-              <div className="flex items-center justify-center md:justify-start gap-2.5">
-                {AVATAR_PRESETS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setAvatar(preset)}
-                    className={`w-9 h-9 rounded-full overflow-hidden border-2 transition-all ${
-                      avatar === preset
-                        ? "border-[#93C453] scale-110 shadow-md ring-2 ring-[#93C453]/30"
-                        : "border-transparent opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={preset} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
+            {/* Avatar Upload Button */}
+            <div className="pt-2 flex justify-center md:justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl text-xs font-bold gap-2 border-primary/30 text-primary"
+                onClick={() => document.getElementById("seller-avatar-file-input")?.click()}
+                disabled={isUploadingAvatar}
+              >
+                <Camera className="h-4 w-4" />
+                {isUploadingAvatar ? "Đang xử lý ảnh..." : "Chọn ảnh đại diện từ máy tính"}
+              </Button>
             </div>
           </div>
         </div>

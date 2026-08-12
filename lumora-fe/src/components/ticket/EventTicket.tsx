@@ -330,7 +330,7 @@ export function ETicketModal({
       <DialogContent className="sm:max-w-4xl max-w-4xl w-[95vw] rounded-[28px] p-5 sm:p-7 border border-white/10 bg-[#0D1117] text-white shadow-2xl overflow-hidden">
         <DialogHeader className="pb-3 border-b border-white/10">
           <DialogTitle className="font-black text-lg flex items-center gap-2.5 text-white">
-            🎟️ Phôi Vé Điện Tử Chính Thức
+            Phôi Vé Điện Tử Chính Thức
           </DialogTitle>
           {ticket.holderName && (
             <p className="text-xs text-slate-400 font-medium mt-0.5">

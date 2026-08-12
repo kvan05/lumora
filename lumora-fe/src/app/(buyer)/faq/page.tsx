@@ -31,14 +31,14 @@ const FAQS = [
     questions: [
       {
         q: "Vé điện tử (E-ticket) sử dụng thế nào khi vào cổng?",
-        a: "Bạn chỉ cần mở mã QR code trên điện thoại hoặc bản in PDF tại mục 'Chi tiết đơn hàng' để nhân viên soát vé quét mã QR tại cổng."
+        a: "Bạn chỉ cần mở vé mã vạch trên điện thoại hoặc bản in PDF tại mục 'Chi tiết đơn hàng' để nhân viên soát vé quét mã vạch tại cổng."
       },
       {
-        q: "Một mã QR code có thể sử dụng mấy lần?",
-        a: "Mỗi vé có một mã QR duy nhất và chỉ có giá trị cho một lần quét duy nhất. Vui lòng giữ bảo mật mã QR của bạn."
+        q: "Một vé mã vạch có thể sử dụng mấy lần?",
+        a: "Mỗi vé có một mã vạch duy nhất và chỉ có giá trị cho một lần quét duy nhất. Vui lòng giữ bảo mật mã vạch của bạn."
       },
       {
-        q: "Tôi có thể chụp màn hình mã QR gửi cho bạn bè được không?",
+        q: "Tôi có thể chụp màn hình vé mã vạch gửi cho bạn bè được không?",
         a: "Được. Tuy nhiên nếu vé của bạn bị quét trước bởi người khác, hệ thống sẽ từ chối vé đến sau."
       }
     ]

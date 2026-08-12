@@ -1,277 +1,375 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  Users, Calendar, Ticket, TrendingUp, RefreshCw, BarChart3,
-  ShoppingCart, CreditCard, ArrowUpRight, ArrowDownRight,
-  AlertCircle, CheckCircle2, Clock, Activity, Zap, Award
+  Users, Calendar, Ticket, TrendingUp, RefreshCw,
+  ShoppingCart, AlertCircle, CheckCircle2, Clock, Activity, Zap, ShieldAlert,
+  Scale, FileText, ArrowUpRight, CheckCircle, XCircle, ArrowRight
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import Link from "next/link";
 
-const STAT_CARDS = [
-  {
-    key: "totalRevenue",
-    label: "Tổng doanh thu",
-    icon: TrendingUp,
-    color: "text-emerald-500",
-    bg: "bg-emerald-500/10",
-    format: (v: number) => `${(v || 0).toLocaleString("vi-VN")} ₫`,
-    sub: (v: number) => `Phí nền tảng: ${((v || 0) * 0.05).toLocaleString("vi-VN")} ₫`,
-    trend: "+12.5%",
-    trendUp: true,
-  },
-  {
-    key: "totalOrders",
-    label: "Đơn mua vé",
-    icon: ShoppingCart,
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
-    format: (v: number) => `${v || 0} đơn`,
-    sub: () => "Tháng này",
-    trend: "+8.2%",
-    trendUp: true,
-  },
-  {
-    key: "totalUsers",
-    label: "Người dùng",
-    icon: Users,
-    color: "text-purple-500",
-    bg: "bg-purple-500/10",
-    format: (v: number) => `${v || 0} thành viên`,
-    sub: (v: number, stats: any) => `Mua vé: ${stats?.totalBuyers || 0} | NTC: ${stats?.totalSellers || 0}`,
-    trend: "+5.1%",
-    trendUp: true,
-  },
-  {
-    key: "totalEvents",
-    label: "Sự kiện",
-    icon: Calendar,
-    color: "text-orange-500",
-    bg: "bg-orange-500/10",
-    format: (v: number) => `${v || 0} sự kiện`,
-    sub: () => "Trên hệ thống",
-    trend: "+3.8%",
-    trendUp: true,
-  },
-];
+export default function AdminControlCenter() {
+  const [period, setPeriod] = useState("30d");
 
-const MOCK_RECENT_ORDERS = [
-  { id: "ORD-001", buyer: "Nguyễn Văn A", event: "Live Concert Sky Dec", amount: 1200000, status: "CONFIRMED", time: "10 phút trước" },
-  { id: "ORD-002", buyer: "Trần Thị B", event: "Workshop Vẽ Tranh", amount: 350000, status: "PENDING", time: "25 phút trước" },
-  { id: "ORD-003", buyer: "Lê Văn C", event: "Marathon TP.HCM", amount: 500000, status: "CONFIRMED", time: "1 giờ trước" },
-  { id: "ORD-004", buyer: "Phạm Thị D", event: "Hà Anh Tuấn Concert", amount: 2500000, status: "CANCELLED", time: "2 giờ trước" },
-  { id: "ORD-005", buyer: "Vũ Minh E", event: "Triển lãm Art Festival", amount: 200000, status: "CONFIRMED", time: "3 giờ trước" },
-];
-
-const MOCK_PENDING_EVENTS = [
-  { id: "1", title: "Đêm nhạc Bolero 2026", organizer: "Công ty Âm nhạc Phương Nam", category: "Âm nhạc", date: "15/08/2026" },
-  { id: "2", title: "Tech Summit Vietnam", organizer: "VietTech Corp", category: "Workshop", date: "20/08/2026" },
-  { id: "3", title: "Food Festival Đà Nẵng", organizer: "Hội ẩm thực Đà Nẵng", category: "Ẩm thực", date: "01/09/2026" },
-];
-
-const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  CONFIRMED: { label: "Đã xác nhận", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
-  PENDING: { label: "Chờ TT", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
-  CANCELLED: { label: "Đã hủy", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
-};
-
-export default function AdminDashboard() {
-  const [stats, setStats] = useState<any>({
-    totalRevenue: 520000000,
-    totalOrders: 680,
-    totalUsers: 1420,
-    totalBuyers: 1250,
-    totalSellers: 170,
-    totalEvents: 45,
+  // Fetch 100% Real Control Center Data from Backend API
+  const { data: ccData, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ["admin-control-center", period],
+    queryFn: async () => {
+      const res = await api.get(`/admin/control-center?period=${period}`);
+      return res.data.success ? res.data.data : null;
+    },
   });
-  const [loading, setLoading] = useState(false);
 
-  const loadStats = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get("/admin/stats").catch(() => null);
-      if (res?.data?.success) setStats(res.data.data);
-    } catch {
-      /* use mock data */
-    } finally {
-      setLoading(false);
-    }
+  const summary = ccData?.summary || {
+    totalUsers: 0, totalBuyers: 0, totalSellers: 0, totalEvents: 0,
+    totalOrders: 0, totalTickets: 0, totalTicketsSold: 0, totalTicketsCheckedIn: 0,
+    totalGMV: 0, platformRevenue: 0, totalRefund: 0, pendingWithdrawal: 0, pendingComplaint: 0
   };
 
-  useEffect(() => { loadStats(); }, []);
+  const ticketAnalytics = ccData?.ticketAnalytics || { sold: 0, available: 0, checkedIn: 0, notCheckedIn: 0, checkinRate: 0 };
+  const paymentAnalytics = ccData?.paymentAnalytics || { successful: 0, pending: 0, failed: 0, refunded: 0, successRate: 100 };
+  const revenueTimeline = Array.isArray(ccData?.revenueTimeline) ? ccData.revenueTimeline : [];
+  const topEvents = Array.isArray(ccData?.topEvents) ? ccData.topEvents : [];
+  const systemAlerts = Array.isArray(ccData?.systemAlerts) ? ccData.systemAlerts : [];
+
+  const maxRevenue = Math.max(...revenueTimeline.map((item: any) => item.revenue || 0), 1000000);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Dashboard tổng quan 📊</h1>
-          <p className="text-sm text-muted-foreground mt-1">Theo dõi toàn bộ hoạt động của nền tảng Lumora.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
+            <Activity className="h-7 w-7 text-primary" /> Admin Control Center
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Trung tâm điều hành hệ thống toàn diện Lumora — Giám sát giao dịch, chỉ số vé và rủi ro thời gian thực.
+          </p>
         </div>
-        <Button onClick={loadStats} variant="outline" className="rounded-xl gap-2 h-9 text-sm" disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Làm mới
-        </Button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Tabs value={period} onValueChange={setPeriod} className="w-auto">
+            <TabsList className="rounded-xl h-9 p-1 bg-muted/40 border">
+              <TabsTrigger value="7d" className="rounded-lg text-xs font-bold px-3">7 ngày</TabsTrigger>
+              <TabsTrigger value="30d" className="rounded-lg text-xs font-bold px-3">30 ngày</TabsTrigger>
+              <TabsTrigger value="90d" className="rounded-lg text-xs font-bold px-3">90 ngày</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button
+            onClick={() => { refetch(); toast.success("Cập nhật chỉ số điều hành mới nhất!"); }}
+            variant="outline"
+            className="rounded-xl gap-2 h-9 border-border/60"
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            Làm mới
+          </Button>
+        </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {STAT_CARDS.map((card) => (
-          <Card key={card.key} className="rounded-2xl border-border/50 hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0">
-              <CardDescription className="text-xs font-semibold uppercase tracking-wider">{card.label}</CardDescription>
-              <div className={`p-2 rounded-xl ${card.bg}`}>
-                <card.icon className={`h-4 w-4 ${card.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              <p className="text-2xl font-black">{card.format(stats[card.key])}</p>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{card.sub(stats[card.key], stats)}</p>
-                <span className={`text-xs font-bold flex items-center gap-0.5 ${card.trendUp ? "text-emerald-500" : "text-red-500"}`}>
-                  {card.trendUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                  {card.trend}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Quick Actions */}
-      <Card className="rounded-2xl border-border/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" /> Thao tác nhanh
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: "Duyệt sự kiện chờ", href: "/admin/events", icon: Calendar, badge: MOCK_PENDING_EVENTS.length },
-              { label: "Xem đơn hàng mới", href: "/admin/orders", icon: ShoppingCart, badge: 12 },
-              { label: "Xử lý hoàn tiền", href: "/admin/refunds", icon: RefreshCw, badge: 5 },
-              { label: "Báo cáo vi phạm", href: "/admin/reports", icon: AlertCircle, badge: 3 },
-            ].map((action) => (
-              <a key={action.href} href={action.href}>
-                <Button variant="outline" size="sm" className="rounded-xl gap-2 h-9 relative">
-                  <action.icon className="h-4 w-4" />
-                  {action.label}
-                  {action.badge > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-primary text-primary-foreground rounded-full text-[10px] font-bold flex items-center justify-center">
-                      {action.badge}
-                    </span>
-                  )}
-                </Button>
-              </a>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent Orders */}
-        <Card className="rounded-2xl border-border/50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-500" /> Đơn hàng gần đây
-              </CardTitle>
-              <a href="/admin/orders">
-                <Button variant="ghost" size="sm" className="h-7 text-xs rounded-lg">Xem tất cả</Button>
-              </a>
-            </div>
+      {/* Dynamic System Alerts Banner */}
+      {systemAlerts.length > 0 && (
+        <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5 shadow-xs overflow-hidden">
+          <CardHeader className="pb-2 pt-3 px-4 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber-500" /> System Alerts — Cảnh Báo Điều Hành Hệ Thống ({systemAlerts.length})
+            </CardTitle>
+            <Link href="/admin/risk-alerts">
+              <Button variant="ghost" size="sm" className="h-6 text-xs text-amber-600 font-bold hover:bg-amber-500/10">
+                Xem Risk Center <ArrowRight className="h-3 w-3 ml-1" />
+              </Button>
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-3 p-4 pt-0">
-            {MOCK_RECENT_ORDERS.map((order, i) => (
-              <div key={order.id}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{order.buyer}</p>
-                    <p className="text-xs text-muted-foreground truncate">{order.event} · {order.time}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[order.status]?.className}`}>
-                      {STATUS_BADGE[order.status]?.label}
-                    </span>
-                    <p className="text-xs font-bold text-right">{order.amount.toLocaleString("vi-VN")}₫</p>
-                  </div>
+          <CardContent className="px-4 pb-3 pt-0">
+            <div className="space-y-1.5">
+              {systemAlerts.map((alert: any) => (
+                <div key={alert.id} className="flex items-center justify-between bg-amber-500/10 p-2.5 rounded-xl text-xs font-semibold text-amber-950 dark:text-amber-200">
+                  <span className="truncate">{alert.message}</span>
+                  <Link href={alert.link}>
+                    <Badge variant="outline" className="cursor-pointer border-amber-500/40 text-amber-600 bg-background/50 hover:bg-background shrink-0">
+                      Xử lý ngay
+                    </Badge>
+                  </Link>
                 </div>
-                {i < MOCK_RECENT_ORDERS.length - 1 && <Separator className="mt-3" />}
-              </div>
-            ))}
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Core Executive Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+          <CardContent className="pt-3.5 pb-3.5 px-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Tổng GMV</p>
+            {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> : (
+              <p className="text-lg font-black text-foreground mt-0.5">{summary.totalGMV.toLocaleString("vi-VN")} ₫</p>
+            )}
+            <p className="text-[10px] text-emerald-600 font-medium mt-1">Phí sàn 5%: {summary.platformRevenue.toLocaleString("vi-VN")} ₫</p>
           </CardContent>
         </Card>
 
-        {/* Pending Events */}
-        <Card className="rounded-2xl border-border/50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Clock className="h-4 w-4 text-orange-500" /> Sự kiện chờ duyệt
-              </CardTitle>
-              <a href="/admin/events">
-                <Button variant="ghost" size="sm" className="h-7 text-xs rounded-lg">Xem tất cả</Button>
-              </a>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 p-4 pt-0">
-            {MOCK_PENDING_EVENTS.map((event, i) => (
-              <div key={event.id}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{event.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{event.organizer}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{event.category}</Badge>
-                      <span className="text-[10px] text-muted-foreground">{event.date}</span>
+        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+          <CardContent className="pt-3.5 pb-3.5 px-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Đơn Hàng Mua Vé</p>
+            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+              <p className="text-lg font-black text-blue-600 dark:text-blue-400 mt-0.5">{summary.totalOrders} đơn</p>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1">Toàn bộ giao dịch</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+          <CardContent className="pt-3.5 pb-3.5 px-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Người Dùng Sàn</p>
+            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+              <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">{summary.totalUsers} thành viên</p>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1">Buyers: {summary.totalBuyers} · Sellers: {summary.totalSellers}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+          <CardContent className="pt-3.5 pb-3.5 px-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Sự Kiện Khởi Tạo</p>
+            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+              <p className="text-lg font-black text-orange-500 mt-0.5">{summary.totalEvents} sự kiện</p>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1">Trên hệ thống</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+          <CardContent className="pt-3.5 pb-3.5 px-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Rút Tiền Chờ Duyệt</p>
+            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+              <p className={`text-lg font-black mt-0.5 ${summary.pendingWithdrawal > 0 ? "text-amber-500" : "text-foreground"}`}>
+                {summary.pendingWithdrawal} đơn
+              </p>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1">Cần Admin xử lý</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+          <CardContent className="pt-3.5 pb-3.5 px-3.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase">TỔNG HOÀN TIỀN</p>
+            {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> : (
+              <p className="text-lg font-black text-red-500 mt-0.5">{summary.totalRefund.toLocaleString("vi-VN")} ₫</p>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1">Đã chấp thuận refund</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Revenue Timeline Chart Bar */}
+      <Card className="rounded-3xl border-border/50 bg-card shadow-xs p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4">
+          <div>
+            <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
+              <TrendingUp className="h-5 w-5 text-emerald-500" /> Biểu Đồ Doanh Thu Tổng Theo Chu Kỳ ({period})
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Giá trị giao dịch Gross GMV tính theo ngày từ CSDL thực tế</p>
+          </div>
+          <Badge variant="outline" className="font-mono text-xs text-emerald-600 bg-emerald-500/10 border-emerald-500/30 w-fit">
+            Platform Fee: 5%
+          </Badge>
+        </div>
+
+        {isLoading ? (
+          <Skeleton className="h-48 w-full rounded-2xl" />
+        ) : revenueTimeline.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground text-xs font-semibold">Chưa có dữ liệu doanh thu trong khoảng thời gian này</div>
+        ) : (
+          <div className="space-y-2">
+            <div className="h-44 flex items-end gap-1.5 pt-4 border-b border-border/40 pb-2 overflow-x-auto">
+              {revenueTimeline.map((item: any, idx: number) => {
+                const heightPercent = Math.max(8, Math.round((item.revenue / maxRevenue) * 100));
+                return (
+                  <div key={idx} className="flex-1 min-w-[14px] flex flex-col items-center gap-1 group relative">
+                    <div
+                      style={{ height: `${heightPercent}%` }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 rounded-t shadow-xs transition-all relative"
+                    >
+                      <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] p-1.5 rounded-lg border shadow-md whitespace-nowrap z-20 pointer-events-none">
+                        <p className="font-bold">{item.date}</p>
+                        <p className="text-emerald-500 font-black">{item.revenue.toLocaleString("vi-VN")} ₫</p>
+                        <p className="text-muted-foreground">Phí: {item.fee.toLocaleString("vi-VN")} ₫</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" className="h-7 text-xs px-3 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white">Duyệt</Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs px-3 rounded-lg text-destructive hover:bg-destructive/10 border-destructive/30">Từ chối</Button>
-                  </div>
-                </div>
-                {i < MOCK_PENDING_EVENTS.length - 1 && <Separator className="mt-3" />}
+                );
+              })}
+            </div>
+            <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
+              <span>{revenueTimeline[0]?.date}</span>
+              <span>{revenueTimeline[Math.floor(revenueTimeline.length / 2)]?.date}</span>
+              <span>{revenueTimeline[revenueTimeline.length - 1]?.date}</span>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Ticket Analytics & Payment Analytics Grid */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Ticket Analytics */}
+        <Card className="rounded-3xl border-border/50 bg-card shadow-xs">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Ticket className="h-5 w-5 text-purple-500" /> Ticket Analytics & Check-in Rate
+              </CardTitle>
+              <Badge variant="secondary" className="bg-purple-500/15 text-purple-600 font-bold text-xs">
+                Check-in Rate: {ticketAnalytics.checkinRate}%
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted/30 p-3 rounded-2xl border">
+                <p className="text-xs text-muted-foreground font-semibold">Vé đã bán (Sold)</p>
+                <p className="text-xl font-black text-foreground mt-0.5">{ticketAnalytics.sold} vé</p>
               </div>
-            ))}
+              <div className="bg-muted/30 p-3 rounded-2xl border">
+                <p className="text-xs text-muted-foreground font-semibold">Vé đã Check-in</p>
+                <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{ticketAnalytics.checkedIn} vé</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-semibold">
+                <span>Tỷ lệ vé đã soát cổng (Checked-in)</span>
+                <span>{ticketAnalytics.checkedIn} / {ticketAnalytics.sold} ({ticketAnalytics.checkinRate}%)</span>
+              </div>
+              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-purple-600 rounded-full" style={{ width: `${ticketAnalytics.checkinRate}%` }} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment Analytics */}
+        <Card className="rounded-3xl border-border/50 bg-card shadow-xs">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-blue-500" /> Payment Analytics & Success Rate
+              </CardTitle>
+              <Badge variant="secondary" className="bg-blue-500/15 text-blue-600 font-bold text-xs">
+                Success Rate: {paymentAnalytics.successRate}%
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="bg-emerald-500/10 p-2.5 rounded-2xl border border-emerald-500/20">
+                <p className="text-[10px] text-emerald-600 font-bold uppercase">Thành công</p>
+                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{paymentAnalytics.successful}</p>
+              </div>
+              <div className="bg-amber-500/10 p-2.5 rounded-2xl border border-amber-500/20">
+                <p className="text-[10px] text-amber-600 font-bold uppercase">Chờ xử lý</p>
+                <p className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">{paymentAnalytics.pending}</p>
+              </div>
+              <div className="bg-red-500/10 p-2.5 rounded-2xl border border-red-500/20">
+                <p className="text-[10px] text-red-600 font-bold uppercase">Thất bại</p>
+                <p className="text-lg font-black text-red-600 dark:text-red-400 mt-0.5">{paymentAnalytics.failed}</p>
+              </div>
+              <div className="bg-gray-500/10 p-2.5 rounded-2xl border border-gray-500/20">
+                <p className="text-[10px] text-muted-foreground font-bold uppercase">Hoàn tiền</p>
+                <p className="text-lg font-black text-foreground mt-0.5">{paymentAnalytics.refunded}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-semibold">
+                <span>Tỷ lệ thanh toán thành công (Payment Success)</span>
+                <span>{paymentAnalytics.successRate}%</span>
+              </div>
+              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${paymentAnalytics.successRate}%` }} />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Platform Fee Config */}
-      <Card className="rounded-2xl border-border/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <Award className="h-4 w-4 text-primary" /> Cấu hình phí dịch vụ nền tảng
-          </CardTitle>
-          <CardDescription className="text-xs">Tỷ lệ phần trăm thu từ nhà tổ chức trên mỗi vé bán thành công.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3 items-end max-w-sm">
-            <div className="flex-1 space-y-1">
-              <label className="text-xs font-bold">Phí dịch vụ (%)</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  defaultValue="5"
-                  className="w-full h-10 px-3 pr-8 rounded-xl border border-border bg-background text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
-              </div>
-            </div>
-            <Button className="h-10 rounded-xl px-5 text-sm" onClick={() => toast.success("Đã cập nhật phí dịch vụ!")}>
-              Lưu
-            </Button>
+      {/* Top Events Table */}
+      <Card className="rounded-3xl border-border/50 bg-card shadow-xs overflow-hidden">
+        <CardHeader className="pb-3 border-b border-border/40">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-orange-500" /> Top Events — Sự Kiện Có Doanh Thu & Check-in Cao Nhất
+            </CardTitle>
+            <Link href="/admin/events">
+              <Button variant="ghost" size="sm" className="h-8 text-xs font-bold">Xem tất cả sự kiện</Button>
+            </Link>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">Ví dụ: Khách mua 1.000.000₫ → Organizer nhận 950.000₫, Lumora thu 50.000₫</p>
+        </CardHeader>
+        <CardContent className="p-4 pt-2">
+          {isLoading ? (
+            <Skeleton className="h-32 w-full rounded-2xl" />
+          ) : topEvents.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-xs font-semibold">Chưa có sự kiện nào bán được vé</div>
+          ) : (
+            <div className="space-y-3">
+              {topEvents.map((ev: any, idx: number) => (
+                <div key={ev.id || idx} className="flex items-center justify-between p-3 rounded-2xl bg-muted/20 hover:bg-muted/40 transition-colors gap-3">
+                  <div className="min-w-0 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center font-black text-sm shrink-0">
+                      #{idx + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate text-foreground">{ev.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{ev.sellerName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-right shrink-0">
+                    <div>
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{ev.gmv.toLocaleString("vi-VN")} ₫</p>
+                      <p className="text-[10px] text-muted-foreground">{ev.ticketsSold} vé bán</p>
+                    </div>
+                    <div>
+                      <Badge variant="outline" className="text-[10px] font-bold">Check-in: {ev.checkedInCount}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Admin Quick Action Footer Bar */}
+      <div className="grid sm:grid-cols-3 gap-3">
+        <Link href="/admin/risk-alerts">
+          <Button variant="outline" className="w-full h-12 rounded-2xl justify-between font-bold text-xs border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-600">
+            <span className="flex items-center gap-2"><ShieldAlert className="h-4 w-4" /> Fraud Risk Detection Center</span>
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Link>
+
+        <Link href="/admin/reconciliation">
+          <Button variant="outline" className="w-full h-12 rounded-2xl justify-between font-bold text-xs border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary">
+            <span className="flex items-center gap-2"><Scale className="h-4 w-4" /> Financial Reconciliation Center</span>
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Link>
+
+        <Link href="/admin/audit-logs">
+          <Button variant="outline" className="w-full h-12 rounded-2xl justify-between font-bold text-xs border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-600">
+            <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> System Audit Logs</span>
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

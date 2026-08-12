@@ -14,6 +14,7 @@ adminRoutes.get("/stats", AdminController.getStats);
 // User management
 adminRoutes.get("/users", AdminController.getUsers);
 adminRoutes.patch("/users/:id/block", AdminController.toggleUserBlock);
+adminRoutes.patch("/users/:id/role", AdminController.updateUserRole);
 adminRoutes.delete("/users/:id", AdminController.deleteUser);
 adminRoutes.patch("/users/:id/approve-organizer", AdminController.approveOrganizer);
 
@@ -36,12 +37,20 @@ adminRoutes.delete("/vouchers/:id", AdminController.deleteVoucher);
 adminRoutes.get("/orders", AdminController.getOrders);
 adminRoutes.patch("/orders/:id/status", AdminController.updateOrderStatus);
 
+// Ticket management
+adminRoutes.get("/tickets", AdminController.getCheckinTickets);
+
 // Organizer application management
+adminRoutes.get("/organizers", AdminController.getOrganizers);
 adminRoutes.get("/organizer-applications", AdminController.getOrganizerApplications);
 adminRoutes.patch("/organizer-applications/:id/approve", AdminController.approveOrganizerApplication);
 adminRoutes.patch("/organizer-applications/:id/reject", AdminController.rejectOrganizerApplication);
 
-// Settlement management
+// Payments management
+adminRoutes.get("/payments", AdminController.getPayments);
+
+// Finance & Settlement management
+adminRoutes.get("/finance/stats", AdminController.getFinanceStats);
 adminRoutes.get("/settlements", AdminController.getSettlements);
 adminRoutes.post("/settlements", AdminController.createSettlement);
 adminRoutes.patch("/settlements/:id", AdminController.processSettlement);
@@ -52,5 +61,26 @@ adminRoutes.patch("/withdrawals/:id", AdminController.processWithdrawal);
 
 // E-ticket & Check-in (Mã vạch Barcode)
 adminRoutes.get("/checkin", AdminController.getCheckinTickets);
+adminRoutes.get("/checkin/stats", AdminController.getCheckinStats);
 adminRoutes.post("/checkin/verify", AdminController.verifyCheckinTicket);
+adminRoutes.post("/checkin/override", AdminController.overrideCheckin);
+
+// Refund & Complaint management
+adminRoutes.get("/refunds", AdminController.getRefundRequests);
+adminRoutes.post("/refunds/:id/approve", AdminController.approveRefund);
+adminRoutes.post("/refunds/:id/reject", AdminController.rejectRefund);
+
+// Audit logs
+adminRoutes.get("/logs", AdminController.getAdminLogs);
+
+// ─── 6 Advanced Admin Features Routes ────────────────────────────────────
+adminRoutes.get("/control-center", AdminController.getControlCenterData);
+adminRoutes.get("/risk-alerts", AdminController.getRiskAlerts);
+adminRoutes.patch("/risk-alerts/:id", AdminController.updateRiskAlertStatus);
+adminRoutes.get("/tickets/:ticketId/timeline", AdminController.getTicketTimeline);
+adminRoutes.get("/events/health-scores", AdminController.getEventHealthScores);
+adminRoutes.get("/reconciliation", AdminController.getFinancialReconciliation);
+adminRoutes.post("/reconciliation", AdminController.createReconciliationSnapshot);
+
+
 

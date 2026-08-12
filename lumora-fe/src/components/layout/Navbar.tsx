@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -117,18 +118,21 @@ export function Navbar() {
               </Link>
             </Button>
 
-            {/* My Tickets Shortcut */}
+            {/* My Tickets Shortcut & Notification Bell */}
             {session ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                asChild
-                className="text-slate-800 dark:text-slate-100 hover:bg-white/40 font-semibold text-xs h-9 px-3 hidden sm:flex"
-              >
-                <Link href="/orders" className="flex items-center gap-1.5">
-                  <Ticket className="h-4 w-4 text-[#EB5B95]" /> Vé của tôi
-                </Link>
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className="text-slate-800 dark:text-slate-100 hover:bg-white/40 font-semibold text-xs h-9 px-3 hidden sm:flex"
+                >
+                  <Link href="/orders" className="flex items-center gap-1.5">
+                    <Ticket className="h-4 w-4 text-[#EB5B95]" /> Vé của tôi
+                  </Link>
+                </Button>
+                <NotificationBell />
+              </>
             ) : null}
 
             {/* Account / Auth */}
@@ -211,8 +215,8 @@ export function Navbar() {
             </div>
 
             {/* Language Flag Badge */}
-            <div className="flex items-center gap-1 bg-white/40 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 rounded-full text-xs font-semibold cursor-pointer border border-slate-300/40">
-              <span>🇻🇳</span>
+            <div className="flex items-center gap-1 bg-white/40 dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer border border-slate-300/40">
+              <span>VN</span>
               <ChevronDown className="h-3 w-3 opacity-70" />
             </div>
 
@@ -265,7 +269,7 @@ export function Navbar() {
               + Tạo sự kiện
             </Link>
             <Link href="/orders" className="py-2 px-3 hover:bg-slate-100 rounded-lg">
-              🎟️ Vé của tôi
+              Vé của tôi
             </Link>
             {!session && (
               <Link href="/login" className="py-2 px-3 hover:bg-slate-100 rounded-lg text-[#4A7C59] font-bold">

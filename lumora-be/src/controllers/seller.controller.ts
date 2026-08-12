@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../prisma/client";
 import { createError } from "../middleware/errorHandler";
+import { createNotification, createRoleNotification } from "./notification.controller";
 
 const getSellerId = (req: Request) => req.user!.userId;
 
@@ -511,6 +512,23 @@ export async function requestWithdrawal(
         status: "PENDING",
       },
     });
+
+    // Send notifications to Seller and Admins
+    createNotification(
+      sellerId,
+      "Yêu cầu rút tiền đã được gửi",
+      `Yêu cầu rút ${Number(amount).toLocaleString("vi-VN")} ₫ của bạn đã được tiếp nhận và chờ xử lý.`,
+      "WITHDRAWAL_REQUESTED",
+      { withdrawalId: withdrawal.id }
+    ).catch(console.error);
+
+    createRoleNotification(
+      "ADMIN",
+      "Yêu cầu rút tiền mới",
+      `Nhà tổ chức vừa gửi yêu cầu rút ${Number(amount).toLocaleString("vi-VN")} ₫.`,
+      "ADMIN_WITHDRAWAL_REQUESTED",
+      { withdrawalId: withdrawal.id }
+    ).catch(console.error);
 
     res.status(201).json({
       success: true,

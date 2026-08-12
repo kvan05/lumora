@@ -162,6 +162,69 @@ export async function getFeaturedEvents(
   }
 }
 
+// ─── Get Homepage Aggregated Events ────────────────────────────────────
+export async function getHomepageEvents(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const selectFields = {
+      id: true,
+      title: true,
+      slug: true,
+      bannerUrl: true,
+      category: true,
+      venue: true,
+      city: true,
+      startDate: true,
+      endDate: true,
+      isFeatured: true,
+      hasSeatMap: true,
+      ticketTypes: {
+        where: { status: "ACTIVE" },
+        select: { price: true },
+        orderBy: { price: "asc" as const },
+        take: 1,
+      },
+    };
+
+    const [featured, allEvents] = await Promise.all([
+      prisma.event.findMany({
+        where: { status: "PUBLISHED", isFeatured: true },
+        take: 6,
+        orderBy: { startDate: "asc" },
+        select: selectFields,
+      }),
+      prisma.event.findMany({
+        where: { status: "PUBLISHED" },
+        take: 8,
+        orderBy: { createdAt: "desc" },
+        select: selectFields,
+      }),
+    ]);
+
+    const mapMinPrice = (e: any) => ({
+      ...e,
+      minPrice: e.ticketTypes[0]?.price ?? null,
+      ticketTypes: undefined,
+    });
+
+    // HTTP Cache Headers: Public cache 60s
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=120, stale-while-revalidate=300");
+
+    res.json({
+      success: true,
+      data: {
+        featured: featured.map(mapMinPrice),
+        allEvents: allEvents.map(mapMinPrice),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── Get Event by Slug ─────────────────────────────────────────────────
 export async function getEventBySlug(
   req: Request,
@@ -440,18 +503,26 @@ export async function updateEventStatus(
   try {
     const id = req.params.id as string;
     const { status } = req.body;
-    const sellerId = req.user!.userId;
+    const userId = req.user!.userId;
+    const userRole = req.user!.role;
 
     const validStatuses = ["DRAFT", "PUBLISHED", "PAUSED", "CANCELLED", "COMPLETED"];
     if (!validStatuses.includes(status)) {
-      throw createError("Invalid status", 400, "INVALID_STATUS");
+      throw createError("Trạng thái không hợp lệ", 400, "INVALID_STATUS");
     }
 
-    const event = await prisma.event.findFirst({ where: { id, sellerId } });
-    if (!event) throw createError("Event not found or access denied", 404);
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) throw createError("Không tìm thấy sự kiện", 404);
 
-    const updated = await prisma.event.update({ where: { id }, data: { status } });
-    res.json({ success: true, data: updated });
+    if (userRole !== "ADMIN" && event.sellerId !== userId) {
+      throw createError("Bạn không có quyền thay đổi trạng thái sự kiện này", 403, "FORBIDDEN");
+    }
+
+    const updated = await prisma.event.update({
+      where: { id },
+      data: { status },
+    });
+    res.json({ success: true, data: updated, message: `Đã cập nhật trạng thái sự kiện thành ${status}` });
   } catch (err) {
     next(err);
   }

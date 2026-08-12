@@ -23,7 +23,7 @@ import {
   Zap, 
   ShieldCheck, 
   Flame,
-  QrCode
+  Barcode
 } from "lucide-react";
 
 // Fallback Banner slides for Hero Carousel
@@ -58,28 +58,36 @@ export default function BuyerDashboardPage() {
   const router = useRouter();
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Fetch featured events
-  const { data: featuredEventsData, isLoading: isLoadingFeatured } = useQuery({
-    queryKey: ["featured-events"],
+  // Single Aggregated Fetch for Homepage Data with Graceful Fallback
+  const { data: homepageData, isLoading: isLoadingEvents } = useQuery({
+    queryKey: ["homepage-events"],
     queryFn: async () => {
-      const res = await api.get("/events/featured");
-      const data = res.data.data;
-      return Array.isArray(data) ? data : data?.events || [];
+      try {
+        const res = await api.get("/events/homepage");
+        if (res.data?.success && res.data?.data?.allEvents?.length > 0) {
+          return res.data.data;
+        }
+      } catch (e) {
+        console.warn("Homepage endpoint fallback triggered:", e);
+      }
+
+      // Resilient fallback to individual endpoints
+      const [featRes, allRes] = await Promise.all([
+        api.get("/events/featured").catch(() => ({ data: { data: [] } })),
+        api.get("/events?limit=8").catch(() => ({ data: { data: [] } })),
+      ]);
+      const featData = featRes.data?.data;
+      const allData = allRes.data?.data;
+      return {
+        featured: Array.isArray(featData) ? featData : featData?.events || [],
+        allEvents: Array.isArray(allData) ? allData : allData?.events || [],
+      };
     },
+    staleTime: 3 * 60 * 1000, // 3 minutes cache
   });
 
-  // Fetch all events for listing
-  const { data: allEventsData, isLoading: isLoadingEvents } = useQuery({
-    queryKey: ["all-events-home"],
-    queryFn: async () => {
-      const res = await api.get("/events?limit=8");
-      const data = res.data.data;
-      return Array.isArray(data) ? data : data?.events || [];
-    },
-  });
-
-  const featuredEvents = Array.isArray(featuredEventsData) ? featuredEventsData : [];
-  const allEvents = Array.isArray(allEventsData) ? allEventsData : [];
+  const featuredEvents = homepageData?.featured || [];
+  const allEvents = homepageData?.allEvents || [];
 
   // Auto advance slide every 5 seconds
   useEffect(() => {
@@ -104,7 +112,7 @@ export default function BuyerDashboardPage() {
     : [
         {
           id: "welcome-banner",
-          title: "CHÀO MỪNG BẠN ĐẾN VỚI LUMORA 🎉",
+          title: "CHÀO MỪNG BẠN ĐẾN VỚI LUMORA",
           subtitle: "Hãy đăng nhập tài khoản Seller để bắt đầu tạo và bán vé sự kiện thật của bạn ngay hôm nay!",
           bannerUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80",
           slug: "seller/events/create",
@@ -163,7 +171,10 @@ export default function BuyerDashboardPage() {
                   <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />
 
                   {/* Badge top right */}
-                  <div className="absolute top-6 right-6 z-10">
+                  <div className="absolute top-6 right-6 z-10 flex flex-wrap gap-2 justify-end">
+                    <Badge className="bg-amber-500/90 text-slate-950 font-extrabold text-xs px-3 py-1 rounded-full shadow-lg border-none backdrop-blur">
+                      NỀN TẢNG MÔ PHỎNG HỌC TẬP
+                    </Badge>
                     <Badge className="bg-[#EB5B95] text-white font-extrabold text-xs md:text-sm px-4 py-1.5 rounded-full shadow-lg border-none">
                       NỔI BẬT
                     </Badge>
@@ -177,7 +188,7 @@ export default function BuyerDashboardPage() {
                       </h3>
                       {subtitle && (
                         <p className="text-slate-200 text-sm md:text-base font-bold drop-shadow-sm line-clamp-1">
-                          📍 {subtitle}
+                          {subtitle}
                         </p>
                       )}
                     </div>
@@ -222,7 +233,7 @@ export default function BuyerDashboardPage() {
             <div className="flex items-center gap-2">
               <Flame className="h-6 w-6 text-[#EB5B95] fill-[#EB5B95]" />
               <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-                Sự kiện đang bán vé 🔥
+                Sự kiện đang bán vé
               </h2>
             </div>
             <Button
@@ -321,11 +332,11 @@ export default function BuyerDashboardPage() {
 
             <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-xs">
               <div className="w-10 h-10 rounded-xl bg-[#EB5B95]/20 text-[#EB5B95] flex items-center justify-center">
-                <QrCode className="h-5 w-5" />
+                <Barcode className="h-5 w-5" />
               </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">E-Ticket & Check-in QR</h3>
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">E-Ticket & Check-in Mã Vạch</h3>
               <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-                Vé điện tử gửi trực tiếp qua Email và App với mã QR mã hóa an toàn chống vé giả.
+                Vé điện tử gửi trực tiếp qua Email và App với vé mã vạch mã hóa an toàn chống vé giả.
               </p>
             </div>
           </div>

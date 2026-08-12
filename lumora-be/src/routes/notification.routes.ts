@@ -6,6 +6,8 @@ export const notificationRoutes = Router();
 
 notificationRoutes.use(authenticate);
 
-notificationRoutes.get("/", NotificationController.getMyNotifications);          // Get all notifications
-notificationRoutes.patch("/:id/read", NotificationController.markAsRead);        // Mark one as read
-notificationRoutes.patch("/all/read", NotificationController.markAsRead);        // Mark all as read (id="all")
+notificationRoutes.get("/", NotificationController.getMyNotifications);
+notificationRoutes.get("/unread-count", NotificationController.getUnreadCount);
+notificationRoutes.patch("/:id/read", NotificationController.markAsRead);
+notificationRoutes.patch("/all/read", NotificationController.markAsRead);
+notificationRoutes.delete("/:id", NotificationController.deleteNotification);

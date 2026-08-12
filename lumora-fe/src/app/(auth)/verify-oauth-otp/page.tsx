@@ -82,7 +82,7 @@ export default function VerifyOauthOtpPage() {
         <div className="mx-auto w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4">
           <Mail className="h-8 w-8 text-primary" />
         </div>
-        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác thực Google ✉️</h2>
+        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác thực Google</h2>
         <p className="text-sm text-muted-foreground">
           Vui lòng nhập mã 6 số vừa được gửi tới <strong>{email}</strong> để hoàn tất liên kết tài khoản.
         </p>

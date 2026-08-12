@@ -126,7 +126,7 @@ export default function ForgotPasswordPage() {
 
         {step === 1 && (
           <>
-            <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Quên mật khẩu? 🔒</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Quên mật khẩu?</h2>
             <p className="text-sm text-muted-foreground">
               Nhập email của bạn và chúng tôi sẽ gửi mã OTP để đặt lại mật khẩu.
             </p>
@@ -134,7 +134,7 @@ export default function ForgotPasswordPage() {
         )}
         {step === 2 && (
           <>
-            <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác nhận OTP ✉️</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Xác nhận OTP</h2>
             <p className="text-sm text-muted-foreground">
               Nhập mã gồm 6 chữ số vừa được gửi tới <strong>{email}</strong>.
             </p>
@@ -142,7 +142,7 @@ export default function ForgotPasswordPage() {
         )}
         {step === 3 && (
           <>
-            <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Mật khẩu mới 🔑</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Mật khẩu mới</h2>
             <p className="text-sm text-muted-foreground">
               Vui lòng nhập mật khẩu mới cho tài khoản của bạn.
             </p>

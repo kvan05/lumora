@@ -54,7 +54,7 @@ export default function SupportPage() {
               </div>
               <div>
                 <h3 className="font-bold text-base">Email Hỗ trợ</h3>
-                <p className="text-sm text-muted-foreground mt-0.5">support@lumora.vn</p>
+                <p className="text-sm text-muted-foreground mt-0.5">support@lumora.pro.vn</p>
                 <p className="text-xs text-muted-foreground/70 mt-1">Phản hồi trong 2 giờ</p>
               </div>
             </CardContent>

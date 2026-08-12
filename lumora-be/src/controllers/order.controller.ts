@@ -25,9 +25,15 @@ export async function createOrder(
     }
 
     const event = await prisma.event.findUnique({
-      where: { id: eventId, status: "PUBLISHED" },
+      where: { id: eventId },
     });
-    if (!event) throw createError("Event not found or not available", 404);
+    if (!event) throw createError("Sự kiện không tồn tại", 404);
+    if (event.status === "PAUSED") {
+      throw createError("Sự kiện này hiện đang ngưng bán vé.", 400, "EVENT_PAUSED");
+    }
+    if (event.status !== "PUBLISHED") {
+      throw createError("Sự kiện hiện không khả dụng để đặt vé", 400, "EVENT_NOT_AVAILABLE");
+    }
 
     // ── Atomic transaction: check availability + reserve ────────────────
     const order = await prisma.$transaction(async (tx) => {

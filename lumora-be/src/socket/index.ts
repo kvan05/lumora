@@ -42,9 +42,12 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
     const user = socket.data.user as JwtPayload | undefined;
     console.log(`🔌 Socket connected: ${socket.id}${user ? ` (user: ${user.userId})` : " (guest)"}`);
 
-    // ── Join authenticated user's personal room ──────────────────────
+    // ── Join authenticated user's personal & role rooms ──────────────────
     if (user) {
       socket.join(`user:${user.userId}`);
+      if (user.role) {
+        socket.join(`role:${user.role}`);
+      }
     }
 
     // ── Join event room for realtime inventory ───────────────────────
