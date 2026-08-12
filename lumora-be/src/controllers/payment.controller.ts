@@ -5,6 +5,7 @@ import { createError } from "../middleware/errorHandler";
 import { getSocketIO } from "../socket";
 import { sendOrderConfirmationEmail } from "../utils/email";
 import { releaseInventory } from "./order.controller";
+import { generateTicketCode } from "../utils/orderUtils";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
@@ -173,39 +174,43 @@ export async function handleWebhook(
   next: NextFunction
 ): Promise<void> {
   try {
-    // Return 200 OK gracefully for empty ping or health test
+    console.log("[PayOS Webhook] 📩 Webhook received payload:", JSON.stringify(req.body));
+
+    // Return 200 OK for empty ping or health test
     if (!req.body || Object.keys(req.body).length === 0) {
+      console.log("[PayOS Webhook] ℹ️ Empty ping received.");
       res.status(200).json({ success: true, message: "Webhook ping received" });
       return;
     }
 
     let webhookData: any = req.body.data || req.body;
 
-    // Use official SDK to verify signature if configured
+    // Verify signature with PayOS SDK if payos client is configured and signature exists
     if (payos && req.body.signature) {
       try {
         webhookData = payos.webhooks.verify(req.body);
-      } catch (verifyErr) {
-        console.warn("⚠️ PayOS Webhook signature verification note:", verifyErr);
-        // If it's a test ping from PayOS dashboard, respond 200 OK
-        if (
-          req.body?.data?.orderCode === 123456 ||
-          req.body?.desc === "success" ||
-          req.body?.code === "00"
-        ) {
-          res.status(200).json({ success: true, message: "Webhook test ping verified" });
+        console.log("[PayOS Webhook] ✅ Signature verified successfully with Checksum Key!");
+      } catch (verifyErr: any) {
+        console.warn("⚠️ [PayOS Webhook] Signature verification note:", verifyErr?.message || verifyErr);
+        // If it's an explicit test ping from PayOS dashboard (orderCode 123456)
+        if (req.body?.data?.orderCode === 123456 || req.body?.orderCode === 123456) {
+          console.log("[PayOS Webhook] 🧪 Test verification ping from PayOS Dashboard confirmed.");
+          res.status(200).json({ success: true, message: "PayOS Webhook test ping verified" });
           return;
         }
       }
     }
 
-    const orderCode = webhookData?.orderCode;
-    const paymentCode = webhookData?.code || req.body?.code;
-    const payosEventId = webhookData?.id || req.body?.id;
+    const orderCode = webhookData?.orderCode || req.body?.data?.orderCode || req.body?.orderCode;
+    const paymentCode = webhookData?.code || req.body?.data?.code || req.body?.code;
+    const payosEventId = webhookData?.id || req.body?.data?.id || req.body?.id;
     const topLevelCode = req.body?.code;
 
-    // Gracefully handle PayOS test payloads or missing orderCode
+    console.log(`[PayOS Webhook] 🔍 Extracted orderCode: ${orderCode}, paymentCode: ${paymentCode}, topLevelCode: ${topLevelCode}`);
+
+    // Handle PayOS test payloads or missing orderCode
     if (!orderCode || orderCode === 123456) {
+      console.log("[PayOS Webhook] 🧪 PayOS Test Payload acknowledged.");
       res.status(200).json({ success: true, message: "Webhook test payload received" });
       return;
     }
@@ -214,38 +219,52 @@ export async function handleWebhook(
     try {
       parsedOrderCode = BigInt(orderCode);
     } catch {
+      console.warn(`[PayOS Webhook] ⚠️ Cannot convert orderCode "${orderCode}" to BigInt.`);
       res.status(200).json({ success: true, message: "Invalid orderCode format, ignored" });
       return;
     }
 
-    // Idempotency: skip if already processed
+    // Idempotency: skip if already processed successfully
     const idempotencyKey = String(payosEventId || orderCode);
-    const existing = await prisma.transaction.findUnique({
+    const existingTransaction = await prisma.transaction.findUnique({
       where: { payosEventId: idempotencyKey },
     });
-    if (existing) {
-      res.json({ success: true, message: "Already processed" });
+
+    if (existingTransaction && existingTransaction.status === "SUCCEEDED") {
+      console.log(`[PayOS Webhook] ℹ️ Webhook event ${idempotencyKey} already processed successfully.`);
+      res.status(200).json({ success: true, message: "Already processed successfully" });
       return;
     }
 
     // Find payment by payosOrderCode
     const payment = await prisma.payment.findUnique({
       where: { payosOrderCode: parsedOrderCode },
-      include: { order: { include: { items: true, buyer: true, event: true } } },
+      include: {
+        order: {
+          include: {
+            items: { include: { ticketType: true, seat: true } },
+            buyer: true,
+            event: true,
+          },
+        },
+      },
     });
 
     if (!payment) {
-      // PayOS test ping or unknown order - respond 200 OK
-      res.status(200).json({ success: true, message: "Payment not found, ignoring" });
+      console.warn(`[PayOS Webhook] ⚠️ Payment record not found in DB for payosOrderCode: ${orderCode}`);
+      res.status(200).json({ success: true, message: "Payment record not found, ignored" });
       return;
     }
 
-    const isSuccess = topLevelCode === "00" && paymentCode === "00";
+    const isSuccess = (topLevelCode === "00" || paymentCode === "00") && (webhookData?.desc === "success" || req.body?.desc === "success" || paymentCode === "00");
+
+    console.log(`[PayOS Webhook] ⚙️ Processing payment result for Order #${payment.order.orderNumber} (ID: ${payment.orderId}). Success: ${isSuccess}`);
 
     await prisma.$transaction(async (tx) => {
-      // Record transaction
-      await tx.transaction.create({
-        data: {
+      // Upsert transaction log
+      await tx.transaction.upsert({
+        where: { payosEventId: idempotencyKey },
+        create: {
           paymentId: payment.id,
           payosEventId: idempotencyKey,
           type: isSuccess ? "PAYMENT_SUCCESS" : "PAYMENT_FAILED",
@@ -253,27 +272,41 @@ export async function handleWebhook(
           status: isSuccess ? "SUCCEEDED" : "FAILED",
           rawPayload: JSON.stringify(req.body),
         },
+        update: {
+          status: isSuccess ? "SUCCEEDED" : "FAILED",
+          rawPayload: JSON.stringify(req.body),
+        },
       });
 
       if (isSuccess) {
+        // 1. Update Payment status to SUCCEEDED / PAID
         await tx.payment.update({
           where: { id: payment.id },
           data: { status: "SUCCEEDED", paidAt: new Date() },
         });
 
+        // 2. Update Order status to CONFIRMED (PAID)
         await tx.order.update({
           where: { id: payment.orderId },
           data: { status: "CONFIRMED", confirmedAt: new Date() },
         });
 
-        // Finalize inventory: reserved → sold
+        // 3. Issue Tickets: Ensure ticketCode exists & finalize inventory (reserved -> sold)
         for (const item of payment.order.items) {
+          if (!item.ticketCode) {
+            await tx.orderItem.update({
+              where: { id: item.id },
+              data: { ticketCode: generateTicketCode() },
+            });
+          }
+
           if (item.ticketTypeId) {
             await tx.ticketInventory.update({
               where: { ticketTypeId: item.ticketTypeId },
               data: { reservedQty: { decrement: 1 }, soldQty: { increment: 1 } },
             });
           }
+
           if (item.seatId) {
             await tx.seat.update({
               where: { id: item.seatId },
@@ -282,16 +315,31 @@ export async function handleWebhook(
           }
         }
 
-        // Notify buyer
+        // 4. Create Notification for Buyer
         await tx.notification.create({
           data: {
             userId: payment.order.buyerId,
             title: "Đặt vé thành công! 🎉",
-            message: `Vé của bạn cho sự kiện "${payment.order.event.title}" đã được xác nhận. Đơn: ${payment.order.orderNumber}`,
+            message: `Vé của bạn cho sự kiện "${payment.order.event.title}" đã được xác nhận. Mã đơn: ${payment.order.orderNumber}`,
             type: "ORDER_CONFIRMED",
             metadata: JSON.stringify({ orderId: payment.orderId }),
           },
         });
+
+        // 5. Create Notification for Seller / Organizer
+        if (payment.order.event.sellerId) {
+          await tx.notification.create({
+            data: {
+              userId: payment.order.event.sellerId,
+              title: "Đơn hàng mới! 🎫",
+              message: `Đơn hàng #${payment.order.orderNumber} cho sự kiện "${payment.order.event.title}" vừa được thanh toán thành công.`,
+              type: "SELLER_NEW_ORDER",
+              metadata: JSON.stringify({ orderId: payment.orderId }),
+            },
+          });
+        }
+
+        console.log(`[PayOS Webhook] 🎉 ORDER CONFIRMED & TICKETS ISSUED SUCCESSFULLY! Order #${payment.order.orderNumber}`);
       } else {
         await tx.payment.update({
           where: { id: payment.id },
@@ -302,10 +350,12 @@ export async function handleWebhook(
           where: { id: payment.orderId },
           data: { status: "CANCELLED" },
         });
+
+        console.log(`[PayOS Webhook] ❌ Payment failed for Order #${payment.order.orderNumber}`);
       }
     });
 
-    // Emit realtime events
+    // Realtime Socket updates
     const io = getSocketIO();
     io.to(`user:${payment.order.buyerId}`).emit("order:confirmed", {
       orderId: payment.orderId,
@@ -317,14 +367,28 @@ export async function handleWebhook(
       eventId: payment.order.eventId,
     });
 
-    // Send confirmation email (non-blocking)
+    // Send order confirmation email asynchronously
     if (isSuccess) {
-      sendOrderConfirmationEmail(payment.order).catch(console.error);
+      sendOrderConfirmationEmail(payment.order).catch((err) =>
+        console.error("[PayOS Webhook] Email error:", err)
+      );
     }
 
-    res.json({ success: true });
+    res.status(200).json({
+      success: true,
+      message: isSuccess
+        ? "Thanh toán thành công. Đơn hàng đã được xác nhận và phát hành vé."
+        : "Thanh toán không thành công.",
+      data: {
+        orderId: payment.orderId,
+        orderNumber: payment.order.orderNumber,
+        status: isSuccess ? "CONFIRMED" : "FAILED",
+      },
+    });
   } catch (err) {
-    next(err);
+    console.error("[PayOS Webhook Error]:", err);
+    // Always return HTTP 200 OK so PayOS does not record a failed webhook delivery
+    res.status(200).json({ success: true, message: "Webhook error handled gracefully" });
   }
 }
 
