@@ -12,10 +12,10 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 // ─── PayOS Client (Official SDK) ─────────────────────────────────────────
 const payos = (process.env.PAYOS_CLIENT_ID && process.env.PAYOS_API_KEY && process.env.PAYOS_CHECKSUM_KEY)
   ? new PayOS({
-      clientId: process.env.PAYOS_CLIENT_ID,
-      apiKey: process.env.PAYOS_API_KEY,
-      checksumKey: process.env.PAYOS_CHECKSUM_KEY
-    })
+    clientId: process.env.PAYOS_CLIENT_ID,
+    apiKey: process.env.PAYOS_API_KEY,
+    checksumKey: process.env.PAYOS_CHECKSUM_KEY
+  })
   : null;
 
 // ─── Create VietQR Payment ───────────────────────────────────────────────
@@ -93,8 +93,8 @@ export async function createPayment(
       buyerName: (order.buyer.name || "Lumora User").slice(0, 255),
       buyerEmail: order.buyer.email,
       items,
-      returnUrl: `${FRONTEND_URL}/checkout/success?orderId=${order.id}`,
-      cancelUrl: `${FRONTEND_URL}/checkout/cancel?orderId=${order.id}`,
+      returnUrl: `${FRONTEND_URL}/checkout/${order.id}/status`,
+      cancelUrl: `${FRONTEND_URL}/checkout/${order.id}/status?cancel=true`,
       expiredAt: Math.floor(order.expiresAt.getTime() / 1000),
     });
 
