@@ -4,11 +4,11 @@ import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { Calendar, MapPin, ShieldCheck, Tag, User, Ticket as TicketIcon } from "lucide-react";
+import { Calendar, MapPin, ShieldCheck, Heart } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ─────────────────────────────────────────────
-// Barcode SVG renderer (shared, reusable)
+// BarcodeImage — reusable horizontal barcode
 // ─────────────────────────────────────────────
 export function BarcodeImage({
   text,
@@ -26,7 +26,6 @@ export function BarcodeImage({
   dark?: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-
   useEffect(() => {
     if (svgRef.current && text) {
       try {
@@ -46,12 +45,11 @@ export function BarcodeImage({
       }
     }
   }, [text, height, width, fontSize, displayValue, dark]);
-
   return <svg ref={svgRef} className="max-w-full h-auto mx-auto block" />;
 }
 
 // ─────────────────────────────────────────────
-// Props interface
+// Props
 // ─────────────────────────────────────────────
 interface EventTicketProps {
   ticketCode: string;
@@ -70,52 +68,130 @@ interface EventTicketProps {
 }
 
 // ─────────────────────────────────────────────
-// Status badge helper
+// Status badge
 // ─────────────────────────────────────────────
 function StatusBadge({ status, isCheckedIn }: { status?: string; isCheckedIn?: boolean }) {
-  if (isCheckedIn) {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase tracking-wide">
-        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse inline-block" />
-        Đã Soát Vé
-      </span>
-    );
-  }
-  if (status === "CONFIRMED" || status === "PAID") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wide">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-        Vé Hợp Lệ
-      </span>
-    );
-  }
-  if (status === "PENDING") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wide">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-        Chờ Thanh Toán
-      </span>
-    );
-  }
-  if (status === "CANCELLED" || status === "REFUNDED") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-red-500/20 text-red-300 border border-red-500/30 uppercase tracking-wide">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
-        Đã Hủy
-      </span>
-    );
-  }
+  const base = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide whitespace-nowrap";
+  if (isCheckedIn)
+    return <span className={`${base} bg-blue-500/25 text-blue-200 border border-blue-400/30`}><span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse inline-block" />Đã Soát Vé</span>;
+  if (status === "CONFIRMED" || status === "PAID")
+    return <span className={`${base} bg-emerald-500/25 text-emerald-200 border border-emerald-400/30`}><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />Vé Hợp Lệ</span>;
+  if (status === "PENDING")
+    return <span className={`${base} bg-amber-500/25 text-amber-200 border border-amber-400/30`}><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />Chờ TT</span>;
+  if (status === "CANCELLED" || status === "REFUNDED")
+    return <span className={`${base} bg-red-500/25 text-red-300 border border-red-400/30`}><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />Đã Hủy</span>;
+  return <span className={`${base} bg-slate-500/25 text-slate-300 border border-slate-400/30`}>Không xác định</span>;
+}
+
+// ─────────────────────────────────────────────
+// StubBarcode — scales CODE128 SVG to fit stub width via viewBox
+// ─────────────────────────────────────────────
+function StubBarcode({ text }: { text: string }) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el || !text) return;
+    try {
+      JsBarcode(el, text, {
+        format: "CODE128",
+        width: 2,
+        height: 80,
+        displayValue: false,
+        margin: 6,
+        background: "#ffffff",
+        lineColor: "#111827",
+      });
+      const w = el.getAttribute("width");
+      const h = el.getAttribute("height");
+      if (w && h) {
+        el.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        el.removeAttribute("width");
+        el.removeAttribute("height");
+      }
+    } catch (err) {
+      console.error("Barcode error:", err);
+    }
+  }, [text]);
+  return <svg ref={svgRef} style={{ width: "100%", height: "auto", display: "block" }} />;
+}
+
+// ─────────────────────────────────────────────
+// Decorative SVG sparkle/leaf overlay
+// ─────────────────────────────────────────────
+function DecorativeOverlay() {
   return (
-    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-slate-500/20 text-slate-300 border border-slate-500/30 uppercase tracking-wide">
-      Không xác định
-    </span>
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      viewBox="0 0 400 220"
+      preserveAspectRatio="xMidYMid slice"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Botanical leaves — corners */}
+      {/* Top-left leaf cluster */}
+      <g opacity="0.18" stroke="white" strokeWidth="1" fill="none">
+        <path d="M-10,10 Q20,40 0,70" />
+        <path d="M0,10 Q30,35 10,65" />
+        <path d="M-5,5 Q15,20 5,45" />
+        <path d="M10,0 Q40,25 20,55" />
+      </g>
+      {/* Bottom-left leaves */}
+      <g opacity="0.15" stroke="white" strokeWidth="1" fill="none" transform="translate(0,130) rotate(-20)">
+        <path d="M-10,10 Q30,40 5,80" />
+        <path d="M5,5 Q40,35 15,75" />
+        <path d="M15,0 Q50,30 25,70" />
+      </g>
+      {/* Top-right leaves */}
+      <g opacity="0.15" stroke="white" strokeWidth="1" fill="none" transform="translate(280,-10) rotate(15)">
+        <path d="M10,0 Q-20,30 0,60" />
+        <path d="M20,5 Q-10,35 10,65" />
+        <path d="M30,0 Q0,25 20,55" />
+      </g>
+      {/* Bottom-right leaves */}
+      <g opacity="0.13" stroke="white" strokeWidth="1" fill="none" transform="translate(290,130) rotate(25)">
+        <path d="M10,0 Q-20,30 0,60" />
+        <path d="M20,5 Q-10,35 10,65" />
+      </g>
+
+      {/* Sparkle stars */}
+      {/* ✦ shape: 4-pointed star using two rotated lines */}
+      {[
+        { x: 60, y: 18, s: 5 },
+        { x: 180, y: 12, s: 6 },
+        { x: 290, y: 30, s: 4 },
+        { x: 340, y: 80, s: 5 },
+        { x: 130, y: 160, s: 4 },
+        { x: 250, y: 170, s: 6 },
+        { x: 50, y: 120, s: 4 },
+        { x: 320, y: 150, s: 5 },
+      ].map(({ x, y, s }, i) => (
+        <g key={i} transform={`translate(${x},${y})`} opacity="0.55">
+          <line x1={0} y1={-s} x2={0} y2={s} stroke="white" strokeWidth="1.2" />
+          <line x1={-s} y1={0} x2={s} y2={0} stroke="white" strokeWidth="1.2" />
+          <line x1={-s * 0.5} y1={-s * 0.5} x2={s * 0.5} y2={s * 0.5} stroke="white" strokeWidth="0.7" />
+          <line x1={s * 0.5} y1={-s * 0.5} x2={-s * 0.5} y2={s * 0.5} stroke="white" strokeWidth="0.7" />
+        </g>
+      ))}
+    </svg>
   );
 }
 
 // ─────────────────────────────────────────────
-// Main EventTicket — NEW UNIFIED LAYOUT
-// Left : Customer info (status, name, ticket type, seat) + Barcode
-// Right: Event image as full background + overlay info (title, time, venue)
+// Main EventTicket
+//
+// ┌──────────────────────────────────────────────┬────────────┐
+// │  [Purple→Blue gradient + botanical + sparks] │   WHITE    │
+// │                                              │   stub     │
+// │  "✦ LUMORA · {category}"      (top small)    │   NO.      │
+// │                                              │            │
+// │  {eventTitle}    (large bold, peach/coral)   │   ▌▌▌▌▌   │
+// │  {ticketType}    (script italic white)       │   ▌▌▌▌▌   │
+// │                                              │  BARCODE   │
+// │  ┌─────────────────────────────────────┐     │            │
+// │  │ ❤ {time} · {date} | {venue}, {city} │     │   LM-XXX   │
+// │  └─────────────────────────────────────┘     │            │
+// │  👤 {holder}  💺 {seat}   [Status badge]     │            │
+// └──────────────────────────────────────────────┴────────────┘
+//              ○ notch                       ○ notch
 // ─────────────────────────────────────────────
 export function EventTicket({
   ticketCode,
@@ -133,173 +209,165 @@ export function EventTicket({
   className = "",
 }: EventTicketProps) {
   const dateObj = new Date(startDate);
-  const formattedDay = format(dateObj, "EEEE", { locale: vi });
-  const formattedDate = format(dateObj, "d 'Tháng' M, yyyy", { locale: vi });
+  const formattedDate = format(dateObj, "d MMM yyyy", { locale: vi });
   const formattedTime = format(dateObj, "HH:mm");
 
   return (
     <div
-      className={`relative w-full rounded-[28px] overflow-hidden shadow-2xl flex flex-col sm:flex-row min-h-[320px] border border-white/10 ${className}`}
-      style={{ background: "#161B22" }}
+      className={`relative w-full rounded-2xl overflow-hidden shadow-2xl flex flex-row ${className}`}
+      style={{ minHeight: 220, fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
     >
-      {/* Perforation notch cutouts */}
+      {/* ── Notch cutouts at the perforation line ── */}
       <div
-        className="absolute top-0 left-[44%] -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full z-30 hidden sm:block"
-        style={{ background: "#0D1117" }}
+        className="absolute top-0 right-[22%] -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full z-30 hidden sm:block"
+        style={{ background: "#f3f4f6" }}
       />
       <div
-        className="absolute bottom-0 left-[44%] -translate-x-1/2 translate-y-1/2 w-7 h-7 rounded-full z-30 hidden sm:block"
-        style={{ background: "#0D1117" }}
+        className="absolute bottom-0 right-[22%] -translate-x-1/2 translate-y-1/2 w-6 h-6 rounded-full z-30 hidden sm:block"
+        style={{ background: "#f3f4f6" }}
       />
 
-      {/* ════ LEFT — Customer info + Barcode ════ */}
+      {/* ════ LEFT 78% — coloured body ════ */}
       <div
-        className="w-full sm:w-[46%] flex flex-col justify-between px-5 py-5 border-b-2 sm:border-b-0 sm:border-r-2 border-dashed border-white/15 relative z-10 shrink-0"
-        style={{ background: "#1A2030" }}
+        className="relative overflow-hidden flex flex-col justify-between p-5"
+        style={{
+          flex: "0 0 78%",
+          minWidth: 0,
+          minHeight: 220,
+          background: bannerUrl
+            ? undefined
+            : "linear-gradient(135deg, #7C3AED 0%, #6366F1 45%, #3B82F6 100%)",
+        }}
       >
-        {/* Top: brand + status */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black tracking-[0.18em] text-emerald-400 uppercase font-mono whitespace-nowrap">
-              ✦ LUMORA E-TICKET
-            </span>
-            <StatusBadge status={status} isCheckedIn={isCheckedIn} />
+        {/* Banner image (if provided) */}
+        {bannerUrl && (
+          <>
+            <img
+              src={bannerUrl}
+              alt={eventTitle}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            {/* Dark scrim for text legibility */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to right,rgba(0,0,0,0.78) 0%,rgba(0,0,0,0.45) 60%,rgba(0,0,0,0.15) 100%), linear-gradient(to top,rgba(0,0,0,0.85) 0%,rgba(0,0,0,0.05) 55%)",
+              }}
+            />
+          </>
+        )}
+
+        {/* Decorative SVG layer (botanical + sparkles) */}
+        <DecorativeOverlay />
+
+        {/* ── Content (above decorations) ── */}
+        <div className="relative z-10 flex flex-col justify-between h-full gap-3">
+
+          {/* Top row: brand + category */}
+          <p className="text-[10px] italic text-white/65 font-light tracking-widest">
+            ✦ LUMORA · {category}
+          </p>
+
+          {/* Middle: event name + type */}
+          <div className="flex-1 flex flex-col justify-center gap-1">
+            <h3
+              className="font-black leading-tight line-clamp-2"
+              style={{
+                fontSize: "clamp(1.2rem, 3.5vw, 2rem)",
+                color: bannerUrl ? "#ffffff" : "#FDBA74",   /* peach/coral when gradient */
+                textShadow: "0 2px 12px rgba(0,0,0,0.55)",
+              }}
+            >
+              {eventTitle}
+            </h3>
+            {/* Ticket type — script-like italic */}
+            <p
+              className="text-white/85 font-semibold"
+              style={{
+                fontSize: "clamp(0.85rem, 2vw, 1.1rem)",
+                fontStyle: "italic",
+                textShadow: "0 1px 6px rgba(0,0,0,0.4)",
+              }}
+            >
+              {ticketType}
+            </p>
           </div>
 
-          <div className="w-full h-px bg-white/10" />
-
-          {/* Customer details */}
-          <div className="space-y-3">
-            {/* Holder name */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
-                <User className="h-4 w-4 text-emerald-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                  Chủ Vé
-                </p>
-                <p className="text-sm font-extrabold text-white truncate leading-tight">
-                  {holderName || "Khách hàng Lumora"}
-                </p>
-              </div>
+          {/* Bottom: info badge + holder + status */}
+          <div className="space-y-2">
+            {/* Teal pill badge — date + venue */}
+            <div
+              className="inline-flex flex-wrap items-center gap-1.5 px-3 py-2 rounded-xl text-white font-semibold text-[11px] shadow-lg max-w-full"
+              style={{ background: "rgba(20,184,166,0.80)", backdropFilter: "blur(8px)" }}
+            >
+              <Heart className="h-3 w-3 text-red-400 shrink-0 fill-red-400" />
+              <span className="font-bold">{formattedTime} · {formattedDate}</span>
+              <span className="opacity-60">|</span>
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="line-clamp-1">{venue}{city ? `, ${city}` : ""}</span>
             </div>
 
-            {/* Ticket type */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-violet-500/15 border border-violet-500/25 flex items-center justify-center shrink-0">
-                <Tag className="h-4 w-4 text-violet-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                  Hạng Vé
-                </p>
-                <p className="text-sm font-extrabold text-white truncate leading-tight">
-                  {ticketType}
-                </p>
-              </div>
+            {/* Holder + seat + status */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {holderName && (
+                <span className="text-[11px] text-white/80 font-medium">👤 {holderName}</span>
+              )}
+              {seatInfo && (
+                <span className="text-[11px] text-amber-300 font-bold">💺 {seatInfo}</span>
+              )}
+              <StatusBadge status={status} isCheckedIn={isCheckedIn} />
             </div>
-
-            {/* Seat info (optional) */}
-            {seatInfo && (
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-                  <TicketIcon className="h-4 w-4 text-amber-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                    Số Ghế
-                  </p>
-                  <p className="text-sm font-extrabold text-amber-300 truncate leading-tight">
-                    {seatInfo}
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-
-        {/* Bottom: Barcode */}
-        <div className="mt-5 space-y-2">
-          <div className="w-full h-px bg-white/10" />
-
-          {isCheckedIn ? (
-            <div className="bg-blue-900/30 border border-blue-500/25 rounded-2xl p-3 flex items-center gap-3">
-              <ShieldCheck className="h-6 w-6 text-blue-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs font-black text-blue-300 uppercase tracking-wider">
-                  Đã Soát Vé Xác Nhận
-                </p>
-                <p className="text-[10px] text-blue-400/70 font-mono mt-0.5 truncate">
-                  {ticketCode}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl px-2 pt-2 pb-1.5">
-              <BarcodeImage text={ticketCode} height={46} width={1.5} fontSize={10} />
-              <div className="flex items-center justify-between px-1 pt-1">
-                <span className="text-[9px] font-black text-slate-700 font-mono tracking-widest">
-                  {ticketCode}
-                </span>
-                <span className="text-[9px] font-black text-slate-400 uppercase">LUMORA</span>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ════ RIGHT — Event image BG + overlay info ════ */}
-      <div className="flex-1 relative min-h-[200px] sm:min-h-0 overflow-hidden">
-        {/* Background: event image or gradient fallback */}
-        {bannerUrl ? (
-          <img
-            src={bannerUrl}
-            alt={eventTitle}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+      {/* ════ RIGHT 22% — White stub ════ */}
+      <div
+        className="flex flex-col items-center justify-between py-4 px-2.5"
+        style={{
+          flex: "0 0 22%",
+          minWidth: 0,
+          background: "#ffffff",
+          borderLeft: "2px dashed #d1d5db",
+        }}
+      >
+        {/* NO. label */}
+        <span
+          className="text-slate-400 font-black uppercase tracking-[0.15em]"
+          style={{ fontSize: 9, fontFamily: "monospace" }}
+        >
+          NO.
+        </span>
+
+        {/* Barcode */}
+        {isCheckedIn ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-1.5 py-2">
+            <ShieldCheck className="h-8 w-8 text-teal-500" />
+            <p className="text-[8px] font-black text-teal-600 uppercase tracking-wider text-center leading-tight">
+              Đã Soát Vé
+            </p>
+          </div>
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-950" />
+          <div className="flex-1 w-full flex items-center justify-center py-2">
+            <StubBarcode text={ticketCode} />
+          </div>
         )}
 
-        {/* Gradient overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10" />
-
-        {/* Category tag — top right */}
-        <div className="absolute top-4 right-4 z-20">
-          <span className="inline-block bg-black/50 backdrop-blur-sm text-white border border-white/20 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow-md">
-            {category}
-          </span>
-        </div>
-
-        {/* Event info — pinned to bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 z-20 space-y-2.5">
-          <h3 className="text-base sm:text-lg md:text-xl font-black text-white leading-snug drop-shadow-lg line-clamp-2">
-            {eventTitle}
-          </h3>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-              <span className="text-[12px] sm:text-[13px] text-slate-200 font-semibold capitalize drop-shadow">
-                {formattedTime} &middot; {formattedDay}, {formattedDate}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-              <span className="text-[12px] sm:text-[13px] text-slate-200 font-semibold line-clamp-1 drop-shadow">
-                {venue}{city ? `, ${city}` : ""}
-              </span>
-            </div>
-          </div>
-        </div>
+        {/* Code text */}
+        <p
+          className="text-center break-all leading-tight text-slate-400 font-mono font-bold"
+          style={{ fontSize: 7 }}
+        >
+          {ticketCode}
+        </p>
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────
-// ETicketModal — dialog wrapper for ETicket
+// ETicketModal
 // ─────────────────────────────────────────────
 export function ETicketModal({
   open,
@@ -324,22 +392,20 @@ export function ETicketModal({
   } | null;
 }) {
   if (!ticket) return null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-w-4xl w-[95vw] rounded-[28px] p-5 sm:p-7 border border-white/10 bg-[#0D1117] text-white shadow-2xl overflow-hidden">
-        <DialogHeader className="pb-3 border-b border-white/10">
-          <DialogTitle className="font-black text-lg flex items-center gap-2.5 text-white">
-            Phôi Vé Điện Tử Chính Thức
+      <DialogContent className="sm:max-w-3xl max-w-3xl w-[95vw] rounded-2xl p-5 sm:p-6 bg-slate-100 shadow-2xl overflow-hidden border-0">
+        <DialogHeader className="pb-3 border-b border-slate-200">
+          <DialogTitle className="font-black text-lg text-slate-800">
+            🎫 Phôi Vé Điện Tử
           </DialogTitle>
           {ticket.holderName && (
-            <p className="text-xs text-slate-400 font-medium mt-0.5">
-              Chủ sở hữu vé:{" "}
-              <span className="font-bold text-emerald-400">{ticket.holderName}</span>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Chủ sở hữu:{" "}
+              <span className="font-bold text-violet-600">{ticket.holderName}</span>
             </p>
           )}
         </DialogHeader>
-
         <div className="py-3">
           <EventTicket
             ticketCode={ticket.ticketCode}

@@ -317,7 +317,7 @@ export default function OrderDetailPage() {
         <div className="flex flex-col gap-6">
           {order.items.map((item: any) => {
             const ticketTypeName = item.ticketType?.name || (item.seat ? "Vé Có Số Ghế" : "General Admission");
-            const seatLabel = item.seat ? `Hàng ${item.seat.row.rowLabel} — Ghế ${item.seat.seatLabel} (${item.seat.row.section.name})` : undefined;
+            const seatLabel = item.seat ? `Hàng ${item.seat.row?.rowLabel} — Ghế ${item.seat.seatLabel} (${item.seat.row?.section?.name || ""})` : undefined;
             
             return (
               <EventTicket
@@ -333,6 +333,7 @@ export default function OrderDetailPage() {
                 seatInfo={seatLabel}
                 status={order.status}
                 isCheckedIn={item.isCheckedIn}
+                holderName={order.buyer?.name}
               />
             );
           })}
