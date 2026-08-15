@@ -203,7 +203,7 @@ export async function checkInOrder(
   }
 }
 
-// ─── Check-in Single Item (by ticket code) ──────────────────────────────
+// ─── Check-in Single Item (by barcode/ticket code/id) ───────────────────
 export async function checkInItem(
   req: Request,
   res: Response,
@@ -212,26 +212,223 @@ export async function checkInItem(
   try {
     const itemId = req.params.itemId as string;
     const sellerId = getSellerId(req);
+    const cleanCode = itemId?.trim();
+
+    if (!cleanCode) {
+      throw createError("Mã vé không được để trống", 400);
+    }
 
     const item = await prisma.orderItem.findFirst({
       where: {
-        id: itemId,
-        order: { event: { sellerId }, status: "CONFIRMED" },
-        isCheckedIn: false,
+        OR: [
+          { ticketCode: cleanCode },
+          { id: cleanCode },
+        ],
+        order: {
+          event: { sellerId },
+        },
+      },
+      include: {
+        order: {
+          include: {
+            buyer: { select: { id: true, name: true, email: true, phone: true } },
+            event: { select: { id: true, title: true, bannerUrl: true, category: true, venue: true, city: true, startDate: true } },
+          },
+        },
+        ticketType: { select: { id: true, name: true, price: true } },
+        seat: { select: { id: true, seatLabel: true } },
       },
     });
-    if (!item) throw createError("Ticket not found, already checked in, or access denied", 404);
 
+    if (!item) {
+      throw createError("Không tìm thấy vé hoặc vé không thuộc quyền quản lý của bạn", 404);
+    }
+
+    if (item.order.status === "REFUNDED" || item.order.status === "CANCELLED") {
+      throw createError(`Vé này đã bị hủy hoặc hoàn tiền (Trạng thái đơn: ${item.order.status})`, 400);
+    }
+
+    if (!["CONFIRMED", "PAID"].includes(item.order.status)) {
+      throw createError(`Đơn hàng chưa thanh toán thành công (Trạng thái: ${item.order.status})`, 400);
+    }
+
+    const ticketDetail = {
+      id: item.id,
+      ticketCode: item.ticketCode || item.id,
+      orderNumber: item.order.orderNumber,
+      eventTitle: item.order.event.title,
+      bannerUrl: item.order.event.bannerUrl,
+      category: item.order.event.category,
+      venue: item.order.event.venue,
+      city: item.order.event.city,
+      startDate: item.order.event.startDate,
+      buyerName: item.order.buyer.name || item.order.buyer.email,
+      buyerEmail: item.order.buyer.email,
+      buyerPhone: item.order.buyer.phone,
+      ticketType: item.ticketType?.name || (item.seat ? `Ghế ${item.seat.seatLabel}` : "Vé Khách Hàng"),
+      seatLabel: item.seat?.seatLabel || null,
+      isCheckedIn: item.isCheckedIn,
+      checkedInAt: item.checkedInAt,
+    };
+
+    // If ALREADY checked in
+    if (item.isCheckedIn) {
+      const formattedTime = item.checkedInAt ? new Date(item.checkedInAt).toLocaleString("vi-VN") : "";
+      res.json({
+        success: true,
+        alreadyCheckedIn: true,
+        message: `Vé này ĐÃ ĐƯỢC CHECK-IN trước đó${formattedTime ? ` (lúc ${formattedTime})` : ""}!`,
+        data: ticketDetail,
+      });
+      return;
+    }
+
+    // Process Check-in
+    const now = new Date();
     await prisma.orderItem.update({
-      where: { id: itemId },
-      data: { isCheckedIn: true, checkedInAt: new Date() },
+      where: { id: item.id },
+      data: { isCheckedIn: true, checkedInAt: now },
     });
 
-    res.json({ success: true, message: "Ticket checked in" });
+    res.json({
+      success: true,
+      alreadyCheckedIn: false,
+      message: "Check-in vé thành công!",
+      data: {
+        ...ticketDetail,
+        isCheckedIn: true,
+        checkedInAt: now,
+      },
+    });
   } catch (err) {
     next(err);
   }
 }
+
+// ─── Get Seller Check-in Stats ──────────────────────────────────────────
+export async function getSellerCheckinStats(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const { eventId } = req.query as Record<string, string>;
+
+    const orderWhere: any = {
+      event: { sellerId },
+      status: { in: ["CONFIRMED", "PAID"] },
+      ...(eventId ? { eventId } : {}),
+    };
+
+    const [totalTickets, checkedInCount] = await Promise.all([
+      prisma.orderItem.count({
+        where: { order: orderWhere },
+      }),
+      prisma.orderItem.count({
+        where: {
+          order: orderWhere,
+          isCheckedIn: true,
+        },
+      }),
+    ]);
+
+    const uncheckedCount = Math.max(0, totalTickets - checkedInCount);
+    const checkinRate = totalTickets > 0 ? Math.round((checkedInCount / totalTickets) * 100) : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalTickets,
+        checkedInCount,
+        uncheckedCount,
+        checkinRate,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Get Seller Check-in Tickets (Attendee List) ─────────────────────────
+export async function getSellerCheckinTickets(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const { eventId, search, isCheckedIn } = req.query as Record<string, string>;
+
+    const where: any = {
+      order: {
+        event: { sellerId },
+        status: { in: ["CONFIRMED", "PAID"] },
+        ...(eventId ? { eventId } : {}),
+      },
+    };
+
+    if (isCheckedIn !== undefined && isCheckedIn !== "") {
+      where.isCheckedIn = isCheckedIn === "true";
+    }
+
+    if (search && search.trim()) {
+      const query = search.trim();
+      where.OR = [
+        { ticketCode: { contains: query, mode: "insensitive" } },
+        { id: { contains: query, mode: "insensitive" } },
+        { order: { orderNumber: { contains: query, mode: "insensitive" } } },
+        { order: { buyer: { name: { contains: query, mode: "insensitive" } } } },
+        { order: { buyer: { email: { contains: query, mode: "insensitive" } } } },
+        { order: { buyer: { phone: { contains: query, mode: "insensitive" } } } },
+      ];
+    }
+
+    const items = await prisma.orderItem.findMany({
+      where,
+      take: 200,
+      orderBy: { createdAt: "desc" },
+      include: {
+        order: {
+          include: {
+            buyer: { select: { id: true, name: true, email: true, phone: true } },
+            event: { select: { id: true, title: true, venue: true, city: true, startDate: true } },
+          },
+        },
+        ticketType: { select: { id: true, name: true, price: true } },
+        seat: { select: { id: true, seatLabel: true } },
+      },
+    });
+
+    const tickets = items.map((item) => ({
+      id: item.id,
+      ticketCode: item.ticketCode || item.id,
+      orderId: item.orderId,
+      orderNumber: item.order.orderNumber,
+      eventId: item.order.event.id,
+      eventTitle: item.order.event.title,
+      venue: item.order.event.venue,
+      city: item.order.event.city,
+      startDate: item.order.event.startDate,
+      buyerId: item.order.buyer.id,
+      buyerName: item.order.buyer.name || item.order.buyer.email,
+      buyerEmail: item.order.buyer.email,
+      buyerPhone: item.order.buyer.phone || null,
+      ticketType: item.ticketType?.name || (item.seat ? `Ghế ${item.seat.seatLabel}` : "Vé Khách Hàng"),
+      seatLabel: item.seat?.seatLabel || null,
+      price: Number(item.unitPrice),
+      quantity: item.quantity,
+      isCheckedIn: item.isCheckedIn,
+      checkedInAt: item.checkedInAt,
+      createdAt: item.createdAt,
+    }));
+
+    res.json({ success: true, data: tickets });
+  } catch (err) {
+    next(err);
+  }
+}
+
 
 // ─── Analytics ─────────────────────────────────────────────────────────
 export async function getAnalytics(
@@ -300,41 +497,223 @@ export async function getCustomers(
 ): Promise<void> {
   try {
     const sellerId = getSellerId(req);
-    const { page = "1", limit = "20" } = req.query as Record<string, string>;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const {
+      page = "1",
+      limit = "15",
+      search,
+      eventId,
+      segment,
+      sortBy = "recent",
+    } = req.query as Record<string, string>;
 
-    const buyers = await prisma.user.findMany({
-      where: {
-        orders: { some: { event: { sellerId }, status: "CONFIRMED" } },
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 15);
+
+    // 1. Fetch Stats for all seller's customers
+    const [totalCustomersCount, totalRevenueAggregate, allConfirmedOrders] = await Promise.all([
+      // Count unique buyers for this seller
+      prisma.user.count({
+        where: {
+          orders: {
+            some: {
+              event: { sellerId },
+              status: { in: ["CONFIRMED", "CHECKED_IN"] },
+            },
+          },
+        },
+      }),
+
+      // Aggregate revenue for seller's confirmed orders
+      prisma.order.aggregate({
+        where: {
+          event: { sellerId },
+          status: { in: ["CONFIRMED", "CHECKED_IN"] },
+        },
+        _sum: { total: true },
+      }),
+
+      // Fetch all order items count to calculate total tickets sold
+      prisma.orderItem.aggregate({
+        where: {
+          order: {
+            event: { sellerId },
+            status: { in: ["CONFIRMED", "CHECKED_IN"] },
+          },
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    const totalRevenue = Number(totalRevenueAggregate._sum.total || 0);
+    const totalTicketsSold = allConfirmedOrders._sum.quantity || 0;
+    const avgSpendPerCustomer = totalCustomersCount > 0 ? Math.round(totalRevenue / totalCustomersCount) : 0;
+
+    // 2. Build Where Filter for Buyer Query
+    const buyerWhere: any = {
+      orders: {
+        some: {
+          event: { sellerId },
+          status: { in: ["CONFIRMED", "CHECKED_IN"] },
+          ...(eventId ? { eventId } : {}),
+        },
       },
+    };
+
+    if (search && search.trim()) {
+      const query = search.trim();
+      buyerWhere.OR = [
+        { name: { contains: query, mode: "insensitive" } },
+        { email: { contains: query, mode: "insensitive" } },
+        { phone: { contains: query, mode: "insensitive" } },
+      ];
+    }
+
+    // 3. Fetch Buyers matching criteria
+    const rawBuyers = await prisma.user.findMany({
+      where: buyerWhere,
       select: {
         id: true,
         name: true,
         email: true,
         phone: true,
+        avatar: true,
         createdAt: true,
         orders: {
-          where: { event: { sellerId }, status: "CONFIRMED" },
-          select: { total: true },
+          where: {
+            event: { sellerId },
+            status: { in: ["CONFIRMED", "CHECKED_IN"] },
+            ...(eventId ? { eventId } : {}),
+          },
+          orderBy: { createdAt: "desc" },
+          include: {
+            event: { select: { id: true, title: true } },
+            items: {
+              include: {
+                ticketType: { select: { id: true, name: true, price: true } },
+                seat: { select: { id: true, seatLabel: true } },
+              },
+            },
+          },
         },
       },
-      skip,
-      take: parseInt(limit),
     });
+
+    // 4. Process and Aggregate data per Customer
+    let processedCustomers = rawBuyers.map((b) => {
+      const orders = b.orders || [];
+      const totalSpent = orders.reduce((sum, o) => sum + Number(o.total), 0);
+      const orderCount = orders.length;
+
+      let totalTickets = 0;
+      const eventMap: Record<string, { id: string; title: string; ticketCount: number }> = {};
+
+      orders.forEach((o) => {
+        const itemTickets = o.items.reduce((s, i) => s + (i.quantity || 1), 0);
+        totalTickets += itemTickets;
+
+        if (o.event) {
+          if (!eventMap[o.event.id]) {
+            eventMap[o.event.id] = { id: o.event.id, title: o.event.title, ticketCount: 0 };
+          }
+          eventMap[o.event.id].ticketCount += itemTickets;
+        }
+      });
+
+      const eventsList = Object.values(eventMap);
+      const lastOrderDate = orders[0]?.confirmedAt || orders[0]?.createdAt || null;
+
+      const ordersHistory = orders.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        total: Number(o.total),
+        subtotal: Number(o.subtotal),
+        fees: Number(o.fees),
+        discount: Number(o.discount),
+        confirmedAt: o.confirmedAt,
+        createdAt: o.createdAt,
+        event: o.event,
+        items: o.items.map((i) => ({
+          id: i.id,
+          ticketType: i.ticketType,
+          seat: i.seat,
+          quantity: i.quantity,
+          unitPrice: Number(i.unitPrice),
+          subtotal: Number(i.subtotal),
+          ticketCode: i.ticketCode,
+          qrCode: i.qrCode,
+          isCheckedIn: i.isCheckedIn,
+          checkedInAt: i.checkedInAt,
+        })),
+      }));
+
+      return {
+        id: b.id,
+        name: b.name || "Khách hàng",
+        email: b.email,
+        phone: b.phone || null,
+        avatar: b.avatar || null,
+        createdAt: b.createdAt,
+        totalSpent,
+        orderCount,
+        totalTickets,
+        lastOrderDate,
+        events: eventsList,
+        ordersHistory,
+      };
+    });
+
+    // 5. Apply Segment Filter if provided
+    if (segment === "VIP") {
+      processedCustomers = processedCustomers.filter((c) => c.totalSpent >= 1000000);
+    } else if (segment === "LOYAL") {
+      processedCustomers = processedCustomers.filter((c) => c.orderCount >= 2);
+    } else if (segment === "NEW") {
+      processedCustomers = processedCustomers.filter((c) => c.orderCount === 1);
+    }
+
+    // 6. Apply Sorting
+    if (sortBy === "spent_desc") {
+      processedCustomers.sort((a, b) => b.totalSpent - a.totalSpent);
+    } else if (sortBy === "orders_desc") {
+      processedCustomers.sort((a, b) => b.orderCount - a.orderCount);
+    } else {
+      // default: recent order date
+      processedCustomers.sort((a, b) => {
+        const timeA = a.lastOrderDate ? new Date(a.lastOrderDate).getTime() : 0;
+        const timeB = b.lastOrderDate ? new Date(b.lastOrderDate).getTime() : 0;
+        return timeB - timeA;
+      });
+    }
+
+    // 7. Paginate Results
+    const totalCustomers = processedCustomers.length;
+    const totalPages = Math.ceil(totalCustomers / limitNum) || 1;
+    const paginatedCustomers = processedCustomers.slice((pageNum - 1) * limitNum, pageNum * limitNum);
 
     res.json({
       success: true,
-      data: buyers.map((b) => ({
-        ...b,
-        totalSpent: b.orders.reduce((sum, o) => sum + Number(o.total), 0),
-        orderCount: b.orders.length,
-        orders: undefined,
-      })),
+      data: {
+        stats: {
+          totalCustomers: totalCustomersCount,
+          totalTicketsSold,
+          totalRevenue,
+          avgSpendPerCustomer,
+        },
+        customers: paginatedCustomers,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalCustomers,
+          totalPages,
+        },
+      },
     });
   } catch (err) {
     next(err);
   }
 }
+
 
 // ─── Export Report (CSV for now) ────────────────────────────────────────
 export async function exportReport(

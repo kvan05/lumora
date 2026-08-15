@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Calendar, Ticket, Users,
-  BarChart3, Wallet, ScanLine, Settings, LogOut
+  BarChart3, Wallet, ScanLine, Settings, LogOut, UserCog
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -27,6 +27,7 @@ export function SellerNav() {
         { name: "Thống kê & Báo cáo", href: "/seller/analytics", icon: BarChart3 },
         { name: "Tài chính", href: "/seller/finance", icon: Wallet },
         { name: "Check-in Scanner", href: "/seller/checkin", icon: ScanLine },
+        { name: "Nhân viên", href: "/seller/staff", icon: UserCog },
       ],
     },
   ];

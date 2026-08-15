@@ -15,6 +15,8 @@ sellerRoutes.get("/orders", SellerController.getSellerOrders);
 sellerRoutes.get("/orders/:orderId", SellerController.getSellerOrderDetail);
 sellerRoutes.patch("/orders/:orderId/checkin", SellerController.checkInOrder);
 sellerRoutes.patch("/orders/items/:itemId/checkin", SellerController.checkInItem);
+sellerRoutes.get("/checkin/stats", SellerController.getSellerCheckinStats);
+sellerRoutes.get("/checkin/tickets", SellerController.getSellerCheckinTickets);
 sellerRoutes.get("/analytics", SellerController.getAnalytics);
 sellerRoutes.get("/customers", SellerController.getCustomers);
 sellerRoutes.get("/reports/export", SellerController.exportReport);

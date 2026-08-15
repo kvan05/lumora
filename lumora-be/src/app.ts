@@ -18,6 +18,8 @@ import { adminRoutes } from "./routes/admin.routes";
 import { favoriteRoutes } from "./routes/favorite.routes";
 import { reviewRoutes } from "./routes/review.routes";
 import { notificationRoutes } from "./routes/notification.routes";
+import { staffRoutes } from "./routes/staff.routes";
+import { staffCheckinRoutes } from "./routes/staff-checkin.routes";
 import { startOrderTimeoutJob } from "./jobs/orderTimeout.job";
 
 // ─── Parse allowed origins from FRONTEND_URL env var ──────────────────
@@ -88,6 +90,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/favorites", favoriteRoutes);
 app.use("/api", reviewRoutes);  // /api/events/:eventId/reviews, /api/reviews, /api/reports
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/seller/staff", staffRoutes);
+app.use("/api/staff", staffCheckinRoutes);
 
 // ─── Error Handler (must be last) ─────────────────────────────────────
 app.use(errorHandler);

@@ -224,8 +224,32 @@ export async function getOrderById(
     const order = await prisma.order.findFirst({
       where: { id, buyerId },
       include: {
-        event: true,
-        items: { include: { ticketType: true, seat: { include: { row: { include: { section: true } } } } } },
+        event: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            bannerUrl: true,
+            startDate: true,
+            endDate: true,
+            venue: true,
+            city: true,
+            category: true,
+          },
+        },
+        buyer: {
+          select: { id: true, name: true, email: true },
+        },
+        items: {
+          include: {
+            ticketType: { select: { id: true, name: true, price: true } },
+            seat: {
+              include: {
+                row: { include: { section: { select: { id: true, name: true } } } },
+              },
+            },
+          },
+        },
         payment: true,
         RefundRequest: true,
       },

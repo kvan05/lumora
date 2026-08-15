@@ -32,6 +32,8 @@ model User {
   Review           Review[]
   sessions         UserSession[]
   Withdrawal       Withdrawal[]
+  staffMember      StaffMember?      @relation("StaffUser")
+  managedStaff     StaffMember[]     @relation("SellerStaff")
 
   @@map("users")
 }
@@ -111,6 +113,9 @@ model Event {
   seatSections      SeatSection[]
   Settlement        Settlement?
   ticketTypes       TicketType[]
+
+  staffAssignments StaffEventAssignment[]
+  checkinLogs      CheckinLog[]
 
   @@map("events")
 }
@@ -495,6 +500,50 @@ model EventApprovalLog {
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@map("event_approval_logs")
+}
+
+model StaffMember {
+  id          String                @id @default(cuid())
+  userId      String                @unique
+  sellerId    String
+  isActive    Boolean               @default(true)
+  note        String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  user        User                  @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
+  seller      User                  @relation("SellerStaff", fields: [sellerId], references: [id], onDelete: Cascade)
+  assignments StaffEventAssignment[]
+
+  @@map("staff_members")
+}
+
+model StaffEventAssignment {
+  id            String      @id @default(cuid())
+  staffMemberId String
+  eventId       String
+  assignedAt    DateTime    @default(now())
+  staffMember   StaffMember @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([staffMemberId, eventId])
+  @@map("staff_event_assignments")
+}
+
+model CheckinLog {
+  id          String   @id @default(cuid())
+  ticketCode  String
+  orderItemId String?
+  eventId     String
+  staffUserId String
+  sellerId    String
+  action      String   // SUCCESS | ALREADY_CHECKED_IN | WRONG_EVENT | INVALID | CANCELLED
+  note        String?
+  scannedAt   DateTime @default(now())
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, scannedAt])
+  @@index([staffUserId, scannedAt])
+  @@map("checkin_logs")
 }
 
 model RiskAlert {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,55 +10,277 @@ import { vi } from "date-fns/locale";
 import api from "@/lib/api";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Calendar, 
-  MapPin, 
-  ChevronLeft, 
-  ChevronRight, 
-  Star, 
-  Ticket, 
-  Zap, 
-  ShieldCheck, 
+import {
+  Calendar,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  Ticket,
+  Zap,
+  ShieldCheck,
   Flame,
-  Barcode
+  Barcode,
+  TrendingUp,
+  Star,
+  ChevronRight as ArrowRight,
 } from "lucide-react";
 
-// Fallback Banner slides for Hero Carousel
+/* ─── Fallback banners ────────────────────────────────────────────────── */
 const HERO_BANNERS = [
   {
     id: "banner-1",
     title: "XOAY TRÒN DAY 3",
     subtitle: "Vinhomes Ocean Park 3, Hưng Yên",
-    time: "19:00 - 06.09.2026",
-    bannerUrl: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1200&q=80",
+    time: "19:00 · 06.09.2026",
+    bannerUrl:
+      "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80",
     slug: "xoay-tron-day-3",
   },
   {
     id: "banner-2",
     title: "PICKLEBALL WORLD CUP 2026",
-    subtitle: "Tien Son Sport Center, Danang, Vietnam",
-    time: "AUG 30TH TO SEP 6TH",
-    bannerUrl: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80",
+    subtitle: "Tien Son Sport Center, Đà Nẵng",
+    time: "30.08 – 06.09.2026",
+    bannerUrl:
+      "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80",
     slug: "pickleball-world-cup-2026",
   },
   {
     id: "banner-3",
     title: "LUMORA MUSIC FESTIVAL 2026",
-    subtitle: "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
-    time: "20:00 - 15.10.2026",
-    bannerUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80",
+    subtitle: "Sân vận động Mỹ Đình, Hà Nội",
+    time: "20:00 · 15.10.2026",
+    bannerUrl:
+      "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80",
     slug: "lumora-music-festival",
   },
 ];
 
+/* ─── Helpers ─────────────────────────────────────────────────────────── */
+function formatPrice(event: any): string | null {
+  const minPrice = event.minPrice ?? event.ticketTypes?.[0]?.price;
+  if (!minPrice && minPrice !== 0) return null;
+  if (minPrice === 0) return "Miễn phí";
+  return `Từ ${Number(minPrice).toLocaleString("vi-VN")}₫`;
+}
+
+function formatEventDate(dateStr: string): string {
+  try {
+    return format(new Date(dateStr), "dd/MM/yyyy", { locale: vi });
+  } catch {
+    return dateStr;
+  }
+}
+
+/* ─── EventCard (horizontal scroll variant) ───────────────────────────── */
+function EventCardHScroll({ event }: { event: any }) {
+  const router = useRouter();
+  const href = `/events/${event.slug || event.id}`;
+  const price = formatPrice(event);
+
+  return (
+    <Link
+      href={href}
+      className="shrink-0 w-[180px] sm:w-[220px] md:w-[260px] relative aspect-[3/4] group block rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm hover:shadow-xl active:scale-[0.98] transition-all duration-300"
+    >
+      {/* Full Image */}
+      {event.bannerUrl ? (
+        <Image
+          src={event.bannerUrl}
+          alt={event.title}
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-700"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center">
+          <span className="text-white font-black text-4xl">
+            {event.title.substring(0, 2).toUpperCase()}
+          </span>
+        </div>
+      )}
+
+      {/* Category Badge always visible */}
+      {event.category && (
+        <Badge className="absolute top-3 left-3 bg-[#93C453] text-slate-900 text-[11px] font-extrabold px-3 py-1 rounded-full border-none shadow-md z-20">
+          {event.category}
+        </Badge>
+      )}
+
+      {/* Hover Info Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 sm:p-5 z-10">
+        <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+          <h3 className="text-white font-extrabold text-base sm:text-lg leading-snug line-clamp-2 drop-shadow-md">
+            {event.title}
+          </h3>
+          {(event.venue || event.city) && (
+            <p className="text-slate-300 text-[12px] flex items-center gap-1.5 mt-2 line-clamp-1">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              {[event.venue, event.city].filter(Boolean).join(", ")}
+            </p>
+          )}
+          <div className="flex items-center justify-between mt-3">
+            {event.startDate && (
+              <p className="text-slate-300 text-[12px] flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                {formatEventDate(event.startDate)}
+              </p>
+            )}
+            {price && (
+              <p className="text-[#93C453] font-black text-sm">
+                {price}
+              </p>
+            )}
+          </div>
+          <p className="text-[#EB5B95] text-[12px] font-bold flex items-center gap-1 mt-3">
+            Bấm để xem chi tiết sự kiện <ChevronRight className="w-3.5 h-3.5" />
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ─── EventCard (grid/large variant) ─────────────────────────────────── */
+function EventCardGrid({ event }: { event: any }) {
+  const href = `/events/${event.slug || event.id}`;
+  const price = formatPrice(event);
+
+  return (
+    <Link href={href} className="group block relative w-full aspect-[3/4] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm active:scale-[0.98] transition-all duration-300 hover:shadow-xl">
+      {/* Full Image */}
+      {event.bannerUrl ? (
+        <Image
+          src={event.bannerUrl}
+          alt={event.title}
+          fill
+          className="object-cover group-hover:scale-105 transition-transform duration-700"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center">
+          <span className="text-white font-black text-4xl">
+            {event.title.substring(0, 2).toUpperCase()}
+          </span>
+        </div>
+      )}
+
+      {/* Category Badge */}
+      {event.category && (
+        <Badge className="absolute top-3 left-3 bg-[#93C453] text-slate-900 text-[11px] font-extrabold px-3 py-1 rounded-full border-none shadow-md z-20">
+          {event.category}
+        </Badge>
+      )}
+
+      {/* Hover Info Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 sm:p-5 z-10">
+        <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+          <h3 className="text-white font-extrabold text-base sm:text-lg leading-snug line-clamp-2 drop-shadow-md">
+            {event.title}
+          </h3>
+          {(event.venue || event.city) && (
+            <p className="text-slate-300 text-[12px] flex items-center gap-1.5 mt-2 line-clamp-1">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              {[event.venue, event.city].filter(Boolean).join(", ")}
+            </p>
+          )}
+          <div className="flex items-center justify-between mt-3">
+            {event.startDate && (
+              <p className="text-slate-300 text-[12px] flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                {formatEventDate(event.startDate)}
+              </p>
+            )}
+            {price && (
+              <p className="text-[#93C453] font-black text-sm">{price}</p>
+            )}
+          </div>
+          <p className="text-[#EB5B95] text-[12px] font-bold flex items-center gap-1 mt-3">
+            Bấm để xem chi tiết sự kiện <ChevronRight className="w-3.5 h-3.5" />
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ─── Section Header ─────────────────────────────────────────────────── */
+function SectionHeader({
+  icon,
+  title,
+  href,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  href: string;
+}) {
+  return (
+    <div className="flex items-center justify-between px-4 mb-3">
+      <div className="flex items-center gap-1.5">
+        {icon}
+        <h2 className="text-[15px] sm:text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+          {title}
+        </h2>
+      </div>
+      <Link
+        href={href}
+        className="flex items-center gap-0.5 text-[12px] font-bold text-[#4A7C59] dark:text-[#93C453] shrink-0"
+      >
+        Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
+      </Link>
+    </div>
+  );
+}
+
+/* ─── Horizontal Scroll Row ──────────────────────────────────────────── */
+function HScrollRow({ events, loading }: { events: any[]; loading: boolean }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  if (loading) {
+    return (
+      <div className="flex gap-4 px-4 overflow-hidden py-2">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="shrink-0 w-[180px] sm:w-[220px] md:w-[260px]">
+            <Skeleton className="aspect-[3/4] w-full rounded-3xl" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!events.length) return null;
+
+  return (
+    <div
+      ref={rowRef}
+      className="flex gap-4 sm:gap-5 px-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-6 pt-2"
+      style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+    >
+      {events.map((event: any) => (
+        <div key={event.id} className="snap-start flex-shrink-0">
+          <EventCardHScroll event={event} />
+        </div>
+      ))}
+
+      {/* "Xem tất cả" card at end */}
+      <Link
+        href="/events"
+        className="shrink-0 snap-start w-[180px] sm:w-[220px] md:w-[260px] aspect-[3/4] flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-[#93C453] hover:text-[#4A7C59] dark:hover:text-[#93C453] transition-colors gap-3 text-center p-4 group hover:bg-slate-50 dark:hover:bg-slate-900/50"
+      >
+        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+          <ArrowRight className="w-8 h-8" />
+        </div>
+        <span className="text-base font-bold leading-tight">Xem tất cả sự kiện</span>
+      </Link>
+    </div>
+  );
+}
+
+/* ─── Page ───────────────────────────────────────────────────────────── */
 export default function BuyerDashboardPage() {
   const router = useRouter();
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Single Aggregated Fetch for Homepage Data with Graceful Fallback
   const { data: homepageData, isLoading: isLoadingEvents } = useQuery({
     queryKey: ["homepage-events"],
     queryFn: async () => {
@@ -70,11 +292,9 @@ export default function BuyerDashboardPage() {
       } catch (e) {
         console.warn("Homepage endpoint fallback triggered:", e);
       }
-
-      // Resilient fallback to individual endpoints
       const [featRes, allRes] = await Promise.all([
         api.get("/events/featured").catch(() => ({ data: { data: [] } })),
-        api.get("/events?limit=8").catch(() => ({ data: { data: [] } })),
+        api.get("/events?limit=12").catch(() => ({ data: { data: [] } })),
       ]);
       const featData = featRes.data?.data;
       const allData = allRes.data?.data;
@@ -83,262 +303,227 @@ export default function BuyerDashboardPage() {
         allEvents: Array.isArray(allData) ? allData : allData?.events || [],
       };
     },
-    staleTime: 3 * 60 * 1000, // 3 minutes cache
+    staleTime: 3 * 60 * 1000,
   });
 
-  const featuredEvents = homepageData?.featured || [];
-  const allEvents = homepageData?.allEvents || [];
+  const featuredEvents: any[] = homepageData?.featured || [];
+  const allEvents: any[] = homepageData?.allEvents || [];
 
-  // Auto advance slide every 5 seconds
+  // Fallback banner list
+  const bannerList =
+    featuredEvents.length > 0
+      ? featuredEvents
+      : allEvents.length > 0
+      ? allEvents.slice(0, 3)
+      : HERO_BANNERS;
+
+  // Auto-advance banner
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % HERO_BANNERS.length);
-    }, 5000);
+    const timer = setInterval(
+      () => setCurrentSlide((p) => (p + 1) % bannerList.length),
+      5000
+    );
     return () => clearInterval(timer);
-  }, []);
+  }, [bannerList.length]);
 
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev === 0 ? HERO_BANNERS.length - 1 : prev - 1));
-  };
+  const prevSlide = () =>
+    setCurrentSlide((p) => (p === 0 ? bannerList.length - 1 : p - 1));
+  const nextSlide = () =>
+    setCurrentSlide((p) => (p + 1) % bannerList.length);
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % HERO_BANNERS.length);
-  };
-
-  const activeBanners = (featuredEvents && featuredEvents.length > 0)
-    ? featuredEvents
-    : (allEvents && allEvents.length > 0)
-    ? allEvents
-    : [
-        {
-          id: "welcome-banner",
-          title: "CHÀO MỪNG BẠN ĐẾN VỚI LUMORA",
-          subtitle: "Hãy đăng nhập tài khoản Seller để bắt đầu tạo và bán vé sự kiện thật của bạn ngay hôm nay!",
-          bannerUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80",
-          slug: "seller/events/create",
-        }
-      ];
+  // Split events into sections (first 6 for horizontal, rest for grid)
+  const hScrollEvents = allEvents.slice(0, 8);
+  const trendingEvents = allEvents.slice(0, 6);
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans">
-      
-      {/* ── 1. Hero Dual-Card Banner Carousel (Bright Sky Blue + Pastel Fresh Accent) ── */}
-      <section className="relative py-8 md:py-12 bg-linear-to-b from-[#EBF4FA] via-[#FAF7F2] to-[#FAF7F2] dark:from-slate-900 dark:via-slate-950 dark:to-slate-950 border-b border-slate-200/80 dark:border-slate-800 overflow-hidden">
-        
-        <div className="container mx-auto px-4 max-w-7xl">
-          {/* Dual Slide Container */}
-          <div className="relative group">
-            
-            {/* Left Nav Arrow */}
-            <button
-              onClick={prevSlide}
-              className="absolute -left-3 md:-left-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/90 dark:bg-slate-800/90 hover:bg-[#93C453] text-slate-800 dark:text-slate-100 hover:text-slate-900 flex items-center justify-center transition-all border border-slate-200 dark:border-slate-700 shadow-xl opacity-90 hover:scale-110"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
+    <div className="min-h-screen bg-[#FAF7F2] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
 
-            {/* Right Nav Arrow */}
-            <button
-              onClick={nextSlide}
-              className="absolute -right-3 md:-right-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/90 dark:bg-slate-800/90 hover:bg-[#93C453] text-slate-800 dark:text-slate-100 hover:text-slate-900 flex items-center justify-center transition-all border border-slate-200 dark:border-slate-700 shadow-xl opacity-90 hover:scale-110"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
+      {/* ══════════════════════════════════════════
+          1. HERO BANNER CAROUSEL
+          ══════════════════════════════════════════ */}
+      <section className="pt-3 pb-4 px-4 bg-gradient-to-b from-[#EBF4FA] to-[#FAF7F2] dark:from-slate-900 dark:to-slate-950">
+        <div className="relative max-w-[1280px] mx-auto">
 
-            {/* Single Large Featured Banner Layout */}
+          {/* Banner container */}
+          <div
+            onClick={() => {
+              const b = bannerList[currentSlide];
+              router.push(`/events/${b?.slug || b?.id || ""}`);
+            }}
+            className="relative w-full h-[180px] sm:h-[220px] md:h-[320px] lg:h-[400px] rounded-2xl md:rounded-3xl overflow-hidden shadow-lg cursor-pointer group"
+          >
             {(() => {
-              const banner = activeBanners[currentSlide % activeBanners.length];
-              const bannerImage = banner?.bannerUrl || HERO_BANNERS[currentSlide % HERO_BANNERS.length].bannerUrl;
-              const title = banner?.title || HERO_BANNERS[currentSlide % HERO_BANNERS.length].title;
-              const subtitle = banner?.venue ? `${banner.venue}, ${banner.city}` : HERO_BANNERS[currentSlide % HERO_BANNERS.length].subtitle;
-              const linkSlug = banner?.slug || banner?.id || HERO_BANNERS[currentSlide % HERO_BANNERS.length].slug;
-
+              const b = bannerList[currentSlide % bannerList.length];
+              const img = b?.bannerUrl || HERO_BANNERS[currentSlide % HERO_BANNERS.length].bannerUrl;
+              const title = b?.title || HERO_BANNERS[0].title;
+              const sub = b?.venue ? `${b.venue}${b.city ? ", " + b.city : ""}` : (b?.subtitle || HERO_BANNERS[0].subtitle);
               return (
-                <div
-                  onClick={() => router.push(`/events/${linkSlug}`)}
-                  className="relative w-full h-[320px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-2xl group/card cursor-pointer transition-transform duration-500 hover:scale-[1.005]"
-                >
-                  {/* Background Image */}
-                  <Image
-                    src={bannerImage}
-                    alt={title}
-                    fill
-                    priority
-                    className="object-cover group-hover/card:scale-105 transition-transform duration-700"
-                  />
-
-                  {/* Gradient Overlay for Text Readability */}
-                  <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/35 to-transparent" />
-
-                  {/* Badge top right */}
-                  <div className="absolute top-6 right-6 z-10 flex flex-wrap gap-2 justify-end">
-                    <Badge className="bg-amber-500/90 text-slate-950 font-extrabold text-xs px-3 py-1 rounded-full shadow-lg border-none backdrop-blur">
-                      NỀN TẢNG MÔ PHỎNG HỌC TẬP
-                    </Badge>
-                    <Badge className="bg-[#EB5B95] text-white font-extrabold text-xs md:text-sm px-4 py-1.5 rounded-full shadow-lg border-none">
+                <>
+                  <Image src={img} alt={title} fill priority className="object-cover transition-all duration-700 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  {/* Content */}
+                  <div className="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-8 z-10">
+                    <Badge className="mb-2 bg-[#EB5B95] text-white text-[10px] md:text-sm font-extrabold px-3 py-1 border-none rounded-full">
                       NỔI BẬT
                     </Badge>
+                    <h3 className="text-white font-black text-base sm:text-lg md:text-4xl leading-tight line-clamp-2 drop-shadow-md">
+                      {title}
+                    </h3>
+                    {sub && (
+                      <p className="text-slate-200 text-[12px] md:text-base mt-1 truncate drop-shadow-sm font-medium">
+                        {sub}
+                      </p>
+                    )}
                   </div>
-
-                  {/* Content & Action Button bottom */}
-                  <div className="absolute bottom-6 left-6 right-6 md:bottom-8 md:left-8 md:right-8 z-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                    <div className="space-y-1.5 max-w-2xl">
-                      <h3 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-tight drop-shadow-md">
-                        {title}
-                      </h3>
-                      {subtitle && (
-                        <p className="text-slate-200 text-sm md:text-base font-bold drop-shadow-sm line-clamp-1">
-                          {subtitle}
-                        </p>
-                      )}
-                    </div>
-
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/events/${linkSlug}`);
-                      }}
-                      size="lg"
-                      className="bg-white dark:bg-slate-800 hover:bg-[#93C453] text-slate-900 dark:text-slate-100 hover:text-slate-900 font-extrabold rounded-2xl px-6 h-12 shadow-2xl transition-all shrink-0 text-base"
-                    >
-                      Xem chi tiết
-                    </Button>
-                  </div>
-                </div>
+                  {/* Desktop arrows */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); prevSlide(); }}
+                    className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/90 hover:bg-[#93C453] items-center justify-center shadow-xl transition-all hover:scale-105"
+                  >
+                    <ChevronLeft className="h-6 w-6 text-slate-800" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); nextSlide(); }}
+                    className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/90 hover:bg-[#93C453] items-center justify-center shadow-xl transition-all hover:scale-105"
+                  >
+                    <ChevronRight className="h-6 w-6 text-slate-800" />
+                  </button>
+                </>
               );
             })()}
-
-            {/* Dots Indicator */}
-            <div className="flex items-center justify-center gap-2 pt-6">
-              {activeBanners.map((item: any, idx: number) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentSlide(idx)}
-                  className={`h-2.5 rounded-full transition-all duration-300 ${
-                    currentSlide === idx ? "w-8 bg-[#93C453]" : "w-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400"
-                  }`}
-                />
-              ))}
-            </div>
           </div>
 
+          {/* Dot indicators */}
+          <div className="flex items-center justify-center gap-2 mt-4">
+            {bannerList.map((_: any, idx: number) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={`rounded-full transition-all duration-300 ${
+                  currentSlide === idx
+                    ? "w-8 h-2 bg-[#93C453]"
+                    : "w-2 h-2 bg-slate-300 dark:bg-slate-700"
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── 3. Trending & Popular Events Grid (Fresh Clean Bright / Dark Slate Cards) ── */}
-      <section className="py-14 px-4 bg-[#FAF7F2] dark:bg-slate-950">
-        <div className="container mx-auto max-w-7xl space-y-10">
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Flame className="h-6 w-6 text-[#EB5B95] fill-[#EB5B95]" />
-              <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-                Sự kiện đang bán vé
-              </h2>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-              className="border-[#93C453] text-[#4A7C59] dark:text-[#93C453] hover:bg-[#93C453] hover:text-slate-900 font-bold rounded-full text-xs"
-            >
-              <Link href="/events">Xem tất cả</Link>
-            </Button>
-          </div>
+      {/* ══════════════════════════════════════════
+          2. ĐANG BÁN VÉ – Horizontal Scroll
+          ══════════════════════════════════════════ */}
+      <section className="py-6 md:py-10 bg-[#FAF7F2] dark:bg-slate-950">
+        <div className="max-w-[1280px] mx-auto">
+          <SectionHeader
+            icon={<Flame className="h-5 w-5 text-[#EB5B95] fill-[#EB5B95]" />}
+            title="Sự kiện đang bán vé"
+            href="/events"
+          />
+          <HScrollRow events={hScrollEvents} loading={isLoadingEvents} />
 
-          {isLoadingEvents ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="space-y-4">
-                  <Skeleton className="h-60 w-full rounded-2xl" />
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
+          {/* DESKTOP: Grid fallback */}
+          {!isLoadingEvents && allEvents.length > 0 && (
+            <div className="hidden md:grid md:grid-cols-4 gap-5 px-4 mt-8">
+              {allEvents.slice(0, 8).map((event: any) => (
+                <EventCardGrid key={event.id} event={event} />
               ))}
             </div>
-          ) : !allEvents || allEvents.length === 0 ? (
-            <div className="text-center py-20 border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-900">
+          )}
+
+          {/* Empty state */}
+          {!isLoadingEvents && allEvents.length === 0 && (
+            <div className="mx-4 text-center py-16 border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-900">
               <Ticket className="h-12 w-12 mx-auto text-slate-400 mb-3" />
-              <p className="text-slate-500 dark:text-slate-400 font-semibold">Chưa có sự kiện nào được tạo</p>
-              <Button className="mt-4 rounded-full bg-[#93C453] text-slate-900 hover:bg-[#82B342] font-bold" asChild>
+              <p className="text-slate-500 dark:text-slate-400 font-semibold text-base">Chưa có sự kiện nào</p>
+              <Button className="mt-4 rounded-full bg-[#93C453] text-slate-900 hover:bg-[#82B342] font-bold h-10 px-6" asChild>
                 <Link href="/seller/events/create">Tạo sự kiện ngay</Link>
               </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {allEvents.map((event: any) => {
-                return (
-                  <Link key={event.id} href={`/events/${event.slug || event.id}`} className="group block">
-                    <div className="relative aspect-[3/4] w-full rounded-3xl overflow-hidden shadow-md group-hover:shadow-2xl group-hover:-translate-y-1.5 transition-all duration-300 border border-slate-200/80 dark:border-slate-800 bg-slate-900">
-                      {event.bannerUrl ? (
-                        <Image
-                          src={event.bannerUrl}
-                          alt={event.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-[#A8C7DC]/40 flex items-center justify-center font-black text-white text-3xl">
-                          {event.title.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-
-                      {/* Category Badge */}
-                      <Badge className="absolute top-3.5 left-3.5 bg-[#93C453] text-slate-900 shadow-md text-xs px-3 py-1 rounded-full font-extrabold border-none z-10">
-                        {event.category || "Sự kiện"}
-                      </Badge>
-
-                      {/* Hover Overlay with CTA */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-5 z-10">
-                        <div className="text-white space-y-1.5">
-                          <h4 className="font-extrabold text-base leading-snug line-clamp-2 text-white">{event.title}</h4>
-                          <p className="text-xs text-[#93C453] font-black flex items-center gap-1">
-                            Bấm để xem chi tiết sự kiện <ChevronRight className="h-3.5 w-3.5" />
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
             </div>
           )}
         </div>
       </section>
 
-      {/* ── 4. Value Propositions (Giữ chỗ 15 phút, VietQR, QR Check-in) ── */}
-      <section className="py-14 px-4 bg-[#EBF4FA] dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-        <div className="container mx-auto max-w-6xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-xs">
-              <div className="w-10 h-10 rounded-xl bg-[#93C453]/20 text-[#4A7C59] dark:text-[#93C453] flex items-center justify-center">
-                <Zap className="h-5 w-5" />
-              </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">Giữ chỗ 15 phút</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-                Tự động giữ vị trí ghế và vé trong 15 phút giúp bạn thoải mái quét mã thanh toán VietQR.
-              </p>
+      {/* ══════════════════════════════════════════
+          3. XU HƯỚNG – Grid 2 cột trên mobile
+          ══════════════════════════════════════════ */}
+      {!isLoadingEvents && trendingEvents.length > 0 && (
+        <section className="py-6 md:py-10 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+          <div className="max-w-[1280px] mx-auto">
+            <SectionHeader
+              icon={<TrendingUp className="h-5 w-5 text-[#4A7C59] dark:text-[#93C453]" />}
+              title="Xu hướng"
+              href="/events?sort=trending"
+            />
+
+            {/* Mobile: 2-column grid */}
+            <div className="grid grid-cols-2 md:hidden gap-4 px-4">
+              {trendingEvents.slice(0, 4).map((event: any) => (
+                <EventCardGrid key={event.id} event={event} />
+              ))}
             </div>
 
-            <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-xs">
-              <div className="w-10 h-10 rounded-xl bg-[#A8C7DC]/30 text-[#2C4A60] dark:text-[#A8C7DC] flex items-center justify-center">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">Thanh toán PayOS VietQR</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-                Thanh toán chuyển khoản ngân hàng bằng mã QR tự động xác thực trong vài giây.
-              </p>
+            {/* Desktop: Grid */}
+            <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-5 px-4">
+              {trendingEvents.map((event: any) => (
+                <EventCardGrid key={event.id} event={event} />
+              ))}
             </div>
+          </div>
+        </section>
+      )}
 
-            <div className="bg-white dark:bg-slate-950 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-xs">
-              <div className="w-10 h-10 rounded-xl bg-[#EB5B95]/20 text-[#EB5B95] flex items-center justify-center">
-                <Barcode className="h-5 w-5" />
+      {/* ══════════════════════════════════════════
+          4. TÍNH NĂNG NỔI BẬT
+          ══════════════════════════════════════════ */}
+      <section className="py-8 md:py-12 px-4 bg-[#EBF4FA] dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+        <div className="max-w-[1280px] mx-auto">
+          {/* Mobile: horizontal scroll chips */}
+          <div className="flex gap-4 overflow-x-auto pb-2 md:hidden" style={{ scrollbarWidth: "none" }}>
+            {[
+              { icon: <Zap className="w-5 h-5" />, title: "Giữ chỗ 15 phút", color: "bg-[#93C453]/20 text-[#4A7C59]" },
+              { icon: <ShieldCheck className="w-5 h-5" />, title: "Thanh toán VietQR", color: "bg-[#A8C7DC]/30 text-[#2C4A60] dark:text-[#A8C7DC]" },
+              { icon: <Barcode className="w-5 h-5" />, title: "E-Ticket & Check-in", color: "bg-[#EB5B95]/20 text-[#EB5B95]" },
+            ].map((feat) => (
+              <div key={feat.title} className="shrink-0 flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${feat.color}`}>
+                  {feat.icon}
+                </div>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">{feat.title}</p>
               </div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">E-Ticket & Check-in Mã Vạch</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
-                Vé điện tử gửi trực tiếp qua Email và App với vé mã vạch mã hóa an toàn chống vé giả.
-              </p>
-            </div>
+            ))}
+          </div>
+
+          {/* Desktop: 3-column cards */}
+          <div className="hidden md:grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: <Zap className="h-6 w-6" />,
+                iconCls: "bg-[#93C453]/20 text-[#4A7C59] dark:text-[#93C453]",
+                title: "Giữ chỗ 15 phút",
+                desc: "Tự động giữ vị trí ghế và vé trong 15 phút giúp bạn thoải mái quét mã thanh toán VietQR.",
+              },
+              {
+                icon: <ShieldCheck className="h-6 w-6" />,
+                iconCls: "bg-[#A8C7DC]/30 text-[#2C4A60] dark:text-[#A8C7DC]",
+                title: "Thanh toán PayOS VietQR",
+                desc: "Thanh toán chuyển khoản ngân hàng bằng mã QR tự động xác thực trong vài giây.",
+              },
+              {
+                icon: <Barcode className="h-6 w-6" />,
+                iconCls: "bg-[#EB5B95]/20 text-[#EB5B95]",
+                title: "E-Ticket & Check-in Mã Vạch",
+                desc: "Vé điện tử gửi trực tiếp qua Email với mã vạch mã hóa an toàn chống vé giả.",
+              },
+            ].map((f) => (
+              <div key={f.title} className="bg-white dark:bg-slate-950 p-6 md:p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-sm hover:shadow-md transition-shadow">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${f.iconCls}`}>
+                  {f.icon}
+                </div>
+                <h3 className="font-extrabold text-lg text-slate-900 dark:text-slate-100">{f.title}</h3>
+                <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base leading-relaxed font-medium">{f.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

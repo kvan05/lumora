@@ -283,6 +283,23 @@ export async function login(
       throw createError("Vui lòng xác minh email trước khi đăng nhập", 403, "EMAIL_NOT_VERIFIED");
     }
 
+    // For STAFF accounts: check isActive in StaffMember table
+    if (user.role === "STAFF") {
+      const staffMember = await prisma.staffMember.findFirst({
+        where: { userId: user.id },
+      });
+      if (!staffMember) {
+        throw createError("Tài khoản nhân viên không hợp lệ", 403, "FORBIDDEN");
+      }
+      if (!staffMember.isActive) {
+        throw createError(
+          "Tài khoản của bạn đã bị khóa bởi Seller. Vui lòng liên hệ quản lý để được mở khóa.",
+          403,
+          "ACCOUNT_LOCKED"
+        );
+      }
+    }
+
     const payload = { userId: user.id, email: user.email, role: user.role };
     const accessToken = generateAccessToken(payload, rememberMe ? "30d" : "1d");
     const refreshToken = generateRefreshToken(payload);
