@@ -8,6 +8,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api, { setMemoryAccessToken } from "@/lib/api";
+import { saveStaffSession } from "@/lib/staff-auth";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -62,6 +63,8 @@ export default function LoginPage() {
         window.location.href = "/admin";
       } else if (userRole === "SELLER") {
         window.location.href = "/seller/dashboard";
+      } else if (userRole === "STAFF") {
+        window.location.href = "/staff/events";
       } else if (callbackUrl && callbackUrl !== "/login") {
         window.location.href = callbackUrl;
       } else {
@@ -109,6 +112,20 @@ export default function LoginPage() {
           localStorage.setItem("lumora_token", accessToken);
           if (refreshToken) localStorage.setItem("lumora_refresh_token", refreshToken);
         } catch {}
+      }
+
+      // 1.5. If STAFF, bypass NextAuth and use dedicated staff session
+      if (userRole === "STAFF") {
+        saveStaffSession(accessToken, {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          avatar: userData.avatar,
+        });
+        toast.success("Đăng nhập thành công! Đang chuyển hướng...");
+        window.location.href = "/staff/events";
+        return;
       }
 
       // 2. Establish NextAuth session

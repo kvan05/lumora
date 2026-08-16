@@ -83,7 +83,7 @@ function EventCardHScroll({ event }: { event: any }) {
   return (
     <Link
       href={href}
-      className="shrink-0 w-[180px] sm:w-[220px] md:w-[260px] relative aspect-[3/4] group block rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm hover:shadow-xl active:scale-[0.98] transition-all duration-300"
+      className="shrink-0 w-[230px] sm:w-[250px] md:w-[280px] relative aspect-[16/9] group block rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm hover:shadow-xl active:scale-[0.98] transition-all duration-300"
     >
       {/* Full Image */}
       {event.bannerUrl ? (
@@ -91,11 +91,11 @@ function EventCardHScroll({ event }: { event: any }) {
           src={event.bannerUrl}
           alt={event.title}
           fill
-          className="object-cover group-hover:scale-105 transition-transform duration-700"
+          className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center">
-          <span className="text-white font-black text-4xl">
+          <span className="text-white font-black text-3xl">
             {event.title.substring(0, 2).toUpperCase()}
           </span>
         </div>
@@ -103,39 +103,36 @@ function EventCardHScroll({ event }: { event: any }) {
 
       {/* Category Badge always visible */}
       {event.category && (
-        <Badge className="absolute top-3 left-3 bg-[#93C453] text-slate-900 text-[11px] font-extrabold px-3 py-1 rounded-full border-none shadow-md z-20">
+        <Badge className="absolute top-2 left-2 bg-[#93C453] text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border-none shadow-md z-20">
           {event.category}
         </Badge>
       )}
 
       {/* Hover Info Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 sm:p-5 z-10">
-        <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-          <h3 className="text-white font-extrabold text-base sm:text-lg leading-snug line-clamp-2 drop-shadow-md">
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 sm:p-4 z-10">
+        <div className="translate-y-0 md:translate-y-2 md:group-hover:translate-y-0 transition-transform duration-300">
+          <h3 className="text-white font-extrabold text-sm sm:text-base leading-snug line-clamp-2 drop-shadow-md">
             {event.title}
           </h3>
           {(event.venue || event.city) && (
-            <p className="text-slate-300 text-[12px] flex items-center gap-1.5 mt-2 line-clamp-1">
-              <MapPin className="w-3.5 h-3.5 shrink-0" />
+            <p className="text-slate-300 text-[11px] sm:text-[12px] flex items-center gap-1 mt-1.5 line-clamp-1">
+              <MapPin className="w-3 h-3 shrink-0" />
               {[event.venue, event.city].filter(Boolean).join(", ")}
             </p>
           )}
-          <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center justify-between mt-2">
             {event.startDate && (
-              <p className="text-slate-300 text-[12px] flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <p className="text-slate-300 text-[11px] sm:text-[12px] flex items-center gap-1">
+                <Calendar className="w-3 h-3 shrink-0" />
                 {formatEventDate(event.startDate)}
               </p>
             )}
             {price && (
-              <p className="text-[#93C453] font-black text-sm">
+              <p className="text-[#93C453] font-black text-xs sm:text-sm">
                 {price}
               </p>
             )}
           </div>
-          <p className="text-[#EB5B95] text-[12px] font-bold flex items-center gap-1 mt-3">
-            Bấm để xem chi tiết sự kiện <ChevronRight className="w-3.5 h-3.5" />
-          </p>
         </div>
       </div>
     </Link>
@@ -148,18 +145,18 @@ function EventCardGrid({ event }: { event: any }) {
   const price = formatPrice(event);
 
   return (
-    <Link href={href} className="group block relative w-full aspect-[3/4] rounded-3xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm active:scale-[0.98] transition-all duration-300 hover:shadow-xl">
+    <Link href={href} className="group block relative w-full aspect-[16/9] rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm active:scale-[0.98] transition-all duration-300 hover:shadow-xl">
       {/* Full Image */}
       {event.bannerUrl ? (
         <Image
           src={event.bannerUrl}
           alt={event.title}
           fill
-          className="object-cover group-hover:scale-105 transition-transform duration-700"
+          className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center">
-          <span className="text-white font-black text-4xl">
+          <span className="text-white font-black text-3xl">
             {event.title.substring(0, 2).toUpperCase()}
           </span>
         </div>
@@ -167,37 +164,34 @@ function EventCardGrid({ event }: { event: any }) {
 
       {/* Category Badge */}
       {event.category && (
-        <Badge className="absolute top-3 left-3 bg-[#93C453] text-slate-900 text-[11px] font-extrabold px-3 py-1 rounded-full border-none shadow-md z-20">
+        <Badge className="absolute top-2 left-2 bg-[#93C453] text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border-none shadow-md z-20">
           {event.category}
         </Badge>
       )}
 
       {/* Hover Info Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 sm:p-5 z-10">
-        <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-          <h3 className="text-white font-extrabold text-base sm:text-lg leading-snug line-clamp-2 drop-shadow-md">
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 sm:p-4 z-10">
+        <div className="translate-y-0 md:translate-y-2 md:group-hover:translate-y-0 transition-transform duration-300">
+          <h3 className="text-white font-extrabold text-sm sm:text-base leading-snug line-clamp-2 drop-shadow-md">
             {event.title}
           </h3>
           {(event.venue || event.city) && (
-            <p className="text-slate-300 text-[12px] flex items-center gap-1.5 mt-2 line-clamp-1">
-              <MapPin className="w-3.5 h-3.5 shrink-0" />
+            <p className="text-slate-300 text-[11px] sm:text-[12px] flex items-center gap-1 mt-1.5 line-clamp-1">
+              <MapPin className="w-3 h-3 shrink-0" />
               {[event.venue, event.city].filter(Boolean).join(", ")}
             </p>
           )}
-          <div className="flex items-center justify-between mt-3">
+          <div className="flex items-center justify-between mt-2">
             {event.startDate && (
-              <p className="text-slate-300 text-[12px] flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <p className="text-slate-300 text-[11px] sm:text-[12px] flex items-center gap-1">
+                <Calendar className="w-3 h-3 shrink-0" />
                 {formatEventDate(event.startDate)}
               </p>
             )}
             {price && (
-              <p className="text-[#93C453] font-black text-sm">{price}</p>
+              <p className="text-[#93C453] font-black text-xs sm:text-sm">{price}</p>
             )}
           </div>
-          <p className="text-[#EB5B95] text-[12px] font-bold flex items-center gap-1 mt-3">
-            Bấm để xem chi tiết sự kiện <ChevronRight className="w-3.5 h-3.5" />
-          </p>
         </div>
       </div>
     </Link>
@@ -233,15 +227,15 @@ function SectionHeader({
 }
 
 /* ─── Horizontal Scroll Row ──────────────────────────────────────────── */
-function HScrollRow({ events, loading }: { events: any[]; loading: boolean }) {
+function HScrollRow({ events, loading, viewAllHref = "/events" }: { events: any[]; loading: boolean; viewAllHref?: string }) {
   const rowRef = useRef<HTMLDivElement>(null);
 
   if (loading) {
     return (
       <div className="flex gap-4 px-4 overflow-hidden py-2">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="shrink-0 w-[180px] sm:w-[220px] md:w-[260px]">
-            <Skeleton className="aspect-[3/4] w-full rounded-3xl" />
+          <div key={i} className="shrink-0 w-[230px] sm:w-[250px] md:w-[280px]">
+            <Skeleton className="aspect-[16/9] w-full rounded-2xl" />
           </div>
         ))}
       </div>
@@ -264,13 +258,13 @@ function HScrollRow({ events, loading }: { events: any[]; loading: boolean }) {
 
       {/* "Xem tất cả" card at end */}
       <Link
-        href="/events"
-        className="shrink-0 snap-start w-[180px] sm:w-[220px] md:w-[260px] aspect-[3/4] flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-[#93C453] hover:text-[#4A7C59] dark:hover:text-[#93C453] transition-colors gap-3 text-center p-4 group hover:bg-slate-50 dark:hover:bg-slate-900/50"
+        href={viewAllHref}
+        className="shrink-0 snap-start w-[230px] sm:w-[250px] md:w-[280px] aspect-[16/9] flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-[#93C453] hover:text-[#4A7C59] dark:hover:text-[#93C453] transition-colors gap-2 text-center p-4 group hover:bg-slate-50 dark:hover:bg-slate-900/50"
       >
-        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-          <ArrowRight className="w-8 h-8" />
+        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+          <ArrowRight className="w-6 h-6 sm:w-7 sm:h-7" />
         </div>
-        <span className="text-base font-bold leading-tight">Xem tất cả sự kiện</span>
+        <span className="text-sm sm:text-base font-bold leading-tight">Xem tất cả sự kiện</span>
       </Link>
     </div>
   );
@@ -334,6 +328,14 @@ export default function BuyerDashboardPage() {
   // Split events into sections (first 6 for horizontal, rest for grid)
   const hScrollEvents = allEvents.slice(0, 8);
   const trendingEvents = allEvents.slice(0, 6);
+
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const thisMonthEvents = allEvents.filter((event: any) => {
+    if (!event.startDate) return false;
+    const d = new Date(event.startDate);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  });
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
@@ -422,14 +424,6 @@ export default function BuyerDashboardPage() {
           />
           <HScrollRow events={hScrollEvents} loading={isLoadingEvents} />
 
-          {/* DESKTOP: Grid fallback */}
-          {!isLoadingEvents && allEvents.length > 0 && (
-            <div className="hidden md:grid md:grid-cols-4 gap-5 px-4 mt-8">
-              {allEvents.slice(0, 8).map((event: any) => (
-                <EventCardGrid key={event.id} event={event} />
-              ))}
-            </div>
-          )}
 
           {/* Empty state */}
           {!isLoadingEvents && allEvents.length === 0 && (
@@ -445,10 +439,26 @@ export default function BuyerDashboardPage() {
       </section>
 
       {/* ══════════════════════════════════════════
+          2.5. SỰ KIỆN THÁNG NÀY
+          ══════════════════════════════════════════ */}
+      {!isLoadingEvents && thisMonthEvents.length > 0 && (
+        <section className="py-6 md:py-10 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+          <div className="max-w-[1280px] mx-auto">
+            <SectionHeader
+              icon={<Calendar className="h-5 w-5 text-[#93C453]" />}
+              title={`Sự kiện tháng ${currentMonth + 1}`}
+              href="/events?time=this-month"
+            />
+            <HScrollRow events={thisMonthEvents} loading={isLoadingEvents} viewAllHref="/events?time=this-month" />
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
           3. XU HƯỚNG – Grid 2 cột trên mobile
           ══════════════════════════════════════════ */}
       {!isLoadingEvents && trendingEvents.length > 0 && (
-        <section className="py-6 md:py-10 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+        <section className="py-6 md:py-10 bg-[#FAF7F2] dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800">
           <div className="max-w-[1280px] mx-auto">
             <SectionHeader
               icon={<TrendingUp className="h-5 w-5 text-[#4A7C59] dark:text-[#93C453]" />}

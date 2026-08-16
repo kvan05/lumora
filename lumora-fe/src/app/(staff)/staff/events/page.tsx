@@ -37,7 +37,11 @@ interface EventStat {
 
 export default function StaffEventsPage() {
   const router = useRouter();
-  const staffUser = getStaffUser();
+  const [staffUser, setStaffUser] = useState<any>(null);
+
+  useEffect(() => {
+    setStaffUser(getStaffUser());
+  }, []);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["staff-my-events"],
