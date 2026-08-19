@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { Shield, Plus, Key, UserCog, Trash2, Edit2, RefreshCw, CheckCircle2, Ban, ShieldCheck, History, Search, Users } from "lucide-react";
+import { Shield, Plus, Key, UserCog, Trash2, Edit2, RefreshCw, CheckCircle2, Ban, ShieldCheck, History, Search, Users, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,6 +18,8 @@ import { toast } from "sonner";
 export default function StaffPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("staff");
+  const [roleFilter, setRoleFilter] = useState("ALL");
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [newRole, setNewRole] = useState("ADMIN");
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
@@ -42,7 +44,15 @@ export default function StaffPage() {
 
   const users = Array.isArray(usersData) ? usersData : [];
   const staffUsers = users.filter((u: any) => u.role === "ADMIN");
+  const sellerUsers = users.filter((u: any) => u.role === "SELLER");
   const auditLogs = Array.isArray(logsData) ? logsData : [];
+
+  // Filtered users for Tab 2
+  const filteredUsers = users.filter((u: any) => {
+    const matchSearch = !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase());
+    const matchRole = roleFilter === "ALL" || u.role === roleFilter;
+    return matchSearch && matchRole;
+  });
 
   // Update Role Mutation
   const updateRoleMutation = useMutation({
@@ -98,7 +108,7 @@ export default function StaffPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -120,40 +130,70 @@ export default function StaffPage() {
         </Button>
       </div>
 
-      {/* Real Overview Stats */}
+      {/* 4 Interactive Clickable Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 1: Total Users */}
+        <Card
+          onClick={() => { setActiveTab("all-users"); setRoleFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeTab === "all-users" && roleFilter === "ALL"
+              ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-primary/50 hover:bg-muted/20"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase">Tổng Người Dùng Sàn</p>
+            <p className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">Tổng Người Dùng Sàn</p>
             <p className="text-2xl font-black text-foreground mt-1">{users.length}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-xs">
+        {/* Card 2: Admins Count */}
+        <Card
+          onClick={() => { setActiveTab("staff"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeTab === "staff"
+              ? "border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500/30 shadow-md scale-[1.02]"
+              : "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500 hover:bg-emerald-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-primary uppercase">Quản Trị Viên (Admin)</p>
-            <p className="text-2xl font-black text-primary mt-1">{staffUsers.length}</p>
+            <p className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Quản Trị Viên (Admin)</p>
+            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{staffUsers.length}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-purple-500/20 bg-purple-500/5 shadow-xs">
+        {/* Card 3: Sellers Count */}
+        <Card
+          onClick={() => { setActiveTab("all-users"); setRoleFilter("SELLER"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeTab === "all-users" && roleFilter === "SELLER"
+              ? "border-purple-500 bg-purple-500/15 ring-2 ring-purple-500/30 shadow-md scale-[1.02]"
+              : "border-purple-500/20 bg-purple-500/5 hover:border-purple-500 hover:bg-purple-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase">Nhà Tổ Chức (Seller)</p>
-            <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
-              {users.filter((u: any) => u.role === "SELLER").length}
-            </p>
+            <p className="text-xs font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Nhà Tổ Chức (Seller)</p>
+            <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">{sellerUsers.length}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 shadow-xs">
+        {/* Card 4: Audit Logs Count */}
+        <Card
+          onClick={() => { setActiveTab("logs"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeTab === "logs"
+              ? "border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/30 shadow-md scale-[1.02]"
+              : "border-amber-500/20 bg-amber-500/5 hover:border-amber-500 hover:bg-amber-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase">Bản Ghi Audit Log</p>
+            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Bản Ghi Audit Log</p>
             <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{auditLogs.length}</p>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="staff" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="rounded-2xl p-1 bg-muted/40 border border-border/50">
           <TabsTrigger value="staff" className="rounded-xl text-xs font-bold px-4">
             Danh Sách Quản Trị Viên ({staffUsers.length})
@@ -282,14 +322,28 @@ export default function StaffPage() {
                   <CardDescription>Chọn người dùng bất kỳ để nâng cấp thành Quản Trị Viên (Admin) hoặc Nhà Tổ Chức (Seller).</CardDescription>
                 </div>
 
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm tên, email..."
-                    className="pl-9 h-9 rounded-xl"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
+                <div className="flex items-center gap-2">
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="w-36 h-9 rounded-xl text-xs font-semibold">
+                      <SelectValue placeholder="Vai trò" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="ALL" className="text-xs font-bold">Tất cả vai trò</SelectItem>
+                      <SelectItem value="ADMIN" className="text-xs">ADMIN</SelectItem>
+                      <SelectItem value="SELLER" className="text-xs">SELLER</SelectItem>
+                      <SelectItem value="BUYER" className="text-xs">BUYER</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <div className="relative w-full sm:w-60">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Tìm tên, email..."
+                      className="pl-9 h-9 rounded-xl text-xs"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -306,7 +360,7 @@ export default function StaffPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u: any) => (
+                    {filteredUsers.map((u: any) => (
                       <TableRow key={u.id} className="hover:bg-muted/20">
                         <TableCell>
                           <p className="font-bold text-sm text-foreground">{u.name || u.email}</p>
@@ -425,59 +479,59 @@ export default function StaffPage() {
         </TabsContent>
       </Tabs>
 
-        {/* Change Role Dialog */}
-        <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
-          <DialogContent className="sm:max-w-md rounded-2xl p-6">
-            <DialogHeader>
-              <DialogTitle className="font-bold text-lg flex items-center gap-2">
-                <UserCog className="h-5 w-5 text-primary" /> Phân Quyền Tài Khoản
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Thay đổi vai trò để cấp quyền truy cập vào các module hệ thống.
-              </DialogDescription>
-            </DialogHeader>
+      {/* Change Role Dialog */}
+      <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="font-bold text-lg flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-primary" /> Phân Quyền Tài Khoản
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Thay đổi vai trò để cấp quyền truy cập vào các module hệ thống.
+            </DialogDescription>
+          </DialogHeader>
 
-            {selectedUser && (
-              <div className="space-y-4 py-2 text-xs">
-                <div className="p-3 bg-muted/40 rounded-xl space-y-1 border">
-                  <p>Tài khoản: <span className="font-bold text-foreground">{selectedUser.name || selectedUser.email}</span></p>
-                  <p>Email: <span className="font-mono">{selectedUser.email}</span></p>
-                  <p>Vai trò hiện tại: <span className="font-bold text-primary">{selectedUser.role}</span></p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-foreground">Chọn vai trò mới (Role)</label>
-                  <Select value={newRole} onValueChange={setNewRole}>
-                    <SelectTrigger className="rounded-xl h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ADMIN">Quản Trị Viên (ADMIN) - Toàn quyền hệ thống</SelectItem>
-                      <SelectItem value="SELLER">Nhà Tổ Chức (SELLER) - Tạo sự kiện & bán vé</SelectItem>
-                      <SelectItem value="BUYER">Khách Mua Vé (BUYER) - Khách hàng thông thường</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          {selectedUser && (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="p-3 bg-muted/40 rounded-xl space-y-1 border">
+                <p>Tài khoản: <span className="font-bold text-foreground">{selectedUser.name || selectedUser.email}</span></p>
+                <p>Email: <span className="font-mono">{selectedUser.email}</span></p>
+                <p>Vai trò hiện tại: <span className="font-bold text-primary">{selectedUser.role}</span></p>
               </div>
-            )}
 
-            <DialogFooter className="gap-2">
-              <Button variant="outline" className="rounded-xl text-xs" onClick={() => setIsRoleDialogOpen(false)}>
-                Hủy
-              </Button>
-              <Button
-                className="rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground"
-                onClick={() =>
-                  selectedUser &&
-                  updateRoleMutation.mutate({ userId: selectedUser.id, role: newRole })
-                }
-                disabled={updateRoleMutation.isPending}
-              >
-                {updateRoleMutation.isPending ? "Đang lưu..." : "Xác Nhận Lưu Phân Quyền"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Chọn vai trò mới (Role)</label>
+                <Select value={newRole} onValueChange={setNewRole}>
+                  <SelectTrigger className="rounded-xl h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">Quản Trị Viên (ADMIN) - Toàn quyền hệ thống</SelectItem>
+                    <SelectItem value="SELLER">Nhà Tổ Chức (SELLER) - Tạo sự kiện & bán vé</SelectItem>
+                    <SelectItem value="BUYER">Khách Mua Vé (BUYER) - Khách hàng thông thường</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" className="rounded-xl text-xs" onClick={() => setIsRoleDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              className="rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={() =>
+                selectedUser &&
+                updateRoleMutation.mutate({ userId: selectedUser.id, role: newRole })
+              }
+              disabled={updateRoleMutation.isPending}
+            >
+              {updateRoleMutation.isPending ? "Đang lưu..." : "Xác Nhận Lưu Phân Quyền"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

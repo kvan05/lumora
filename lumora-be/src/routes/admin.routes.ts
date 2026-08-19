@@ -42,6 +42,8 @@ adminRoutes.get("/tickets", AdminController.getCheckinTickets);
 
 // Organizer application management
 adminRoutes.get("/organizers", AdminController.getOrganizers);
+adminRoutes.get("/organizers/:id/details", AdminController.getOrganizerDetail);
+adminRoutes.patch("/organizers/:id/admin-note", AdminController.updateOrganizerAdminNote);
 adminRoutes.get("/organizer-applications", AdminController.getOrganizerApplications);
 adminRoutes.patch("/organizer-applications/:id/approve", AdminController.approveOrganizerApplication);
 adminRoutes.patch("/organizer-applications/:id/reject", AdminController.rejectOrganizerApplication);
@@ -81,6 +83,11 @@ adminRoutes.get("/tickets/:ticketId/timeline", AdminController.getTicketTimeline
 adminRoutes.get("/events/health-scores", AdminController.getEventHealthScores);
 adminRoutes.get("/reconciliation", AdminController.getFinancialReconciliation);
 adminRoutes.post("/reconciliation", AdminController.createReconciliationSnapshot);
+
+// Reviews & Feedback management
+adminRoutes.get("/reviews", AdminController.getAdminReviews);
+adminRoutes.patch("/reviews/:id/toggle-hide", AdminController.toggleHideReview);
+adminRoutes.delete("/reviews/:id", AdminController.deleteReview);
 
 
 

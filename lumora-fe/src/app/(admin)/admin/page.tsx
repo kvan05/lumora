@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   Users, Calendar, Ticket, TrendingUp, RefreshCw,
   ShoppingCart, AlertCircle, CheckCircle2, Clock, Activity, Zap, ShieldAlert,
-  Scale, FileText, ArrowUpRight, CheckCircle, XCircle, ArrowRight
+  Scale, FileText, ArrowUpRight, CheckCircle, XCircle, ArrowRight, ExternalLink
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 
 export default function AdminControlCenter() {
+  const router = useRouter();
   const [period, setPeriod] = useState("30d");
 
   // Fetch 100% Real Control Center Data from Backend API
@@ -44,7 +46,7 @@ export default function AdminControlCenter() {
   const maxRevenue = Math.max(...revenueTimeline.map((item: any) => item.revenue || 0), 1000000);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -105,69 +107,117 @@ export default function AdminControlCenter() {
         </Card>
       )}
 
-      {/* Core Executive Stat Cards */}
+      {/* Core Executive Stat Cards - ALL CLICKABLE */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-          <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Tổng GMV</p>
-            {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> : (
-              <p className="text-lg font-black text-foreground mt-0.5">{summary.totalGMV.toLocaleString("vi-VN")} ₫</p>
-            )}
-            <p className="text-[10px] text-emerald-600 font-medium mt-1">Phí sàn 5%: {summary.platformRevenue.toLocaleString("vi-VN")} ₫</p>
-          </CardContent>
-        </Card>
+        {/* 1. Tổng GMV -> Reconciliation */}
+        <Link href="/admin/reconciliation" className="block">
+          <Card className="rounded-2xl border-border/50 bg-card shadow-xs hover:border-emerald-500 hover:bg-emerald-500/5 hover:scale-[1.02] transition-all cursor-pointer h-full group">
+            <CardContent className="pt-3.5 pb-3.5 px-3.5 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-emerald-600">Tổng GMV</p>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-emerald-600 transition-all" />
+                </div>
+                {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> : (
+                  <p className="text-lg font-black text-foreground group-hover:text-emerald-600 mt-0.5">{summary.totalGMV.toLocaleString("vi-VN")} ₫</p>
+                )}
+              </div>
+              <p className="text-[10px] text-emerald-600 font-bold mt-1.5">Phí sàn 5%: {summary.platformRevenue.toLocaleString("vi-VN")} ₫</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-          <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Đơn Hàng Mua Vé</p>
-            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
-              <p className="text-lg font-black text-blue-600 dark:text-blue-400 mt-0.5">{summary.totalOrders} đơn</p>
-            )}
-            <p className="text-[10px] text-muted-foreground mt-1">Toàn bộ giao dịch</p>
-          </CardContent>
-        </Card>
+        {/* 2. Đơn hàng mua vé -> Orders */}
+        <Link href="/admin/orders" className="block">
+          <Card className="rounded-2xl border-border/50 bg-card shadow-xs hover:border-blue-500 hover:bg-blue-500/5 hover:scale-[1.02] transition-all cursor-pointer h-full group">
+            <CardContent className="pt-3.5 pb-3.5 px-3.5 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-blue-600">Đơn Hàng Mua Vé</p>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-blue-600 transition-all" />
+                </div>
+                {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+                  <p className="text-lg font-black text-blue-600 dark:text-blue-400 mt-0.5">{summary.totalOrders} đơn</p>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Toàn bộ giao dịch</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-          <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Người Dùng Sàn</p>
-            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
-              <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">{summary.totalUsers} thành viên</p>
-            )}
-            <p className="text-[10px] text-muted-foreground mt-1">Buyers: {summary.totalBuyers} · Sellers: {summary.totalSellers}</p>
-          </CardContent>
-        </Card>
+        {/* 3. Người dùng sàn -> Users */}
+        <Link href="/admin/users" className="block">
+          <Card className="rounded-2xl border-border/50 bg-card shadow-xs hover:border-purple-500 hover:bg-purple-500/5 hover:scale-[1.02] transition-all cursor-pointer h-full group">
+            <CardContent className="pt-3.5 pb-3.5 px-3.5 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-purple-600">Người Dùng Sàn</p>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-purple-600 transition-all" />
+                </div>
+                {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+                  <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">{summary.totalUsers} thành viên</p>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Buyers: {summary.totalBuyers} · Sellers: {summary.totalSellers}</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-          <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Sự Kiện Khởi Tạo</p>
-            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
-              <p className="text-lg font-black text-orange-500 mt-0.5">{summary.totalEvents} sự kiện</p>
-            )}
-            <p className="text-[10px] text-muted-foreground mt-1">Trên hệ thống</p>
-          </CardContent>
-        </Card>
+        {/* 4. Sự kiện khởi tạo -> Events */}
+        <Link href="/admin/events" className="block">
+          <Card className="rounded-2xl border-border/50 bg-card shadow-xs hover:border-orange-500 hover:bg-orange-500/5 hover:scale-[1.02] transition-all cursor-pointer h-full group">
+            <CardContent className="pt-3.5 pb-3.5 px-3.5 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-orange-600">Sự Kiện Khởi Tạo</p>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-orange-600 transition-all" />
+                </div>
+                {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+                  <p className="text-lg font-black text-orange-500 mt-0.5">{summary.totalEvents} sự kiện</p>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Trên hệ thống</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-          <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Rút Tiền Chờ Duyệt</p>
-            {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
-              <p className={`text-lg font-black mt-0.5 ${summary.pendingWithdrawal > 0 ? "text-amber-500" : "text-foreground"}`}>
-                {summary.pendingWithdrawal} đơn
-              </p>
-            )}
-            <p className="text-[10px] text-muted-foreground mt-1">Cần Admin xử lý</p>
-          </CardContent>
-        </Card>
+        {/* 5. Rút tiền chờ duyệt -> Organizers / Reconciliation */}
+        <Link href="/admin/users/organizers" className="block">
+          <Card className="rounded-2xl border-border/50 bg-card shadow-xs hover:border-amber-500 hover:bg-amber-500/5 hover:scale-[1.02] transition-all cursor-pointer h-full group">
+            <CardContent className="pt-3.5 pb-3.5 px-3.5 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-amber-600">Rút Tiền Chờ Duyệt</p>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-amber-600 transition-all" />
+                </div>
+                {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+                  <p className={`text-lg font-black mt-0.5 ${summary.pendingWithdrawal > 0 ? "text-amber-500" : "text-foreground"}`}>
+                    {summary.pendingWithdrawal} đơn
+                  </p>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Cần Admin xử lý</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-          <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">TỔNG HOÀN TIỀN</p>
-            {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> : (
-              <p className="text-lg font-black text-red-500 mt-0.5">{summary.totalRefund.toLocaleString("vi-VN")} ₫</p>
-            )}
-            <p className="text-[10px] text-muted-foreground mt-1">Đã chấp thuận refund</p>
-          </CardContent>
-        </Card>
+        {/* 6. Tổng hoàn tiền -> Reconciliation / Orders */}
+        <Link href="/admin/reconciliation" className="block">
+          <Card className="rounded-2xl border-border/50 bg-card shadow-xs hover:border-red-500 hover:bg-red-500/5 hover:scale-[1.02] transition-all cursor-pointer h-full group">
+            <CardContent className="pt-3.5 pb-3.5 px-3.5 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-red-600">Tổng Hoàn Tiền</p>
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-red-600 transition-all" />
+                </div>
+                {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> : (
+                  <p className="text-lg font-black text-red-500 mt-0.5">{summary.totalRefund.toLocaleString("vi-VN")} ₫</p>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Đã chấp thuận refund</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Revenue Timeline Chart Bar */}
@@ -220,85 +270,89 @@ export default function AdminControlCenter() {
 
       {/* Ticket Analytics & Payment Analytics Grid */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Ticket Analytics */}
-        <Card className="rounded-3xl border-border/50 bg-card shadow-xs">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Ticket className="h-5 w-5 text-purple-500" /> Ticket Analytics & Check-in Rate
-              </CardTitle>
-              <Badge variant="secondary" className="bg-purple-500/15 text-purple-600 font-bold text-xs">
-                Check-in Rate: {ticketAnalytics.checkinRate}%
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/30 p-3 rounded-2xl border">
-                <p className="text-xs text-muted-foreground font-semibold">Vé đã bán (Sold)</p>
-                <p className="text-xl font-black text-foreground mt-0.5">{ticketAnalytics.sold} vé</p>
+        {/* Ticket Analytics - Clickable to Check-in / Tickets */}
+        <Link href="/admin/checkin" className="block">
+          <Card className="rounded-3xl border-border/50 bg-card shadow-xs hover:border-purple-500/50 hover:shadow-md transition-all cursor-pointer group">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-bold flex items-center gap-2 group-hover:text-purple-600">
+                  <Ticket className="h-5 w-5 text-purple-500" /> Ticket Analytics & Check-in Rate <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </CardTitle>
+                <Badge variant="secondary" className="bg-purple-500/15 text-purple-600 font-bold text-xs">
+                  Check-in Rate: {ticketAnalytics.checkinRate}%
+                </Badge>
               </div>
-              <div className="bg-muted/30 p-3 rounded-2xl border">
-                <p className="text-xs text-muted-foreground font-semibold">Vé đã Check-in</p>
-                <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{ticketAnalytics.checkedIn} vé</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-muted/30 p-3 rounded-2xl border">
+                  <p className="text-xs text-muted-foreground font-semibold">Vé đã bán (Sold)</p>
+                  <p className="text-xl font-black text-foreground mt-0.5">{ticketAnalytics.sold} vé</p>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-2xl border">
+                  <p className="text-xs text-muted-foreground font-semibold">Vé đã Check-in</p>
+                  <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{ticketAnalytics.checkedIn} vé</p>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span>Tỷ lệ vé đã soát cổng (Checked-in)</span>
-                <span>{ticketAnalytics.checkedIn} / {ticketAnalytics.sold} ({ticketAnalytics.checkinRate}%)</span>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span>Tỷ lệ vé đã soát cổng (Checked-in)</span>
+                  <span>{ticketAnalytics.checkedIn} / {ticketAnalytics.sold} ({ticketAnalytics.checkinRate}%)</span>
+                </div>
+                <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-600 rounded-full" style={{ width: `${ticketAnalytics.checkinRate}%` }} />
+                </div>
               </div>
-              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-purple-600 rounded-full" style={{ width: `${ticketAnalytics.checkinRate}%` }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* Payment Analytics */}
-        <Card className="rounded-3xl border-border/50 bg-card shadow-xs">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-blue-500" /> Payment Analytics & Success Rate
-              </CardTitle>
-              <Badge variant="secondary" className="bg-blue-500/15 text-blue-600 font-bold text-xs">
-                Success Rate: {paymentAnalytics.successRate}%
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-4 gap-2 text-center">
-              <div className="bg-emerald-500/10 p-2.5 rounded-2xl border border-emerald-500/20">
-                <p className="text-[10px] text-emerald-600 font-bold uppercase">Thành công</p>
-                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{paymentAnalytics.successful}</p>
+        {/* Payment Analytics - Clickable to Orders */}
+        <Link href="/admin/orders" className="block">
+          <Card className="rounded-3xl border-border/50 bg-card shadow-xs hover:border-blue-500/50 hover:shadow-md transition-all cursor-pointer group">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-bold flex items-center gap-2 group-hover:text-blue-600">
+                  <ShoppingCart className="h-5 w-5 text-blue-500" /> Payment Analytics & Success Rate <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </CardTitle>
+                <Badge variant="secondary" className="bg-blue-500/15 text-blue-600 font-bold text-xs">
+                  Success Rate: {paymentAnalytics.successRate}%
+                </Badge>
               </div>
-              <div className="bg-amber-500/10 p-2.5 rounded-2xl border border-amber-500/20">
-                <p className="text-[10px] text-amber-600 font-bold uppercase">Chờ xử lý</p>
-                <p className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">{paymentAnalytics.pending}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="bg-emerald-500/10 p-2.5 rounded-2xl border border-emerald-500/20">
+                  <p className="text-[10px] text-emerald-600 font-bold uppercase">Thành công</p>
+                  <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{paymentAnalytics.successful}</p>
+                </div>
+                <div className="bg-amber-500/10 p-2.5 rounded-2xl border border-amber-500/20">
+                  <p className="text-[10px] text-amber-600 font-bold uppercase">Chờ xử lý</p>
+                  <p className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">{paymentAnalytics.pending}</p>
+                </div>
+                <div className="bg-red-500/10 p-2.5 rounded-2xl border border-red-500/20">
+                  <p className="text-[10px] text-red-600 font-bold uppercase">Thất bại</p>
+                  <p className="text-lg font-black text-red-600 dark:text-red-400 mt-0.5">{paymentAnalytics.failed}</p>
+                </div>
+                <div className="bg-gray-500/10 p-2.5 rounded-2xl border border-gray-500/20">
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase">Hoàn tiền</p>
+                  <p className="text-lg font-black text-foreground mt-0.5">{paymentAnalytics.refunded}</p>
+                </div>
               </div>
-              <div className="bg-red-500/10 p-2.5 rounded-2xl border border-red-500/20">
-                <p className="text-[10px] text-red-600 font-bold uppercase">Thất bại</p>
-                <p className="text-lg font-black text-red-600 dark:text-red-400 mt-0.5">{paymentAnalytics.failed}</p>
-              </div>
-              <div className="bg-gray-500/10 p-2.5 rounded-2xl border border-gray-500/20">
-                <p className="text-[10px] text-muted-foreground font-bold uppercase">Hoàn tiền</p>
-                <p className="text-lg font-black text-foreground mt-0.5">{paymentAnalytics.refunded}</p>
-              </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span>Tỷ lệ thanh toán thành công (Payment Success)</span>
-                <span>{paymentAnalytics.successRate}%</span>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span>Tỷ lệ thanh toán thành công (Payment Success)</span>
+                  <span>{paymentAnalytics.successRate}%</span>
+                </div>
+                <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${paymentAnalytics.successRate}%` }} />
+                </div>
               </div>
-              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${paymentAnalytics.successRate}%` }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Top Events Table */}
@@ -309,7 +363,9 @@ export default function AdminControlCenter() {
               <Calendar className="h-5 w-5 text-orange-500" /> Top Events — Sự Kiện Có Doanh Thu & Check-in Cao Nhất
             </CardTitle>
             <Link href="/admin/events">
-              <Button variant="ghost" size="sm" className="h-8 text-xs font-bold">Xem tất cả sự kiện</Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs font-bold gap-1 text-primary">
+                Xem tất cả sự kiện <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
             </Link>
           </div>
         </CardHeader>

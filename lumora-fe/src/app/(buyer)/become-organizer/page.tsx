@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Building2, FileText, CreditCard, CheckCircle2,
   ChevronRight, ChevronLeft, Upload, User, Globe, Share2,
-  MapPin, BadgeCheck, Banknote, AlertTriangle, Image as ImageIcon, X
+  MapPin, BadgeCheck, Banknote, AlertTriangle, Image as ImageIcon, X, Briefcase
 } from "lucide-react";
 
 const STEPS = [
@@ -28,6 +28,19 @@ const BANKS = [
   "Vietcombank", "Techcombank", "MB Bank", "ACB", "VPBank",
   "BIDV", "Agribank", "VietinBank", "Sacombank", "TPBank",
   "VIB", "OCB", "HDBank", "SHB", "Nam A Bank"
+];
+
+const BUSINESS_CATEGORIES = [
+  "Concert & Âm nhạc",
+  "Sân khấu & Kịch",
+  "Thể thao",
+  "Workshop / Khóa học",
+  "Tham quan & Du lịch",
+  "Hội thảo / Sự kiện doanh nghiệp",
+  "Công viên & Giải trí",
+  "Ẩm thực",
+  "Triển lãm",
+  "Khác",
 ];
 
 // Image compressor helper
@@ -67,13 +80,14 @@ export default function BecomeOrganizerPage() {
 
   // Step 1 — Org info
   const [orgName, setOrgName] = useState("");
+  const [representative, setRepresentative] = useState("");
+  const [businessCategory, setBusinessCategory] = useState("");
   const [orgLogo, setOrgLogo] = useState("");
   const [orgBanner, setOrgBanner] = useState("");
   const [orgDescription, setOrgDescription] = useState("");
   const [website, setWebsite] = useState("");
   const [facebook, setFacebook] = useState("");
   const [address, setAddress] = useState("");
-  const [representative, setRepresentative] = useState("");
 
   // Step 2 — Documents
   const [docType, setDocType] = useState("CCCD"); // CCCD or BUSINESS_LICENSE
@@ -126,7 +140,8 @@ export default function BecomeOrganizerPage() {
     if (step === 1) {
       if (!orgName.trim()) { toast.error("Vui lòng nhập tên tổ chức"); return false; }
       if (!representative.trim()) { toast.error("Vui lòng nhập tên người đại diện"); return false; }
-      if (!address.trim()) { toast.error("Vui lòng nhập địa chỉ"); return false; }
+      if (!businessCategory) { toast.error("Vui lòng chọn lĩnh vực kinh doanh"); return false; }
+      if (!address.trim()) { toast.error("Vui lòng nhập địa chỉ trụ sở"); return false; }
     }
     if (step === 2) {
       if (!docUrl.trim()) { toast.error("Vui lòng tải lên hoặc dán URL giấy tờ xác minh"); return false; }
@@ -156,7 +171,7 @@ export default function BecomeOrganizerPage() {
     setIsSubmitting(true);
     try {
       await api.post("/auth/become-organizer", {
-        orgName, orgLogo, orgBanner, orgDescription, website, facebook,
+        orgName, orgLogo, orgBanner, orgDescription, businessCategory, website, facebook,
         address, representative,
         bankName, accountNumber, accountHolder,
         documents,
@@ -223,11 +238,34 @@ export default function BecomeOrganizerPage() {
                     <Input placeholder="VD: Sun Group Entertainment" value={orgName} onChange={e => setOrgName(e.target.value)} />
                   </div>
 
-                  <div className="md:col-span-2 space-y-1.5">
+                  <div className="space-y-1.5">
                     <label className="text-sm font-semibold">Người đại diện <span className="text-destructive">*</span></label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input className="pl-10" placeholder="Họ và tên người đại diện" value={representative} onChange={e => setRepresentative(e.target.value)} />
+                    </div>
+                  </div>
+
+                  {/* Business Category Selection (Required) */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold flex items-center gap-1">
+                      Lĩnh vực kinh doanh <span className="text-destructive">*</span>
+                    </label>
+                    <div className="relative">
+                      <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                      <select
+                        value={businessCategory}
+                        onChange={(e) => setBusinessCategory(e.target.value)}
+                        className="w-full rounded-xl border border-input bg-background pl-10 pr-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-primary/30 focus:outline-none h-10"
+                        required
+                      >
+                        <option value="">-- Chọn lĩnh vực kinh doanh --</option>
+                        {BUSINESS_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -501,6 +539,7 @@ export default function BecomeOrganizerPage() {
                   {[
                     { label: "Tên tổ chức", value: orgName },
                     { label: "Người đại diện", value: representative },
+                    { label: "Lĩnh vực kinh doanh", value: businessCategory },
                     { label: "Địa chỉ", value: address },
                     { label: "Website", value: website || "—" },
                     { label: "Fanpage", value: facebook || "—" },

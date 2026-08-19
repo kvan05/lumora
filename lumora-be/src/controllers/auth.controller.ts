@@ -535,20 +535,20 @@ export async function becomeOrganizer(req: Request, res: Response, next: NextFun
     }
 
     const {
-      orgName, orgLogo, orgBanner, orgDescription, website, facebook,
+      orgName, orgLogo, orgBanner, orgDescription, businessCategory, website, facebook,
       address, representative, bankName, accountNumber, accountHolder,
       documents = [], agreeTerms,
     } = req.body;
 
-    if (!orgName || !representative || !bankName || !accountNumber || !accountHolder) {
-      throw createError("Vui lòng điền đầy đủ thông tin bắt buộc", 400);
+    if (!orgName || !representative || !businessCategory || !bankName || !accountNumber || !accountHolder) {
+      throw createError("Vui lòng điền đầy đủ thông tin bắt buộc (bao gồm Tên tổ chức, Người đại diện, Lĩnh vực kinh doanh, Địa chỉ và Tài khoản ngân hàng)", 400);
     }
     if (!agreeTerms) throw createError("Bạn cần đồng ý với Điều khoản bán vé của Lumora", 400);
 
     const profile = await prisma.organizerProfile.create({
       data: {
         userId,
-        orgName, orgLogo, orgBanner, orgDescription, website, facebook,
+        orgName, orgLogo, orgBanner, orgDescription, businessCategory, website, facebook,
         address, representative,
         verifyStatus: "PENDING",
         bankInfo: { create: { bankName, accountNumber, accountHolder } },

@@ -408,18 +408,20 @@ model AdminLog {
 }
 
 model OrganizerProfile {
-  id             String              @id @default(cuid())
-  userId         String              @unique
-  orgName        String
-  orgLogo        String?
-  orgBanner      String?
-  orgDescription String?
-  website        String?
-  facebook       String?
-  address        String?
-  representative String?
-  verifyStatus   String              @default("PENDING")
+  id               String              @id @default(cuid())
+  userId           String              @unique
+  orgName          String
+  orgLogo          String?
+  orgBanner        String?
+  orgDescription   String?
+  businessCategory String?
+  website          String?
+  facebook         String?
+  address          String?
+  representative   String?
+  verifyStatus     String              @default("PENDING")
   rejectReason   String?
+  adminNote      String?
   reviewedAt     DateTime?
   reviewedBy     String?
   createdAt      DateTime            @default(now())

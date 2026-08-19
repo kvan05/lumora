@@ -163,21 +163,78 @@ export async function approveOrganizer(req: Request, res: Response, next: NextFu
 // ─── Event Management ──────────────────────────────────────────────────
 export async function getEvents(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { status, search } = req.query;
+    const { status, sellerId, category, period, search } = req.query as Record<string, string>;
 
     const where: any = {};
-    if (status) {
-      where.status = status as string;
+
+    // 1. Status Filter
+    if (status && status !== "ALL") {
+      if (status === "COMPLETED") {
+        where.endDate = { lte: new Date() };
+      } else {
+        where.status = status;
+      }
     }
-    if (search) {
-      where.title = { contains: search as string };
+
+    // 2. Seller Filter
+    if (sellerId && sellerId !== "ALL") {
+      where.sellerId = sellerId;
+    }
+
+    // 3. Category Filter
+    if (category && category !== "ALL") {
+      where.category = category;
+    }
+
+    // 4. Period Date Filter (check startDate or createdAt)
+    if (period === "today") {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      where.createdAt = { gte: startOfDay };
+    } else if (period === "7d") {
+      where.createdAt = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    } else if (period === "30d") {
+      where.createdAt = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (period === "90d") {
+      where.createdAt = { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) };
+    }
+
+    // 5. Search Filter (title, venue, city, seller name/email/orgName)
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { title: { contains: q, mode: "insensitive" } },
+        { venue: { contains: q, mode: "insensitive" } },
+        { city: { contains: q, mode: "insensitive" } },
+        { seller: { name: { contains: q, mode: "insensitive" } } },
+        { seller: { email: { contains: q, mode: "insensitive" } } },
+        { seller: { OrganizerProfile: { orgName: { contains: q, mode: "insensitive" } } } },
+      ];
     }
 
     const events = await prisma.event.findMany({
       where,
       include: {
         seller: {
-          select: { name: true, email: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            OrganizerProfile: {
+              select: {
+                orgName: true,
+                representative: true,
+              },
+            },
+          },
+        },
+        ticketTypes: {
+          select: { id: true, name: true, price: true, quantity: true },
+        },
+        orders: {
+          where: { status: { in: ["CONFIRMED", "CHECKED_IN", "PAID"] } },
+          select: { id: true, total: true, createdAt: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -416,16 +473,29 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
 // ─── Organizers & Profiles Management ────────────────────────────────────
 export async function getOrganizers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { status, search } = req.query as Record<string, string>;
+    const { status, category, period, search } = req.query as Record<string, string>;
+
+    let dateFilter: any = {};
+    if (period === "7d") {
+      dateFilter = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    } else if (period === "30d") {
+      dateFilter = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (period === "90d") {
+      dateFilter = { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) };
+    }
 
     const profiles = await prisma.organizerProfile.findMany({
       where: {
-        ...(status && status !== "ALL" && { verifyStatus: status }),
+        ...(status && status !== "ALL" && status !== "BLOCKED" && { verifyStatus: status }),
+        ...(category && category !== "ALL" && { businessCategory: category }),
+        ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
         ...(search && {
           OR: [
-            { orgName: { contains: search } },
-            { user: { name: { contains: search } } },
-            { user: { email: { contains: search } } },
+            { orgName: { contains: search, mode: "insensitive" } },
+            { representative: { contains: search, mode: "insensitive" } },
+            { user: { name: { contains: search, mode: "insensitive" } } },
+            { user: { email: { contains: search, mode: "insensitive" } } },
+            { user: { phone: { contains: search, mode: "insensitive" } } },
           ],
         }),
       },
@@ -442,7 +512,7 @@ export async function getOrganizers(req: Request, res: Response, next: NextFunct
               select: {
                 id: true,
                 orders: {
-                  where: { status: { in: ["CONFIRMED", "PAID"] } },
+                  where: { status: { in: ["CONFIRMED", "CHECKED_IN", "PAID"] } },
                   select: { total: true },
                 },
               },
@@ -458,11 +528,13 @@ export async function getOrganizers(req: Request, res: Response, next: NextFunct
     const sellersWithoutProfile = await prisma.user.findMany({
       where: {
         role: "SELLER",
-        organizerProfile: null,
+        OrganizerProfile: null,
+        ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
         ...(search && {
           OR: [
-            { name: { contains: search } },
-            { email: { contains: search } },
+            { name: { contains: search, mode: "insensitive" } },
+            { email: { contains: search, mode: "insensitive" } },
+            { phone: { contains: search, mode: "insensitive" } },
           ],
         }),
       },
@@ -471,7 +543,7 @@ export async function getOrganizers(req: Request, res: Response, next: NextFunct
           select: {
             id: true,
             orders: {
-              where: { status: { in: ["CONFIRMED", "PAID"] } },
+              where: { status: { in: ["CONFIRMED", "CHECKED_IN", "PAID"] } },
               select: { total: true },
             },
           },
@@ -479,7 +551,7 @@ export async function getOrganizers(req: Request, res: Response, next: NextFunct
       },
     });
 
-    const formattedProfiles = profiles.map((p) => {
+    let formattedProfiles = profiles.map((p) => {
       const eventsCount = p.user?.events?.length || 0;
       const revenue = p.user?.events?.reduce((sum, ev) => {
         return sum + ev.orders.reduce((oSum, o) => oSum + Number(o.total || 0), 0);
@@ -488,21 +560,29 @@ export async function getOrganizers(req: Request, res: Response, next: NextFunct
       return {
         id: p.id,
         userId: p.userId,
-        name: p.orgName || p.user?.name || "Chưa đặt tên tổ chức",
-        email: p.user?.email,
+        orgName: p.orgName || p.user?.name || "Chưa đặt tên tổ chức",
+        representative: p.representative || p.user?.name || "Chưa cập nhật",
+        email: p.user?.email || "",
         phone: p.user?.phone || "Chưa cập nhật",
+        businessCategory: p.businessCategory || "Khác",
+        address: p.address || "Chưa cập nhật",
+        website: p.website || null,
+        facebook: p.facebook || null,
         businessLicense: p.representative || "Đơn ĐKKD",
         status: p.verifyStatus,
+        rejectReason: p.rejectReason,
+        adminNote: p.adminNote,
         isBlocked: !p.user?.isVerified,
         eventsCount,
         revenue,
         documentUrl: p.documents?.[0]?.docUrl || null,
+        documents: p.documents,
         bankInfo: p.bankInfo,
         createdAt: p.createdAt.toISOString(),
       };
     });
 
-    const formattedSellers = sellersWithoutProfile.map((s) => {
+    let formattedSellers = sellersWithoutProfile.map((s) => {
       const eventsCount = s.events?.length || 0;
       const revenue = s.events?.reduce((sum, ev) => {
         return sum + ev.orders.reduce((oSum, o) => oSum + Number(o.total || 0), 0);
@@ -511,20 +591,164 @@ export async function getOrganizers(req: Request, res: Response, next: NextFunct
       return {
         id: `user-${s.id}`,
         userId: s.id,
-        name: s.name || s.email,
+        orgName: s.name || s.email,
+        representative: s.name || "N/A",
         email: s.email,
         phone: s.phone || "Chưa cập nhật",
+        businessCategory: "Khác",
+        address: "Chưa cập nhật",
+        website: null,
+        facebook: null,
         businessLicense: "Tài khoản ban đầu",
         status: "APPROVED",
+        rejectReason: null,
+        adminNote: null,
         isBlocked: !s.isVerified,
         eventsCount,
         revenue,
         documentUrl: null,
+        documents: [],
+        bankInfo: null,
         createdAt: s.createdAt.toISOString(),
       };
     });
 
-    res.json({ success: true, data: [...formattedProfiles, ...formattedSellers] });
+    let allOrganizers = [...formattedProfiles, ...formattedSellers];
+
+    // Filter BLOCKED if requested
+    if (status === "BLOCKED") {
+      allOrganizers = allOrganizers.filter(o => o.isBlocked);
+    }
+
+    res.json({ success: true, data: allOrganizers });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Get Single Organizer Details ──────────────────────────────────────────
+export async function getOrganizerDetail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    let profile = await prisma.organizerProfile.findFirst({
+      where: { OR: [{ id }, { userId: id }] },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            avatar: true,
+            isVerified: true,
+            createdAt: true,
+            events: {
+              include: {
+                ticketTypes: true,
+                orders: {
+                  where: { status: { in: ["CONFIRMED", "CHECKED_IN"] } },
+                  select: { id: true, total: true, createdAt: true },
+                },
+              },
+              orderBy: { createdAt: "desc" },
+            },
+          },
+        },
+        bankInfo: true,
+        documents: true,
+      },
+    });
+
+    if (!profile) {
+      const targetUserId = id.replace("user-", "");
+      const sellerUser = await prisma.user.findFirst({
+        where: { id: targetUserId, role: "SELLER" },
+        include: {
+          events: {
+            include: {
+              ticketTypes: true,
+              orders: {
+                where: { status: { in: ["CONFIRMED", "CHECKED_IN"] } },
+                select: { id: true, total: true, createdAt: true },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+
+      if (!sellerUser) throw createError("Không tìm thấy thông tin Nhà tổ chức", 404);
+
+      res.json({
+        success: true,
+        data: {
+          id: `user-${sellerUser.id}`,
+          userId: sellerUser.id,
+          orgName: sellerUser.name || sellerUser.email,
+          representative: sellerUser.name || "N/A",
+          email: sellerUser.email,
+          phone: sellerUser.phone || "Chưa cập nhật",
+          businessCategory: "Khác",
+          address: "Chưa cập nhật",
+          website: null,
+          facebook: null,
+          verifyStatus: "APPROVED",
+          isBlocked: !sellerUser.isVerified,
+          adminNote: null,
+          documents: [],
+          bankInfo: null,
+          createdAt: sellerUser.createdAt,
+          events: sellerUser.events,
+          settlements: [],
+          withdrawals: [],
+        },
+      });
+      return;
+    }
+
+    const [settlements, withdrawals] = await Promise.all([
+      prisma.settlement.findMany({
+        where: { sellerId: profile.userId },
+        include: { event: { select: { title: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.withdrawal.findMany({
+        where: { sellerId: profile.userId },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        ...profile,
+        settlements,
+        withdrawals,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Update Organizer Admin Note ──────────────────────────────────────────
+export async function updateOrganizerAdminNote(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const { adminNote } = req.body;
+
+    const profile = await prisma.organizerProfile.findFirst({
+      where: { OR: [{ id }, { userId: id }] },
+    });
+
+    if (!profile) throw createError("Không tìm thấy thông tin Nhà tổ chức", 404);
+
+    const updated = await prisma.organizerProfile.update({
+      where: { id: profile.id },
+      data: { adminNote: adminNote ? adminNote.trim() : null },
+    });
+
+    res.json({ success: true, message: "Đã cập nhật ghi chú nội bộ Admin thành công", data: updated });
   } catch (err) {
     next(err);
   }
@@ -1798,6 +2022,8 @@ export async function getFinancialReconciliation(req: Request, res: Response, ne
       include: {
         payment: true,
         RefundRequest: true,
+        event: { select: { title: true } },
+        user: { select: { name: true, email: true } },
       },
     });
 
@@ -1834,6 +2060,39 @@ export async function getFinancialReconciliation(req: Request, res: Response, ne
       take: 20,
     });
 
+    const ordersDetails = orders.map((o) => ({
+      id: o.id,
+      orderCode: o.id.slice(0, 8),
+      eventTitle: (o as any).event?.title || "Sự kiện",
+      customerName: (o as any).user?.name || (o as any).user?.email || "Khách hàng",
+      customerEmail: (o as any).user?.email || "",
+      total: Number(o.total),
+      fee: Number(o.total) * 0.05,
+      payout: Number(o.total) * 0.95,
+      status: o.status,
+      createdAt: o.createdAt,
+    }));
+
+    const refundDetails = refundedRequests.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      amount: Number(r.amount),
+      reason: r.reason,
+      status: r.status,
+      createdAt: r.createdAt,
+    }));
+
+    const withdrawalDetails = completedWithdrawals.map((w) => ({
+      id: w.id,
+      sellerId: w.sellerId,
+      bankName: w.bankName,
+      accountNumber: w.accountNumber,
+      accountHolder: w.accountHolder,
+      amount: Number(w.amount),
+      status: w.status,
+      createdAt: w.createdAt,
+    }));
+
     res.json({
       success: true,
       data: {
@@ -1853,6 +2112,9 @@ export async function getFinancialReconciliation(req: Request, res: Response, ne
           discrepancy,
           status,
         },
+        orders: ordersDetails,
+        refunds: refundDetails,
+        withdrawals: withdrawalDetails,
         history: savedHistory,
       },
     });
@@ -1895,10 +2157,84 @@ export async function createReconciliationSnapshot(req: Request, res: Response, 
       },
     });
 
-    res.json({ success: true, message: "Đã lưu bản ghi kỳ đối soát tài chính thành công!", data: snapshot });
+    res.json({ success: true, message: "Đã lưu bản ghi chốt kỳ đối soát tài chính thành công!", data: snapshot });
   } catch (err) {
     next(err);
   }
 }
 
+// ─── Reviews & Feedback Management ─────────────────────────────────────
+export async function getAdminReviews(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { rating, status, search } = req.query as Record<string, string>;
 
+    const where: any = {};
+
+    if (rating && rating !== "ALL") {
+      if (rating === "NEGATIVE") {
+        where.rating = { lte: 2 };
+      } else {
+        where.rating = parseInt(rating, 10);
+      }
+    }
+
+    if (status && status !== "ALL") {
+      if (status === "HIDDEN") where.isHidden = true;
+      if (status === "VISIBLE") where.isHidden = false;
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { content: { contains: q, mode: "insensitive" } },
+        { user: { name: { contains: q, mode: "insensitive" } } },
+        { user: { email: { contains: q, mode: "insensitive" } } },
+        { event: { title: { contains: q, mode: "insensitive" } } },
+      ];
+    }
+
+    const reviews = await prisma.review.findMany({
+      where,
+      include: {
+        user: { select: { id: true, name: true, email: true, avatar: true } },
+        event: { select: { id: true, title: true, slug: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ success: true, data: reviews });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function toggleHideReview(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const review = await prisma.review.findUnique({ where: { id } });
+    if (!review) throw createError("Đánh giá không tồn tại", 404);
+
+    const updated = await prisma.review.update({
+      where: { id },
+      data: { isHidden: !review.isHidden },
+    });
+
+    res.json({
+      success: true,
+      message: updated.isHidden ? "Đã ẩn đánh giá khỏi hiển thị công khai" : "Đã mở hiển thị lại đánh giá",
+      data: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteReview(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    await prisma.review.delete({ where: { id } });
+    res.json({ success: true, message: "Đã xóa vĩnh viễn đánh giá thành công" });
+  } catch (err) {
+    next(err);
+  }
+}

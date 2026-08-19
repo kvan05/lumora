@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { ShieldAlert, AlertTriangle, ShieldCheck, RefreshCw, Eye, CheckCircle2, XCircle, Search, Filter, AlertCircle } from "lucide-react";
+import { ShieldAlert, AlertTriangle, ShieldCheck, RefreshCw, Eye, CheckCircle2, XCircle, Search, Filter, AlertCircle, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,8 +61,14 @@ export default function RiskAlertsPage() {
   const highCount = alerts.filter((a: any) => a.riskLevel === "HIGH").length;
   const openCount = alerts.filter((a: any) => a.status === "OPEN").length;
 
+  const handleResetFilters = () => {
+    setStatusFilter("ALL");
+    setLevelFilter("ALL");
+    toast.success("Đã đặt lại tất cả bộ lọc");
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -84,32 +90,64 @@ export default function RiskAlertsPage() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
+      {/* 4 Clickable Interactive Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 1: Total Alerts */}
+        <Card
+          onClick={() => { setLevelFilter("ALL"); setStatusFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            levelFilter === "ALL" && statusFilter === "ALL"
+              ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-primary/50 hover:bg-muted/20"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase">Tổng Số Cảnh Báo</p>
+            <p className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">Tổng Số Cảnh Báo</p>
             <p className="text-2xl font-black text-foreground mt-1">{alerts.length}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-red-500/20 bg-red-500/5 shadow-xs">
+        {/* Card 2: Critical Risk Level */}
+        <Card
+          onClick={() => { setLevelFilter("CRITICAL"); setStatusFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            levelFilter === "CRITICAL"
+              ? "border-red-500 bg-red-500/15 ring-2 ring-red-500/30 shadow-md scale-[1.02]"
+              : "border-red-500/20 bg-red-500/5 hover:border-red-500 hover:bg-red-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase">Mức Độ CRITICAL (80-100)</p>
+            <p className="text-xs font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Mức Độ CRITICAL (80-100)</p>
             <p className="text-2xl font-black text-red-600 dark:text-red-400 mt-1">{criticalCount}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 shadow-xs">
+        {/* Card 3: High Risk Level */}
+        <Card
+          onClick={() => { setLevelFilter("HIGH"); setStatusFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            levelFilter === "HIGH"
+              ? "border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/30 shadow-md scale-[1.02]"
+              : "border-amber-500/20 bg-amber-500/5 hover:border-amber-500 hover:bg-amber-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase">Mức Độ HIGH (60-79)</p>
+            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Mức Độ HIGH (60-79)</p>
             <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{highCount}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-blue-500/20 bg-blue-500/5 shadow-xs">
+        {/* Card 4: Open Status */}
+        <Card
+          onClick={() => { setStatusFilter("OPEN"); setLevelFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            statusFilter === "OPEN"
+              ? "border-blue-500 bg-blue-500/15 ring-2 ring-blue-500/30 shadow-md scale-[1.02]"
+              : "border-blue-500/20 bg-blue-500/5 hover:border-blue-500 hover:bg-blue-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase">Cần Admin Xử Lý (OPEN)</p>
+            <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Cần Admin Xử Lý (OPEN)</p>
             <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{openCount}</p>
           </CardContent>
         </Card>
@@ -117,32 +155,51 @@ export default function RiskAlertsPage() {
 
       {/* Filters Bar */}
       <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl">
-              <SelectValue placeholder="Trạng thái" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
-              <SelectItem value="OPEN">Mới phát hiện (OPEN)</SelectItem>
-              <SelectItem value="REVIEWING">Đang điều tra (REVIEWING)</SelectItem>
-              <SelectItem value="RESOLVED">Đã giải quyết (RESOLVED)</SelectItem>
-              <SelectItem value="IGNORED">Bỏ qua (IGNORED)</SelectItem>
-            </SelectContent>
-          </Select>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl text-xs font-semibold">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="ALL" className="text-xs font-bold">Tất cả trạng thái</SelectItem>
+                <SelectItem value="OPEN" className="text-xs">Mới phát hiện (OPEN)</SelectItem>
+                <SelectItem value="REVIEWING" className="text-xs">Đang điều tra (REVIEWING)</SelectItem>
+                <SelectItem value="RESOLVED" className="text-xs">Đã giải quyết (RESOLVED)</SelectItem>
+                <SelectItem value="IGNORED" className="text-xs">Bỏ qua (IGNORED)</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={levelFilter} onValueChange={setLevelFilter}>
-            <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl">
-              <SelectValue placeholder="Mức độ rủi ro" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tất cả mức độ</SelectItem>
-              <SelectItem value="CRITICAL">CRITICAL (80 - 100)</SelectItem>
-              <SelectItem value="HIGH">HIGH (60 - 79)</SelectItem>
-              <SelectItem value="MEDIUM">MEDIUM (30 - 59)</SelectItem>
-              <SelectItem value="LOW">LOW (0 - 29)</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={levelFilter} onValueChange={setLevelFilter}>
+              <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl text-xs font-semibold">
+                <SelectValue placeholder="Mức độ rủi ro" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="ALL" className="text-xs font-bold">Tất cả mức độ</SelectItem>
+                <SelectItem value="CRITICAL" className="text-xs">CRITICAL (80 - 100)</SelectItem>
+                <SelectItem value="HIGH" className="text-xs">HIGH (60 - 79)</SelectItem>
+                <SelectItem value="MEDIUM" className="text-xs">MEDIUM (30 - 59)</SelectItem>
+                <SelectItem value="LOW" className="text-xs">LOW (0 - 29)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {(statusFilter !== "ALL" || levelFilter !== "ALL") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 rounded-xl gap-1.5 font-semibold text-xs text-muted-foreground hover:text-foreground"
+                onClick={handleResetFilters}
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Đặt lại bộ lọc
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between pt-1 text-xs">
+            <span className="text-muted-foreground font-medium">
+              Hiển thị <strong className="text-foreground">{alerts.length}</strong> cảnh báo rủi ro sau khi lọc
+            </span>
+          </div>
         </CardContent>
       </Card>
 

@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import {
   Users, Search, Ban, CheckCircle2,
-  Trash2, Eye, Shield, RefreshCw, X
+  Trash2, Eye, Shield, RefreshCw, X, RotateCcw, UserCheck
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -102,8 +102,15 @@ export default function UsersPage() {
   const sellerCount = users.filter((u: any) => u.role === "SELLER").length;
   const blockedCount = users.filter((u: any) => u.isBlocked).length;
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setRoleFilter("ALL");
+    setStatusFilter("ALL");
+    toast.success("Đã đặt lại tất cả bộ lọc");
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -126,32 +133,64 @@ export default function UsersPage() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
+      {/* 4 Clickable Interactive Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 1: Total Users */}
+        <Card
+          onClick={() => { setRoleFilter("ALL"); setStatusFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            roleFilter === "ALL" && statusFilter === "ALL"
+              ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-primary/50 hover:bg-muted/20"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase">Tổng Người Dùng</p>
+            <p className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">Tổng Người Dùng</p>
             <p className="text-2xl font-black text-foreground mt-1">{users.length}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-blue-500/20 bg-blue-500/5 shadow-xs">
+        {/* Card 2: Buyer Count */}
+        <Card
+          onClick={() => { setRoleFilter("BUYER"); setStatusFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            roleFilter === "BUYER" && statusFilter === "ALL"
+              ? "border-blue-500 bg-blue-500/15 ring-2 ring-blue-500/30 shadow-md scale-[1.02]"
+              : "border-blue-500/20 bg-blue-500/5 hover:border-blue-500 hover:bg-blue-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase">Khách Hàng (Buyer)</p>
+            <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Khách Hàng (Buyer)</p>
             <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{buyerCount}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-purple-500/20 bg-purple-500/5 shadow-xs">
+        {/* Card 3: Seller Count */}
+        <Card
+          onClick={() => { setRoleFilter("SELLER"); setStatusFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            roleFilter === "SELLER" && statusFilter === "ALL"
+              ? "border-purple-500 bg-purple-500/15 ring-2 ring-purple-500/30 shadow-md scale-[1.02]"
+              : "border-purple-500/20 bg-purple-500/5 hover:border-purple-500 hover:bg-purple-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase">Nhà Tổ Chức (Seller)</p>
+            <p className="text-xs font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Nhà Tổ Chức (Seller)</p>
             <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">{sellerCount}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-red-500/20 bg-red-500/5 shadow-xs">
+        {/* Card 4: Blocked Count */}
+        <Card
+          onClick={() => { setStatusFilter("BLOCKED"); setRoleFilter("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            statusFilter === "BLOCKED"
+              ? "border-red-500 bg-red-500/15 ring-2 ring-red-500/30 shadow-md scale-[1.02]"
+              : "border-red-500/20 bg-red-500/5 hover:border-red-500 hover:bg-red-500/10"
+          }`}
+        >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase">Tài Khoản Khóa</p>
+            <p className="text-xs font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Tài Khoản Khóa</p>
             <p className="text-2xl font-black text-red-600 dark:text-red-400 mt-1">{blockedCount}</p>
           </CardContent>
         </Card>
@@ -159,51 +198,55 @@ export default function UsersPage() {
 
       {/* Filters Bar */}
       <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Tìm theo Tên, Email, Username..."
-              className="pl-9 h-10 rounded-xl"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <CardContent className="p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm theo Tên, Email, Username..."
+                className="pl-9 h-10 rounded-xl text-xs font-medium"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl text-xs font-semibold">
+                <SelectValue placeholder="Vai trò" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="ALL" className="text-xs font-bold">Tất cả vai trò</SelectItem>
+                <SelectItem value="BUYER" className="text-xs">Khách hàng (BUYER)</SelectItem>
+                <SelectItem value="SELLER" className="text-xs">Nhà tổ chức (SELLER)</SelectItem>
+                <SelectItem value="ADMIN" className="text-xs">Quản trị viên (ADMIN)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl text-xs font-semibold">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="ALL" className="text-xs font-bold">Tất cả trạng thái</SelectItem>
+                <SelectItem value="ACTIVE" className="text-xs">Hoạt động</SelectItem>
+                <SelectItem value="BLOCKED" className="text-xs">Đã khóa</SelectItem>
+              </SelectContent>
+            </Select>
+            {(search || roleFilter !== "ALL" || statusFilter !== "ALL") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 rounded-xl gap-1.5 font-semibold text-xs text-muted-foreground hover:text-foreground"
+                onClick={handleResetFilters}
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Đặt lại
+              </Button>
+            )}
           </div>
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl">
-              <SelectValue placeholder="Vai trò" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tất cả vai trò</SelectItem>
-              <SelectItem value="BUYER">Khách hàng (BUYER)</SelectItem>
-              <SelectItem value="SELLER">Nhà tổ chức (SELLER)</SelectItem>
-              <SelectItem value="ADMIN">Quản trị viên (ADMIN)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl">
-              <SelectValue placeholder="Trạng thái" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tất cả trạng thái</SelectItem>
-              <SelectItem value="ACTIVE">Hoạt động</SelectItem>
-              <SelectItem value="BLOCKED">Đã khóa</SelectItem>
-            </SelectContent>
-          </Select>
-          {(search || roleFilter !== "ALL" || statusFilter !== "ALL") && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-10 rounded-xl gap-1.5"
-              onClick={() => {
-                setSearch("");
-                setRoleFilter("ALL");
-                setStatusFilter("ALL");
-              }}
-            >
-              <X className="h-3.5 w-3.5" /> Xóa lọc
-            </Button>
-          )}
+
+          <div className="flex items-center justify-between pt-1 text-xs">
+            <span className="text-muted-foreground font-medium">
+              Hiển thị <strong className="text-foreground">{filtered.length}</strong> người dùng sau khi lọc
+            </span>
+          </div>
         </CardContent>
       </Card>
 

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { Scale, CheckCircle2, AlertTriangle, RefreshCw, Plus, FileText, ArrowRight, History, Calendar } from "lucide-react";
+import {
+  Scale, CheckCircle2, AlertTriangle, RefreshCw, Plus, FileText, ArrowRight, History, Calendar,
+  DollarSign, Receipt, ArrowDownRight, Building2, Banknote, ShoppingBag, Layers, Filter, Check
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +22,9 @@ export default function FinancialReconciliationPage() {
   const [period, setPeriod] = useState("30d");
   const [isSnapshotDialogOpen, setIsSnapshotDialogOpen] = useState(false);
   const [notes, setNotes] = useState("");
+
+  // Filter tab selected by clicking cards
+  const [activeCard, setActiveCard] = useState<"ALL" | "GROSS" | "REFUND" | "FEE" | "PAYOUT" | "WITHDRAW">("ALL");
 
   // Fetch 100% Real Reconciliation Data from Backend Engine
   const { data: reconData, isLoading, refetch, isFetching } = useQuery({
@@ -45,6 +51,10 @@ export default function FinancialReconciliationPage() {
   };
 
   const history = Array.isArray(reconData?.history) ? reconData.history : [];
+  const ordersDetails = Array.isArray(reconData?.orders) ? reconData.orders : [];
+  const refundDetails = Array.isArray(reconData?.refunds) ? reconData.refunds : [];
+  const withdrawalDetails = Array.isArray(reconData?.withdrawals) ? reconData.withdrawals : [];
+
   const isBalanced = current.discrepancy === 0;
 
   // Create Reconciliation Snapshot Mutation
@@ -75,8 +85,10 @@ export default function FinancialReconciliationPage() {
     },
   });
 
+  const fmt = (num: number) => (num || 0).toLocaleString("vi-VN") + " ₫";
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -92,7 +104,7 @@ export default function FinancialReconciliationPage() {
             <SelectTrigger className="w-36 h-9 rounded-xl font-bold">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl">
               <SelectItem value="7d">7 Ngày</SelectItem>
               <SelectItem value="30d">30 Ngày</SelectItem>
               <SelectItem value="90d">90 Ngày</SelectItem>
@@ -143,7 +155,7 @@ export default function FinancialReconciliationPage() {
               <p className="text-xs text-muted-foreground mt-1">
                 {isBalanced
                   ? "Tất cả giao dịch Đơn hàng, Cổng thanh toán PayOS, Phí sàn 5% và Tiền trả Seller khớp tuyệt đối."
-                  : `Phát hiện chênh lệch sổ sách: ${current.discrepancy.toLocaleString("vi-VN")} ₫. Vui lòng kiểm tra lại.`}
+                  : `Phát hiện chênh lệch sổ sách: ${fmt(current.discrepancy)}. Vui lòng kiểm tra lại.`}
               </p>
             </div>
           </div>
@@ -158,50 +170,225 @@ export default function FinancialReconciliationPage() {
         </CardContent>
       </Card>
 
-      {/* Financial Metrics Overview */}
+      {/* 6 Clickable Interactive Financial Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 1: Total Orders */}
+        <Card
+          onClick={() => setActiveCard("ALL")}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "ALL"
+              ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-primary/50 hover:bg-muted/20"
+          }`}
+        >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Tổng Đơn Hàng</p>
+            <p className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-wider">Tổng Đơn Hàng</p>
             <p className="text-lg font-black text-foreground mt-0.5">{current.totalOrdersCount} đơn</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 2: Gross Revenue */}
+        <Card
+          onClick={() => setActiveCard("GROSS")}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "GROSS"
+              ? "border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-emerald-500/50 hover:bg-emerald-500/5"
+          }`}
+        >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase">Gross Revenue</p>
-            <p className="text-lg font-black text-foreground mt-0.5">{current.grossRevenue.toLocaleString("vi-VN")} ₫</p>
+            <p className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Gross Revenue</p>
+            <p className="text-lg font-black text-foreground mt-0.5">{fmt(current.grossRevenue)}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 3: Refund Amount */}
+        <Card
+          onClick={() => setActiveCard("REFUND")}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "REFUND"
+              ? "border-red-500 bg-red-500/15 ring-2 ring-red-500/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-red-500/50 hover:bg-red-500/5"
+          }`}
+        >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-red-500 uppercase">Hoàn Tiền (Refund)</p>
-            <p className="text-lg font-black text-red-500 mt-0.5">-{current.refundedAmount.toLocaleString("vi-VN")} ₫</p>
+            <p className="text-[11px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Hoàn Tiền (Refund)</p>
+            <p className="text-lg font-black text-red-600 dark:text-red-400 mt-0.5">-{fmt(current.refundedAmount)}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 4: Platform Fee */}
+        <Card
+          onClick={() => setActiveCard("FEE")}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "FEE"
+              ? "border-emerald-600 bg-emerald-600/15 ring-2 ring-emerald-600/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-emerald-600/50 hover:bg-emerald-600/5"
+          }`}
+        >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-emerald-600 uppercase">Phí Sàn Lumora (5%)</p>
-            <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{current.platformFee.toLocaleString("vi-VN")} ₫</p>
+            <p className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Phí Sàn Lumora (5%)</p>
+            <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{fmt(current.platformFee)}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 5: Seller Payout */}
+        <Card
+          onClick={() => setActiveCard("PAYOUT")}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "PAYOUT"
+              ? "border-purple-500 bg-purple-500/15 ring-2 ring-purple-500/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-purple-500/50 hover:bg-purple-500/5"
+          }`}
+        >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-purple-600 uppercase">Seller Payout (95%)</p>
-            <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">{current.sellerPayout.toLocaleString("vi-VN")} ₫</p>
+            <p className="text-[11px] font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Seller Payout (95%)</p>
+            <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">{fmt(current.sellerPayout)}</p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
+        {/* Card 6: Paid Withdrawals */}
+        <Card
+          onClick={() => setActiveCard("WITHDRAW")}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "WITHDRAW"
+              ? "border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/30 shadow-md scale-[1.02]"
+              : "border-border/50 bg-card hover:border-amber-500/50 hover:bg-amber-500/5"
+          }`}
+        >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-semibold text-amber-600 uppercase">Đã Chi Trả (Withdraw)</p>
-            <p className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">{current.paidWithdrawalsAmount.toLocaleString("vi-VN")} ₫</p>
+            <p className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Đã Chi Trả (Withdraw)</p>
+            <p className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">{fmt(current.paidWithdrawalsAmount)}</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Interactive Audit Breakdown View according to Active Card */}
+      {activeCard !== "ALL" && (
+        <Card className="rounded-3xl border border-primary/30 bg-card shadow-xs overflow-hidden">
+          <CardHeader className="pb-3 border-b border-border/40 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-extrabold text-primary flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                {activeCard === "GROSS" && "Chi Tiết Doanh Thu Gross (Gross Revenue Breakdown)"}
+                {activeCard === "REFUND" && "Chi Tiết Đơn Hoàn Tiền (Refunded Orders Audit)"}
+                {activeCard === "FEE" && "Chi Tiết Phí Nền Tảng Sàn 5% (Platform Fee Breakdown)"}
+                {activeCard === "PAYOUT" && "Chi Tiết Phân Phối Doanh Thu Seller (Seller Payout 95%)"}
+                {activeCard === "WITHDRAW" && "Chi Tiết Đã Chi Trả Rút Tiền (Completed Withdrawals Audit)"}
+              </CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                Bảng phân tích chi tiết dữ liệu thực tế từ các dòng giao dịch CSDL PostgreSQL.
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" className="rounded-xl text-xs font-bold" onClick={() => setActiveCard("ALL")}>
+              Xem tất cả
+            </Button>
+          </CardHeader>
+
+          <CardContent className="p-4">
+            {activeCard === "GROSS" || activeCard === "FEE" || activeCard === "PAYOUT" ? (
+              ordersDetails.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">Chưa có giao dịch đơn hàng nào trong khoảng thời gian này.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-border/40">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                        <TableHead className="font-bold text-xs uppercase">Mã Đơn</TableHead>
+                        <TableHead className="font-bold text-xs uppercase">Sự Kiện & Khách Hàng</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-right">Tổng Tiền (Gross)</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-right">Phí Sàn 5%</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-right">Thực Nhận Seller 95%</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-center">Trạng Thái</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ordersDetails.map((o: any) => (
+                        <TableRow key={o.id} className="hover:bg-muted/20">
+                          <TableCell className="font-mono font-bold text-xs">{o.orderCode}</TableCell>
+                          <TableCell>
+                            <p className="font-bold text-xs text-foreground line-clamp-1">{o.eventTitle}</p>
+                            <p className="text-[11px] text-muted-foreground">👤 {o.customerName} ({o.customerEmail})</p>
+                          </TableCell>
+                          <TableCell className="text-right font-extrabold text-xs">{fmt(o.total)}</TableCell>
+                          <TableCell className="text-right font-bold text-xs text-emerald-600">{fmt(o.fee)}</TableCell>
+                          <TableCell className="text-right font-bold text-xs text-purple-600">{fmt(o.payout)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="text-[10px] font-bold">{o.status}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )
+            ) : activeCard === "REFUND" ? (
+              refundDetails.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">Chưa có đơn hoàn tiền nào trong kỳ này.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-border/40">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                        <TableHead className="font-bold text-xs uppercase">Mã Yêu Cầu</TableHead>
+                        <TableHead className="font-bold text-xs uppercase">Mã Đơn</TableHead>
+                        <TableHead className="font-bold text-xs uppercase">Lý Do Hoàn Tiền</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-right">Số Tiền Hoàn</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-center">Trạng Thái</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {refundDetails.map((r: any) => (
+                        <TableRow key={r.id} className="hover:bg-muted/20">
+                          <TableCell className="font-mono font-bold text-xs">{r.id.slice(0, 8)}</TableCell>
+                          <TableCell className="font-mono text-xs">{r.orderId.slice(0, 8)}</TableCell>
+                          <TableCell className="text-xs">{r.reason || "Yêu cầu hoàn tiền"}</TableCell>
+                          <TableCell className="text-right font-extrabold text-xs text-red-600">-{fmt(r.amount)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className="bg-emerald-600 text-white text-[10px] font-bold">{r.status}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )
+            ) : (
+              withdrawalDetails.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">Chưa có giao dịch chi trả rút tiền nào trong kỳ này.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-border/40">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                        <TableHead className="font-bold text-xs uppercase">Mã Lệnh Rút</TableHead>
+                        <TableHead className="font-bold text-xs uppercase">Tài Khoản Ngân Hàng Nhận</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-right">Số Tiền Đã Chi Trả</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-center">Trạng Thái</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {withdrawalDetails.map((w: any) => (
+                        <TableRow key={w.id} className="hover:bg-muted/20">
+                          <TableCell className="font-mono font-bold text-xs">{w.id.slice(0, 8)}</TableCell>
+                          <TableCell className="text-xs">
+                            <p className="font-bold">{w.bankName} - {w.accountNumber}</p>
+                            <p className="text-[11px] text-muted-foreground">Chủ TK: {w.accountHolder}</p>
+                          </TableCell>
+                          <TableCell className="text-right font-extrabold text-xs text-amber-600">{fmt(w.amount)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className="bg-emerald-600 text-white text-[10px] font-bold">{w.status}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Reconciliation History */}
       <Card className="rounded-3xl border-border/50 bg-card shadow-xs overflow-hidden">
@@ -233,7 +420,7 @@ export default function FinancialReconciliationPage() {
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Gross GMV</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Phí Sàn (5%)</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Chênh Lệch</TableHead>
-                    <TableHead className="font-bold text-xs uppercase tracking-wider">Trạng Thái</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-center">Trạng Thái</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -246,15 +433,15 @@ export default function FinancialReconciliationPage() {
                         {new Date(h.startDate).toLocaleDateString("vi-VN")} - {new Date(h.endDate).toLocaleDateString("vi-VN")}
                       </TableCell>
                       <TableCell className="text-right font-extrabold text-xs">
-                        {Number(h.grossRevenue || 0).toLocaleString("vi-VN")} ₫
+                        {fmt(Number(h.grossRevenue || 0))}
                       </TableCell>
                       <TableCell className="text-right font-bold text-xs text-emerald-600">
-                        {Number(h.platformFee || 0).toLocaleString("vi-VN")} ₫
+                        {fmt(Number(h.platformFee || 0))}
                       </TableCell>
                       <TableCell className="text-right font-mono font-bold text-xs">
-                        {Number(h.discrepancy || 0).toLocaleString("vi-VN")} ₫
+                        {fmt(Number(h.discrepancy || 0))}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <Badge
                           className={`font-bold text-[10px] ${
                             h.status === "BALANCED" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
@@ -287,8 +474,8 @@ export default function FinancialReconciliationPage() {
           <div className="space-y-3 py-2 text-xs">
             <div className="bg-muted/40 p-3 rounded-xl border space-y-1">
               <p>Chu kỳ: <span className="font-bold text-foreground">{period}</span></p>
-              <p>Gross GMV: <span className="font-extrabold text-primary">{current.grossRevenue.toLocaleString("vi-VN")} ₫</span></p>
-              <p>Phí sàn 5%: <span className="font-bold text-emerald-600">{current.platformFee.toLocaleString("vi-VN")} ₫</span></p>
+              <p>Gross GMV: <span className="font-extrabold text-primary">{fmt(current.grossRevenue)}</span></p>
+              <p>Phí sàn 5%: <span className="font-bold text-emerald-600">{fmt(current.platformFee)}</span></p>
               <p>Trạng thái đối soát: <span className="font-bold text-emerald-600">{current.status}</span></p>
             </div>
 
