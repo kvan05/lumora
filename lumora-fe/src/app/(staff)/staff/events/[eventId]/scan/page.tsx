@@ -9,7 +9,7 @@ import { vi } from "date-fns/locale";
 import {
   ArrowLeft, Camera, CameraOff, ScanLine, Keyboard, CheckCircle2,
   XCircle, AlertTriangle, Clock, User, Ticket, MapPin, List,
-  ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, RefreshCw, X, Barcode
+  ChevronDown, ChevronUp, Loader2, Volume2, VolumeX, RefreshCw, X
 } from "lucide-react";
 
 /* ─────────────────────────── Types ─────────────────────────────────── */
@@ -182,7 +182,7 @@ export default function StaffScanPage() {
 
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 280, height: 120 }, aspectRatio: 1.0 },
+        { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 },
         (decodedText) => handleScan(decodedText),
         () => {}
       );
@@ -192,7 +192,7 @@ export default function StaffScanPage() {
     } catch (err: any) {
       setCameraError(
         err?.message?.includes("NotAllowed")
-          ? "Vui lòng cấp quyền truy cập camera để quét mã vạch"
+          ? "Vui lòng cấp quyền truy cập camera để quét mã QR"
           : "Không thể khởi động camera. Thử dùng nhập mã thủ công."
       );
     }
@@ -306,7 +306,7 @@ export default function StaffScanPage() {
                 : "text-zinc-400 hover:text-white"
             }`}
           >
-            <Barcode className="w-4 h-4" /> Quét mã vạch
+            <Camera className="w-4 h-4" /> Camera QR
           </button>
           <button
             onClick={() => setMode("manual")}
@@ -385,7 +385,7 @@ export default function StaffScanPage() {
             </div>
 
             <p className="text-center text-zinc-500 text-xs">
-              Hướng camera vào mã vạch trên vé để quét tự động
+              Hướng camera vào mã QR trên vé để quét tự động
             </p>
           </div>
         ) : (
@@ -393,9 +393,9 @@ export default function StaffScanPage() {
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 space-y-5">
               <div className="text-center">
-                <Barcode className="w-10 h-10 text-violet-400 mx-auto mb-2" />
+                <ScanLine className="w-10 h-10 text-violet-400 mx-auto mb-2" />
                 <p className="text-white font-semibold">Nhập mã vé thủ công</p>
-                <p className="text-zinc-500 text-xs mt-1">Dùng khi không quét được mã vạch</p>
+                <p className="text-zinc-500 text-xs mt-1">Dùng khi không quét được mã QR</p>
               </div>
               <form onSubmit={handleManualSubmit} className="space-y-3">
                 <input

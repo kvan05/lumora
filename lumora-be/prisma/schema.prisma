@@ -32,6 +32,7 @@ model User {
   Review           Review[]
   sessions         UserSession[]
   Withdrawal       Withdrawal[]
+  bankAccounts     SellerBankAccount[]
   staffMember      StaffMember?      @relation("StaffUser")
   managedStaff     StaffMember[]     @relation("SellerStaff")
 
@@ -488,6 +489,20 @@ model Withdrawal {
   seller        User      @relation(fields: [sellerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("withdrawals")
+}
+
+model SellerBankAccount {
+  id            String   @id @default(cuid())
+  sellerId      String
+  bankName      String
+  accountNumber String
+  accountHolder String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  seller        User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@map("seller_bank_accounts")
 }
 
 model EventApprovalLog {

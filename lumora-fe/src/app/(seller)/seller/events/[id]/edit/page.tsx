@@ -129,11 +129,7 @@ export default function SellerEditEventPage() {
     try {
       const res = await api.put(`/events/${eventId}`, values);
       if (res.data?.success) {
-        if (res.data.isEditRequest) {
-          toast.success(res.data.message || "Đã gửi yêu cầu chỉnh sửa sự kiện đến Admin để xét duyệt!");
-        } else {
-          toast.success(res.data.message || "Cập nhật thông tin sự kiện thành công!");
-        }
+        toast.success(res.data.message || "Cập nhật thông tin sự kiện thành công!");
         refetch();
         router.push(`/seller/events/${eventId}`);
       }
@@ -158,7 +154,6 @@ export default function SellerEditEventPage() {
   }
 
   const isPublished = event.status === "PUBLISHED";
-  const isPendingEdit = event.editRequestStatus === "PENDING_REVIEW";
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto py-4">
@@ -176,40 +171,14 @@ export default function SellerEditEventPage() {
         </div>
       </div>
 
-      {/* Edit Rule Alert Banner */}
-      {isPublished ? (
-        <Alert className="bg-amber-50 border-amber-200 text-amber-900 rounded-2xl dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200">
-          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          <AlertTitle className="font-bold">Quy định chỉnh sửa sự kiện đã mở bán</AlertTitle>
-          <AlertDescription className="text-xs leading-relaxed mt-1">
-            Sự kiện này đã mở bán vé công khai. Để bảo vệ quyền lợi người mua vé, các thay đổi thông tin sẽ được đóng gói thành <strong>Yêu cầu chỉnh sửa</strong> gửi tới Admin để xét duyệt trước khi áp dụng chính thức.
-            {isPendingEdit && (
-              <span className="block mt-2 font-bold text-amber-700 dark:text-amber-300">
-                ⏳ Bạn đang có 1 yêu cầu chỉnh sửa đang chờ Admin xét duyệt. Việc gửi biểu mẫu mới này sẽ cập nhật lại nội dung yêu cầu của bạn.
-              </span>
-            )}
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Alert className="bg-emerald-50 border-emerald-200 text-emerald-900 rounded-2xl dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200">
-          <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          <AlertTitle className="font-bold">Chỉnh sửa tự do</AlertTitle>
-          <AlertDescription className="text-xs leading-relaxed mt-1">
-            Sự kiện chưa được duyệt/mở bán. Bạn có thể tự do thay đổi toàn bộ thông tin và lưu cập nhật ngay lập tức.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Main Form */}
       <Card className="rounded-2xl border-border/60 shadow-sm">
         <CardHeader className="border-b border-border/40 pb-4">
           <CardTitle className="text-xl font-bold">
-            {isPublished ? "Tạo Yêu Cầu Chỉnh Sửa Thông Tin" : "Chỉnh Sửa Thông Tin Sự Kiện"}
+            Chỉnh Sửa Thông Tin Sự Kiện
           </CardTitle>
           <CardDescription>
-            {isPublished
-              ? "Điền thông tin mới muốn thay đổi. Sau khi nhấn gửi, yêu cầu sẽ được gửi tới Admin."
-              : "Cập nhật lại thông tin sự kiện của bạn."}
+            Cập nhật lại thông tin sự kiện của bạn.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">

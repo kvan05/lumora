@@ -75,7 +75,7 @@ export default function EventDetailPage() {
   // Real-time socket connection for inventory updates
   useEffect(() => {
     if (event?.hasSeatMap) {
-      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000", {
+      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5001", {
         withCredentials: true,
       });
 

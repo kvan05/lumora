@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Building2, FileText, CreditCard, CheckCircle2,
   ChevronRight, ChevronLeft, Upload, User, Globe, Share2,
-  MapPin, BadgeCheck, Banknote, AlertTriangle
+  MapPin, BadgeCheck, Banknote, AlertTriangle, Image as ImageIcon, X
 } from "lucide-react";
 
 const STEPS = [
@@ -29,6 +29,35 @@ const BANKS = [
   "BIDV", "Agribank", "VietinBank", "Sacombank", "TPBank",
   "VIB", "OCB", "HDBank", "SHB", "Nam A Bank"
 ];
+
+// Image compressor helper
+const compressImage = (file: File, maxWidth = 1000, quality = 0.8): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 export default function BecomeOrganizerPage() {
   const { data: session, status } = useSession();
@@ -59,6 +88,31 @@ export default function BecomeOrganizerPage() {
   // Step 4 — Terms
   const [agreeTerms, setAgreeTerms] = useState(false);
 
+  // Reusable file upload handler from device
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setter: (url: string) => void,
+    toastId: string,
+    labelName: string
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Dung lượng tệp vượt quá 15MB. Vui lòng chọn tệp nhỏ hơn.");
+      return;
+    }
+
+    try {
+      toast.loading(`Đang xử lý ảnh ${labelName}...`, { id: toastId });
+      const compressedDataUrl = await compressImage(file, 1000, 0.8);
+      setter(compressedDataUrl);
+      toast.success(`Đã tải ảnh ${labelName} từ thiết bị thành công!`, { id: toastId });
+    } catch {
+      toast.error(`Không thể xử lý tệp ảnh ${labelName}.`, { id: toastId });
+    }
+  };
+
   if (status === "loading") return null;
   if (!session) {
     return (
@@ -75,8 +129,8 @@ export default function BecomeOrganizerPage() {
       if (!address.trim()) { toast.error("Vui lòng nhập địa chỉ"); return false; }
     }
     if (step === 2) {
-      if (!docUrl.trim()) { toast.error("Vui lòng cung cấp URL giấy tờ xác minh"); return false; }
-      if (docType === "CCCD" && !selfieUrl.trim()) { toast.error("Vui lòng cung cấp URL ảnh selfie cầm CCCD"); return false; }
+      if (!docUrl.trim()) { toast.error("Vui lòng tải lên hoặc dán URL giấy tờ xác minh"); return false; }
+      if (docType === "CCCD" && !selfieUrl.trim()) { toast.error("Vui lòng tải lên hoặc dán URL ảnh selfie cầm CCCD"); return false; }
     }
     if (step === 3) {
       if (!bankName) { toast.error("Vui lòng chọn ngân hàng"); return false; }
@@ -168,6 +222,7 @@ export default function BecomeOrganizerPage() {
                     <label className="text-sm font-semibold">Tên tổ chức / Ban nhạc / Công ty <span className="text-destructive">*</span></label>
                     <Input placeholder="VD: Sun Group Entertainment" value={orgName} onChange={e => setOrgName(e.target.value)} />
                   </div>
+
                   <div className="md:col-span-2 space-y-1.5">
                     <label className="text-sm font-semibold">Người đại diện <span className="text-destructive">*</span></label>
                     <div className="relative">
@@ -175,20 +230,77 @@ export default function BecomeOrganizerPage() {
                       <Input className="pl-10" placeholder="Họ và tên người đại diện" value={representative} onChange={e => setRepresentative(e.target.value)} />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold">Logo (URL ảnh)</label>
-                    <div className="relative">
-                      <Upload className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input className="pl-10" placeholder="https://..." value={orgLogo} onChange={e => setOrgLogo(e.target.value)} />
-                    </div>
+
+                  {/* Logo Upload from Device */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Logo tổ chức</label>
+                    {orgLogo ? (
+                      <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-border/80 group">
+                        <img src={orgLogo} alt="Logo Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setOrgLogo("")}
+                          className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-border hover:border-primary/50 rounded-2xl cursor-pointer bg-muted/20 hover:bg-primary/5 transition-colors text-xs font-bold text-muted-foreground hover:text-primary">
+                          <Upload className="h-4 w-4" /> Tải logo từ thiết bị
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleFileUpload(e, setOrgLogo, "logo-upload", "Logo")}
+                          />
+                        </label>
+                        <Input
+                          placeholder="Hoặc dán URL ảnh (https://...)"
+                          className="text-xs rounded-xl"
+                          value={orgLogo}
+                          onChange={e => setOrgLogo(e.target.value)}
+                        />
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold">Banner (URL ảnh)</label>
-                    <div className="relative">
-                      <Upload className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input className="pl-10" placeholder="https://..." value={orgBanner} onChange={e => setOrgBanner(e.target.value)} />
-                    </div>
+
+                  {/* Banner Upload from Device */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Banner tổ chức</label>
+                    {orgBanner ? (
+                      <div className="relative w-full h-24 rounded-2xl overflow-hidden border border-border/80 group">
+                        <img src={orgBanner} alt="Banner Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setOrgBanner("")}
+                          className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-border hover:border-primary/50 rounded-2xl cursor-pointer bg-muted/20 hover:bg-primary/5 transition-colors text-xs font-bold text-muted-foreground hover:text-primary">
+                          <Upload className="h-4 w-4" /> Tải banner từ thiết bị
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleFileUpload(e, setOrgBanner, "banner-upload", "Banner")}
+                          />
+                        </label>
+                        <Input
+                          placeholder="Hoặc dán URL ảnh (https://...)"
+                          className="text-xs rounded-xl"
+                          value={orgBanner}
+                          onChange={e => setOrgBanner(e.target.value)}
+                        />
+                      </div>
+                    )}
                   </div>
+
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold">Website</label>
                     <div className="relative">
@@ -196,6 +308,7 @@ export default function BecomeOrganizerPage() {
                       <Input className="pl-10" placeholder="https://example.com" value={website} onChange={e => setWebsite(e.target.value)} />
                     </div>
                   </div>
+
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold">Fanpage Facebook</label>
                     <div className="relative">
@@ -203,6 +316,7 @@ export default function BecomeOrganizerPage() {
                       <Input className="pl-10" placeholder="https://facebook.com/..." value={facebook} onChange={e => setFacebook(e.target.value)} />
                     </div>
                   </div>
+
                   <div className="md:col-span-2 space-y-1.5">
                     <label className="text-sm font-semibold">Địa chỉ trụ sở <span className="text-destructive">*</span></label>
                     <div className="relative">
@@ -210,6 +324,7 @@ export default function BecomeOrganizerPage() {
                       <Input className="pl-10" placeholder="Số nhà, đường, quận, thành phố" value={address} onChange={e => setAddress(e.target.value)} />
                     </div>
                   </div>
+
                   <div className="md:col-span-2 space-y-1.5">
                     <label className="text-sm font-semibold">Mô tả tổ chức</label>
                     <Textarea placeholder="Giới thiệu ngắn về tổ chức, loại sự kiện hay tổ chức..." value={orgDescription} onChange={e => setOrgDescription(e.target.value)} className="resize-none min-h-[80px]" />
@@ -218,7 +333,7 @@ export default function BecomeOrganizerPage() {
               </div>
             )}
 
-            {/* STEP 2 — Documents */}
+            {/* STEP 2 — Documents Upload */}
             {step === 2 && (
               <div className="space-y-5">
                 <h2 className="text-xl font-extrabold flex items-center gap-2">
@@ -255,24 +370,79 @@ export default function BecomeOrganizerPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
+                  {/* Verification Document Image Upload from Device */}
+                  <div className="space-y-2">
                     <label className="text-sm font-semibold">
-                      {docType === "CCCD" ? "URL ảnh CCCD (cả 2 mặt)" : "URL ảnh Giấy phép kinh doanh"} <span className="text-destructive">*</span>
+                      {docType === "CCCD" ? "Ảnh CCCD (cả 2 mặt)" : "Ảnh Giấy phép kinh doanh"} <span className="text-destructive">*</span>
                     </label>
-                    <div className="relative">
-                      <Upload className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input className="pl-10" placeholder="https://drive.google.com/... hoặc imgur.com/..." value={docUrl} onChange={e => setDocUrl(e.target.value)} />
-                    </div>
-                    <p className="text-xs text-muted-foreground">Tải ảnh lên Google Drive / Imgur rồi dán link vào đây</p>
+
+                    {docUrl ? (
+                      <div className="relative w-full max-w-xs h-36 rounded-2xl overflow-hidden border border-border/80 group">
+                        <img src={docUrl} alt="Document Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setDocUrl("")}
+                          className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center justify-center gap-2 px-4 py-5 border-2 border-dashed border-border hover:border-primary/50 rounded-2xl cursor-pointer bg-muted/20 hover:bg-primary/5 transition-colors text-xs font-bold text-muted-foreground hover:text-primary">
+                          <Upload className="h-5 w-5 text-primary" /> Chọn tệp ảnh giấy tờ từ thiết bị
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleFileUpload(e, setDocUrl, "doc-upload", docType === "CCCD" ? "CCCD" : "GPKD")}
+                          />
+                        </label>
+                        <Input
+                          placeholder="Hoặc dán URL ảnh Google Drive / Imgur..."
+                          className="text-xs rounded-xl"
+                          value={docUrl}
+                          onChange={e => setDocUrl(e.target.value)}
+                        />
+                      </div>
+                    )}
                   </div>
 
+                  {/* Selfie Image Upload from Device */}
                   {docType === "CCCD" && (
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold">URL ảnh Selfie cầm CCCD <span className="text-destructive">*</span></label>
-                      <div className="relative">
-                        <Upload className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input className="pl-10" placeholder="https://..." value={selfieUrl} onChange={e => setSelfieUrl(e.target.value)} />
-                      </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Ảnh Selfie cầm CCCD <span className="text-destructive">*</span></label>
+
+                      {selfieUrl ? (
+                        <div className="relative w-full max-w-xs h-36 rounded-2xl overflow-hidden border border-border/80 group">
+                          <img src={selfieUrl} alt="Selfie Preview" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setSelfieUrl("")}
+                            className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          <label className="flex items-center justify-center gap-2 px-4 py-5 border-2 border-dashed border-border hover:border-primary/50 rounded-2xl cursor-pointer bg-muted/20 hover:bg-primary/5 transition-colors text-xs font-bold text-muted-foreground hover:text-primary">
+                            <Upload className="h-5 w-5 text-primary" /> Chọn tệp ảnh Selfie từ thiết bị
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleFileUpload(e, setSelfieUrl, "selfie-upload", "Selfie")}
+                            />
+                          </label>
+                          <Input
+                            placeholder="Hoặc dán URL ảnh Selfie..."
+                            className="text-xs rounded-xl"
+                            value={selfieUrl}
+                            onChange={e => setSelfieUrl(e.target.value)}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

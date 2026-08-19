@@ -275,7 +275,7 @@ export default function CreateEventPage() {
   };
 
   // Form Submission
-  const handleSubmitEvent = async () => {
+  const handleSubmitEvent = async (targetStatus: string = "PUBLISHED") => {
     if (!title.trim()) { toast.error("Vui lòng nhập Tên sự kiện"); return; }
     if (!description.trim()) { toast.error("Vui lòng nhập Mô tả sự kiện"); return; }
     if (!venue.trim()) { toast.error("Vui lòng nhập Tên địa điểm"); return; }
@@ -308,6 +308,7 @@ export default function CreateEventPage() {
         bannerUrl,
         imageUrls: allDetailUrls,
         hasSeatMap,
+        status: targetStatus,
       };
 
       const res = await api.post("/events", payload);
@@ -1017,17 +1018,27 @@ export default function CreateEventPage() {
                   </div>
                 )}
 
-                <div className="pt-6 flex justify-between border-t border-border/40">
+                <div className="pt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/40">
                   <Button variant="outline" onClick={() => setStep(3)} className="rounded-xl font-bold gap-2">
                     <ChevronLeft className="h-4 w-4" /> Quay lại
                   </Button>
-                  <Button
-                    onClick={handleSubmitEvent}
-                    disabled={isSubmitting}
-                    className="rounded-xl font-extrabold text-base gap-2 px-8 h-12 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
-                  >
-                    {isSubmitting ? "Đang xử lý tạo sự kiện..." : "🚀 Xuất Bản & Tạo Sự Kiện Mới"}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleSubmitEvent("DRAFT")}
+                      disabled={isSubmitting}
+                      className="rounded-xl font-bold h-12 px-6"
+                    >
+                      Lưu Bản Nháp
+                    </Button>
+                    <Button
+                      onClick={() => handleSubmitEvent("PUBLISHED")}
+                      disabled={isSubmitting}
+                      className="rounded-xl font-extrabold text-base gap-2 px-8 h-12 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
+                    >
+                      {isSubmitting ? "Đang xử lý tạo sự kiện..." : "🚀 Xuất Bản Sự Kiện Ngay"}
+                    </Button>
+                  </div>
                 </div>
 
               </CardContent>

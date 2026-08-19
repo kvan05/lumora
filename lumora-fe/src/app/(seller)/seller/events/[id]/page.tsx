@@ -112,14 +112,14 @@ export default function SellerEventDetailPage() {
     }
   }
 
-  async function onSubmitApproval() {
+  async function onTogglePublish(targetStatus: string) {
     setIsPublishing(true);
     try {
-      await api.post(`/seller/events/${eventId}/submit`);
-      toast.success("Đã gửi yêu cầu duyệt sự kiện tới Admin thành công!");
+      await api.patch(`/events/${eventId}/status`, { status: targetStatus });
+      toast.success(targetStatus === "PUBLISHED" ? "Đã xuất bản sự kiện!" : "Đã cập nhật trạng thái sự kiện thành công!");
       refetchEvent();
     } catch (error: any) {
-      toast.error(error.response?.data?.error?.message || "Lỗi khi gửi yêu cầu duyệt sự kiện");
+      toast.error(error.response?.data?.error?.message || "Lỗi khi đổi trạng thái sự kiện");
     } finally {
       setIsPublishing(false);
     }
@@ -144,12 +144,14 @@ export default function SellerEventDetailPage() {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-3xl font-extrabold tracking-tight text-foreground">{event.title}</h2>
-            {event.status === "PUBLISHED" || event.isPublished ? (
-              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Đang Công Khai</Badge>
-            ) : event.status === "PENDING_APPROVAL" ? (
-              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none">Đang Chờ Duyệt</Badge>
+            {event.status === "PUBLISHED" ? (
+              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-none font-bold">🚀 Đã Xuất Bản</Badge>
+            ) : event.status === "PAUSED" ? (
+              <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-none font-bold">⏸ Tạm Dừng</Badge>
+            ) : event.status === "HIDDEN" ? (
+              <Badge className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border-none font-bold">🔒 Bị Ẩn Bởi Admin</Badge>
             ) : (
-              <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 border-none">Bản Nháp</Badge>
+              <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-none font-bold">📝 Bản Nháp</Badge>
             )}
           </div>
           <p className="text-muted-foreground mt-1">
@@ -157,28 +159,36 @@ export default function SellerEventDetailPage() {
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          <Button variant="outline" className="rounded-xl shadow-sm border-[#93C453] text-[#4A7C59] dark:text-[#93C453] hover:bg-[#93C453]/10" onClick={() => router.push(`/seller/events/${eventId}/edit`)}>
+          <Button variant="outline" className="rounded-xl shadow-sm border-border text-foreground hover:bg-muted" onClick={() => router.push(`/seller/events/${eventId}/edit`)}>
             <Edit className="mr-2 h-4 w-4" />
             Sửa thông tin
           </Button>
 
-          {event.status === "PUBLISHED" || event.isPublished ? (
-            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-3 py-2 rounded-xl border-none">
-              ✓ Đã duyệt & Mở bán
-            </Badge>
-          ) : event.status === "PENDING_APPROVAL" || event.status === "PENDING" ? (
-            <Button disabled className="rounded-xl shadow-sm bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-bold cursor-not-allowed opacity-90">
-              <Clock className="mr-2 h-4 w-4 animate-spin" />
-              Đang chờ Admin duyệt
+          {event.status === "PUBLISHED" ? (
+            <Button
+              variant="outline"
+              className="rounded-xl shadow-sm border-amber-300 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-bold"
+              onClick={() => onTogglePublish("PAUSED")}
+              disabled={isPublishing}
+            >
+              ⏸ Tạm dừng mở bán
+            </Button>
+          ) : event.status === "PAUSED" ? (
+            <Button
+              className="rounded-xl shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold"
+              onClick={() => onTogglePublish("PUBLISHED")}
+              disabled={isPublishing}
+            >
+              🚀 Mở bán lại
             </Button>
           ) : (
             <Button
-              className="rounded-xl shadow-sm bg-[#93C453] hover:bg-[#82B342] text-slate-900 font-extrabold"
-              onClick={onSubmitApproval}
+              className="rounded-xl shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold"
+              onClick={() => onTogglePublish("PUBLISHED")}
               disabled={isPublishing}
             >
               <Send className="mr-2 h-4 w-4" />
-              Gửi yêu cầu duyệt
+              Xuất bản sự kiện
             </Button>
           )}
         </div>

@@ -192,19 +192,28 @@ export async function getEvents(req: Request, res: Response, next: NextFunction)
 export async function approveEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { status, approvalNote } = req.body; // PUBLISHED or REJECTED
+    const { status, approvalNote } = req.body;
 
+    const targetStatus = status || "PUBLISHED";
     const updated = await prisma.event.update({
       where: { id: id as string },
       data: {
-        status,
-        approvalNote,
-        approvedAt: status === "PUBLISHED" ? new Date() : undefined,
+        status: targetStatus,
+        approvalNote: approvalNote || undefined,
+        approvedAt: targetStatus === "PUBLISHED" ? new Date() : undefined,
         approvedById: req.user?.userId,
       },
     });
 
-    res.json({ success: true, message: `Đã cập nhật trạng thái sự kiện thành ${status === "PUBLISHED" ? "Đã duyệt" : "Từ chối"}`, data: updated });
+    const statusMap: Record<string, string> = {
+      PUBLISHED: "Hiển thị công khai",
+      HIDDEN: "Bị ẩn",
+      PAUSED: "Tạm dừng",
+      CANCELLED: "Đã hủy",
+      DRAFT: "Bản nháp",
+    };
+
+    res.json({ success: true, message: `Đã cập nhật trạng thái sự kiện thành: ${statusMap[targetStatus] || targetStatus}`, data: updated });
   } catch (err) {
     next(err);
   }
@@ -866,7 +875,7 @@ export async function getCheckinStats(req: Request, res: Response, next: NextFun
 export async function verifyCheckinTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { ticketCode } = req.body;
-    if (!ticketCode) throw createError("Mã vé (Barcode) là bắt buộc", 400);
+    if (!ticketCode) throw createError("Mã vé (QR Code) là bắt buộc", 400);
 
     const item = await prisma.orderItem.findFirst({
       where: {
@@ -1648,7 +1657,7 @@ export async function getTicketTimeline(req: Request, res: Response, next: NextF
       timestamp: item.createdAt.toISOString(),
       actor: "Lumora E-Ticket Service",
       status: "SUCCESS",
-      description: `Đã phát hành mã vạch Barcode CODE128 [${item.ticketCode || item.id}] sẵn sàng soát vé`,
+      description: `Đã phát hành mã QR [${item.ticketCode || item.id}] sẵn sàng soát vé`,
     });
 
     // Step 5: Check-in Activity

@@ -379,7 +379,7 @@ export async function createEvent(
         tags: tags ? JSON.stringify(tags) : null,
         metaTitle,
         metaDesc,
-        status: "DRAFT",
+        status: req.body.status && ["DRAFT", "PUBLISHED"].includes(req.body.status) ? req.body.status : "PUBLISHED",
       },
     });
 
@@ -423,44 +423,7 @@ export async function updateEvent(
       status,
     } = req.body;
 
-    // If event is already PUBLISHED and user is SELLER, save changes as Edit Request for Admin approval
-    if (event.status === "PUBLISHED" && userRole === "SELLER") {
-      const proposedPayload = {
-        title: title || event.title,
-        description: description || event.description,
-        bannerUrl: bannerUrl || event.bannerUrl,
-        imageUrls: imageUrls ? JSON.stringify(imageUrls) : event.imageUrls,
-        category: category || event.category,
-        venue: venue || event.venue,
-        address: address || event.address,
-        city: city || event.city,
-        latitude: latitude ?? event.latitude,
-        longitude: longitude ?? event.longitude,
-        startDate: startDate || event.startDate,
-        endDate: endDate || event.endDate,
-        tags: tags ? JSON.stringify(tags) : event.tags,
-        metaTitle: metaTitle || event.metaTitle,
-        metaDesc: metaDesc || event.metaDesc,
-      };
-
-      const updated = await prisma.event.update({
-        where: { id },
-        data: {
-          pendingChanges: JSON.stringify(proposedPayload),
-          editRequestStatus: "PENDING_REVIEW",
-        },
-      });
-
-      res.json({
-        success: true,
-        message: "Sự kiện đã mở bán. Đã gửi yêu cầu chỉnh sửa thông tin đến Admin để xét duyệt.",
-        data: updated,
-        isEditRequest: true,
-      });
-      return;
-    }
-
-    // Direct update for DRAFT, PENDING_APPROVAL, REJECTED, or if user is ADMIN
+    // Direct update for both SELLER and ADMIN
     const updated = await prisma.event.update({
       where: { id },
       data: {
@@ -479,7 +442,7 @@ export async function updateEvent(
         tags: tags ? JSON.stringify(tags) : undefined,
         metaTitle,
         metaDesc,
-        status: userRole === "ADMIN" && status ? status : (event.status === "REJECTED" ? "PENDING_APPROVAL" : event.status),
+        status: status && ["DRAFT", "PUBLISHED", "PAUSED", "CANCELLED", "COMPLETED", "HIDDEN"].includes(status) ? status : event.status,
       },
     });
 
@@ -506,7 +469,7 @@ export async function updateEventStatus(
     const userId = req.user!.userId;
     const userRole = req.user!.role;
 
-    const validStatuses = ["DRAFT", "PUBLISHED", "PAUSED", "CANCELLED", "COMPLETED"];
+    const validStatuses = ["DRAFT", "PUBLISHED", "PAUSED", "CANCELLED", "COMPLETED", "HIDDEN"];
     if (!validStatuses.includes(status)) {
       throw createError("Trạng thái không hợp lệ", 400, "INVALID_STATUS");
     }

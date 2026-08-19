@@ -17,6 +17,7 @@ sellerRoutes.patch("/orders/:orderId/checkin", SellerController.checkInOrder);
 sellerRoutes.patch("/orders/items/:itemId/checkin", SellerController.checkInItem);
 sellerRoutes.get("/checkin/stats", SellerController.getSellerCheckinStats);
 sellerRoutes.get("/checkin/tickets", SellerController.getSellerCheckinTickets);
+sellerRoutes.post("/checkin/verify", SellerController.verifySellerCheckinTicket);
 sellerRoutes.get("/analytics", SellerController.getAnalytics);
 sellerRoutes.get("/customers", SellerController.getCustomers);
 sellerRoutes.get("/reports/export", SellerController.exportReport);
@@ -25,6 +26,10 @@ sellerRoutes.get("/reports/export", SellerController.exportReport);
 sellerRoutes.get("/finance", SellerController.getFinanceOverview);
 sellerRoutes.get("/withdrawals", SellerController.getWithdrawals);
 sellerRoutes.post("/withdrawals", SellerController.requestWithdrawal);
+sellerRoutes.get("/bank-accounts", SellerController.getSellerBankAccounts);
+sellerRoutes.post("/bank-accounts", SellerController.createSellerBankAccount);
+sellerRoutes.put("/bank-accounts/:id", SellerController.updateSellerBankAccount);
+sellerRoutes.delete("/bank-accounts/:id", SellerController.deleteSellerBankAccount);
 
 // Event approval workflow
 sellerRoutes.post("/events/:eventId/submit", SellerController.submitEventForApproval);

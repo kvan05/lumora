@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { BarcodeImage, ETicketModal } from "@/components/ticket/EventTicket";
+import { QRCodeImage, ETicketModal } from "@/components/ticket/EventTicket";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -107,36 +107,114 @@ export async function getSellerOrders(
 ): Promise<void> {
   try {
     const sellerId = getSellerId(req);
-    const { page = "1", limit = "20", status, eventId } = req.query as Record<string, string>;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const {
+      page = "1",
+      limit = "20",
+      search,
+      status,
+      eventId,
+      period,
+      startDate,
+      endDate,
+      ticketTypeId,
+    } = req.query as Record<string, string>;
 
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.max(1, parseInt(limit) || 20);
+    const skip = (pageNum - 1) * limitNum;
+
+    // 1. Date filter construction
+    let dateFilter: any = {};
+    const now = new Date();
+    if (period === "today") {
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      dateFilter = { gte: startOfDay };
+    } else if (period === "7d") {
+      dateFilter = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    } else if (period === "30d") {
+      dateFilter = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (period === "custom") {
+      if (startDate) dateFilter.gte = new Date(startDate);
+      if (endDate) dateFilter.lte = new Date(endDate);
+    }
+
+    // Parse eventId array if passed (comma-separated)
+    const eventIdsArray = eventId ? eventId.split(",").map(e => e.trim()).filter(Boolean) : [];
+
+    // 2. Build Prisma order query filter
     const where: any = {
       event: { sellerId },
-      ...(status && { status }),
-      ...(eventId && { eventId }),
+      ...(status && status !== "ALL" && { status }),
+      ...(eventIdsArray.length > 0 && { eventId: { in: eventIdsArray } }),
+      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
+      ...(ticketTypeId && ticketTypeId !== "ALL" && { items: { some: { ticketTypeId } } }),
     };
 
-    const [orders, total] = await Promise.all([
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { id: { contains: q, mode: "insensitive" } },
+        { orderNumber: { contains: q, mode: "insensitive" } },
+        { buyer: { name: { contains: q, mode: "insensitive" } } },
+        { buyer: { email: { contains: q, mode: "insensitive" } } },
+        { buyer: { phone: { contains: q, mode: "insensitive" } } },
+        { event: { title: { contains: q, mode: "insensitive" } } },
+      ];
+    }
+
+    // 3. Fetch orders, count, and seller events for dropdown options
+    const [orders, total, sellerEvents] = await Promise.all([
       prisma.order.findMany({
         where,
         skip,
-        take: parseInt(limit),
+        take: limitNum,
         orderBy: { createdAt: "desc" },
         include: {
-          buyer: { select: { id: true, name: true, email: true } },
-          event: { select: { id: true, title: true } },
-          items: { include: { ticketType: { select: { name: true } }, seat: { select: { seatLabel: true } } } },
+          buyer: { select: { id: true, name: true, email: true, phone: true } },
+          event: { select: { id: true, title: true, bannerUrl: true, category: true, venue: true, city: true, startDate: true } },
+          items: {
+            include: {
+              ticketType: { select: { id: true, name: true, price: true } },
+              seat: { select: { id: true, seatLabel: true } },
+            },
+          },
           payment: { select: { status: true } },
         },
       }),
       prisma.order.count({ where }),
+      prisma.event.findMany({
+        where: { sellerId },
+        select: {
+          id: true,
+          title: true,
+          ticketTypes: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
     ]);
+
+    const sellerEventsList = sellerEvents.map(e => ({ id: e.id, title: e.title }));
+    const ticketTypesList: Array<{ id: string; name: string }> = [];
+    sellerEvents.forEach(e => {
+      e.ticketTypes.forEach(tt => {
+        ticketTypesList.push({ id: tt.id, name: `${tt.name} (${e.title})` });
+      });
+    });
 
     res.json({
       success: true,
       data: {
         orders,
-        pagination: { page: parseInt(page), limit: parseInt(limit), total, totalPages: Math.ceil(total / parseInt(limit)) },
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+        filterOptions: {
+          events: sellerEventsList,
+          ticketTypes: ticketTypesList,
+        },
       },
     });
   } catch (err) {
@@ -203,7 +281,7 @@ export async function checkInOrder(
   }
 }
 
-// ─── Check-in Single Item (by barcode/ticket code/id) ───────────────────
+// ─── Check-in Single Item (by QR code/ticket code/id) ───────────────────
 export async function checkInItem(
   req: Request,
   res: Response,
@@ -303,6 +381,16 @@ export async function checkInItem(
   } catch (err) {
     next(err);
   }
+}
+
+// ─── Verify Seller Checkin Ticket (POST /api/seller/checkin/verify) ─────
+export async function verifySellerCheckinTicket(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  req.params.itemId = req.body.ticketCode || req.body.code || req.body.itemId || "";
+  return checkInItem(req, res, next);
 }
 
 // ─── Get Seller Check-in Stats ──────────────────────────────────────────
@@ -431,6 +519,7 @@ export async function getSellerCheckinTickets(
 
 
 // ─── Analytics ─────────────────────────────────────────────────────────
+// ─── Analytics ─────────────────────────────────────────────────────────
 export async function getAnalytics(
   req: Request,
   res: Response,
@@ -438,50 +527,167 @@ export async function getAnalytics(
 ): Promise<void> {
   try {
     const sellerId = getSellerId(req);
-    const { eventId, period = "30d" } = req.query as Record<string, string>;
+    const { period = "30d", startDate, endDate, eventId, ticketTypeId } = req.query as Record<string, string>;
 
-    const days = period === "7d" ? 7 : period === "90d" ? 90 : 30;
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
-    const where: any = {
-      event: { sellerId },
-      status: "CONFIRMED",
-      confirmedAt: { gte: since },
-      ...(eventId && { eventId }),
-    };
-
-    // Daily revenue aggregation
-    const orders = await prisma.order.findMany({
-      where,
-      select: { total: true, confirmedAt: true, eventId: true },
-      orderBy: { confirmedAt: "asc" },
-    });
-
-    // Group by day
-    const revenueByDay: Record<string, number> = {};
-    for (const order of orders) {
-      if (!order.confirmedAt) continue;
-      const day = order.confirmedAt.toISOString().split("T")[0];
-      revenueByDay[day] = (revenueByDay[day] || 0) + Number(order.total);
+    // 1. Build date range filter
+    let dateFilter: any = {};
+    if (period === "7d") {
+      dateFilter = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    } else if (period === "30d") {
+      dateFilter = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (period === "90d") {
+      dateFilter = { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) };
+    } else if (period === "custom") {
+      if (startDate) dateFilter.gte = new Date(startDate);
+      if (endDate) dateFilter.lte = new Date(endDate);
     }
 
-    // Top events by revenue
-    const topEvents = await prisma.order.groupBy({
-      by: ["eventId"],
-      where: { event: { sellerId }, status: "CONFIRMED" },
-      _sum: { total: true },
-      _count: { id: true },
-      orderBy: { _sum: { total: "desc" } },
-      take: 5,
+    // Parse eventId array if passed (comma-separated)
+    const eventIdsArray = eventId ? eventId.split(",").map(e => e.trim()).filter(Boolean) : [];
+
+    // 2. Fetch seller's events and ticket types list for filter options
+    const sellerEvents = await prisma.event.findMany({
+      where: { sellerId },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        startDate: true,
+        ticketTypes: { select: { id: true, name: true, quantity: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const sellerEventsList = sellerEvents.map(e => ({ id: e.id, title: e.title }));
+    const ticketTypesList: Array<{ id: string; name: string }> = [];
+    sellerEvents.forEach(e => {
+      e.ticketTypes.forEach(tt => {
+        ticketTypesList.push({ id: tt.id, name: `${tt.name} - ${e.title}` });
+      });
+    });
+
+    // 3. Build Order query filter
+    const orderWhere: any = {
+      event: { sellerId },
+      status: { in: ["CONFIRMED", "CHECKED_IN"] },
+      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
+      ...(eventIdsArray.length > 0 && { eventId: { in: eventIdsArray } }),
+      ...(ticketTypeId && { items: { some: { ticketTypeId } } }),
+    };
+
+    // 4. Fetch matching orders with items
+    const orders = await prisma.order.findMany({
+      where: orderWhere,
+      include: {
+        event: { select: { id: true, title: true } },
+        items: {
+          include: {
+            ticketType: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // 5. Aggregate overall summary stats
+    let totalRevenue = 0;
+    let totalTicketsSold = 0;
+    let totalCheckedIn = 0;
+
+    const revenueByDayMap: Record<string, { revenue: number; ticketsCount: number; ordersCount: number }> = {};
+    const revenueByEventMap: Record<string, { eventId: string; eventTitle: string; revenue: number; ticketsCount: number; checkedInCount: number }> = {};
+
+    for (const order of orders) {
+      const orderTotal = Number(order.total || 0);
+      totalRevenue += orderTotal;
+
+      const dayKey = order.createdAt.toISOString().split("T")[0];
+      if (!revenueByDayMap[dayKey]) {
+        revenueByDayMap[dayKey] = { revenue: 0, ticketsCount: 0, ordersCount: 0 };
+      }
+      revenueByDayMap[dayKey].revenue += orderTotal;
+      revenueByDayMap[dayKey].ordersCount += 1;
+
+      const evtId = order.eventId;
+      const evtTitle = order.event?.title || "Sự kiện";
+      if (!revenueByEventMap[evtId]) {
+        revenueByEventMap[evtId] = { eventId: evtId, eventTitle: evtTitle, revenue: 0, ticketsCount: 0, checkedInCount: 0 };
+      }
+      revenueByEventMap[evtId].revenue += orderTotal;
+
+      for (const item of order.items) {
+        // Skip item if filtering by specific ticketTypeId and it doesn't match
+        if (ticketTypeId && item.ticketTypeId !== ticketTypeId) continue;
+
+        const qty = item.quantity || 1;
+        totalTicketsSold += qty;
+        revenueByDayMap[dayKey].ticketsCount += qty;
+        revenueByEventMap[evtId].ticketsCount += qty;
+
+        if (item.isCheckedIn) {
+          totalCheckedIn += qty;
+          revenueByEventMap[evtId].checkedInCount += qty;
+        }
+      }
+    }
+
+    const checkInRate = totalTicketsSold > 0 ? Number(((totalCheckedIn / totalTicketsSold) * 100).toFixed(1)) : 0;
+
+    // Format revenueByDay
+    const revenueByDay = Object.entries(revenueByDayMap).map(([date, val]) => ({
+      date,
+      revenue: val.revenue,
+      ticketsCount: val.ticketsCount,
+      ordersCount: val.ordersCount,
+    }));
+
+    // Format revenueByEvent
+    const revenueByEvent = Object.values(revenueByEventMap).map(item => ({
+      eventId: item.eventId,
+      eventTitle: item.eventTitle,
+      revenue: item.revenue,
+      ticketsCount: item.ticketsCount,
+      checkedInCount: item.checkedInCount,
+    }));
+
+    // 6. Build event-by-event performance table (eventStats)
+    const targetEvents = eventIdsArray.length > 0 
+      ? sellerEvents.filter(e => eventIdsArray.includes(e.id))
+      : sellerEvents;
+
+    const eventStats = targetEvents.map(e => {
+      const stats = revenueByEventMap[e.id] || { revenue: 0, ticketsCount: 0, checkedInCount: 0 };
+      const totalCapacity = e.ticketTypes.reduce((acc, tt) => acc + (tt.quantity || 0), 0);
+      const remainingTickets = Math.max(0, totalCapacity - stats.ticketsCount);
+
+      return {
+        eventId: e.id,
+        eventTitle: e.title,
+        category: e.category,
+        startDate: e.startDate,
+        ticketsSold: stats.ticketsCount,
+        revenue: stats.revenue,
+        checkedInCount: stats.checkedInCount,
+        totalCapacity,
+        remainingTickets,
+      };
     });
 
     res.json({
       success: true,
       data: {
-        revenueByDay: Object.entries(revenueByDay).map(([date, revenue]) => ({ date, revenue })),
-        topEvents,
-        totalRevenue: orders.reduce((sum, o) => sum + Number(o.total), 0),
-        totalOrders: orders.length,
+        summary: {
+          totalRevenue,
+          totalOrders: orders.length,
+          totalTicketsSold,
+          totalCheckedIn,
+          checkInRate,
+        },
+        revenueByDay,
+        revenueByEvent,
+        eventStats,
+        sellerEventsList,
+        ticketTypesList,
       },
     });
   } catch (err) {
@@ -789,41 +995,65 @@ export async function getSellerProfile(
 }
 
 // ─── Finance Overview ────────────────────────────────────────────────────
+// ─── Finance Overview ────────────────────────────────────────────────────
 export async function getFinanceOverview(
   req: Request, res: Response, next: NextFunction
 ): Promise<void> {
   try {
     const sellerId = getSellerId(req);
+    const { status, period } = req.query as Record<string, string>;
 
-    const [totalRevenue, settlements, pendingWithdrawals, completedWithdrawals] = await Promise.all([
+    // 1. Date filter construction
+    let dateFilter: any = {};
+    if (period === "7d") {
+      dateFilter = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    } else if (period === "30d") {
+      dateFilter = { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (period === "90d") {
+      dateFilter = { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) };
+    }
+
+    const [totalRevenue, allSettlements, pendingWithdrawals, completedWithdrawals] = await Promise.all([
       prisma.order.aggregate({
-        where: { event: { sellerId }, status: "CONFIRMED" },
+        where: { event: { sellerId }, status: { in: ["CONFIRMED", "CHECKED_IN"] } },
         _sum: { total: true },
       }),
       prisma.settlement.findMany({
-        where: { sellerId },
-        include: { event: { select: { title: true, endDate: true } } },
+        where: {
+          sellerId,
+          ...(status && status !== "ALL" && { status }),
+          ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
+        },
+        include: { event: { select: { id: true, title: true, startDate: true, endDate: true } } },
         orderBy: { createdAt: "desc" },
-        take: 20,
       }),
       prisma.withdrawal.aggregate({
         where: { sellerId, status: { in: ["PENDING", "PROCESSING"] } },
         _sum: { amount: true },
       }),
       prisma.withdrawal.aggregate({
-        where: { sellerId, status: "COMPLETED" },
+        where: { sellerId, status: { in: ["APPROVED", "COMPLETED"] } },
         _sum: { amount: true },
       }),
     ]);
 
     const gross = Number(totalRevenue._sum.total || 0);
-    const totalCommission = settlements.reduce((sum, s) => sum + Number(s.commissionFee), 0);
-    const totalSettled = settlements
-      .filter(s => s.status === "COMPLETED")
-      .reduce((sum, s) => sum + Number(s.netAmount), 0);
-    const pendingSettlement = settlements
-      .filter(s => s.status === "PENDING" || s.status === "PROCESSING")
-      .reduce((sum, s) => sum + Number(s.netAmount), 0);
+    const totalCommission = allSettlements.reduce((sum, s) => sum + Number(s.commissionFee || 0), 0);
+    const totalSettled = allSettlements
+      .filter(s => ["SETTLED", "COMPLETED", "PAID_OUT"].includes(s.status.toUpperCase()))
+      .reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
+    const pendingSettlement = allSettlements
+      .filter(s => ["PENDING", "PROCESSING"].includes(s.status.toUpperCase()))
+      .reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
+
+    const pendingWithdrawalAmount = Number(pendingWithdrawals._sum.amount || 0);
+    const completedWithdrawalAmount = Number(completedWithdrawals._sum.amount || 0);
+
+    // Calculate Available Balance:
+    // If settlements exist, available = totalSettled - completed - pending
+    // If no settlement created yet, estimate effectiveSettled = gross * 0.93
+    const effectiveSettled = totalSettled > 0 ? totalSettled : Math.round(gross * 0.93);
+    const availableBalance = Math.max(0, effectiveSettled - completedWithdrawalAmount - pendingWithdrawalAmount);
 
     res.json({
       success: true,
@@ -832,11 +1062,110 @@ export async function getFinanceOverview(
         totalCommission,
         totalSettled,
         pendingSettlement,
-        pendingWithdrawals: Number(pendingWithdrawals._sum.amount || 0),
-        completedWithdrawals: Number(completedWithdrawals._sum.amount || 0),
-        settlements,
+        availableBalance,
+        pendingWithdrawals: pendingWithdrawalAmount,
+        completedWithdrawals: completedWithdrawalAmount,
+        settlements: allSettlements,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Bank Accounts CRUD ──────────────────────────────────────────────────
+export async function getSellerBankAccounts(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const accounts = await prisma.sellerBankAccount.findMany({
+      where: { sellerId },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data: accounts });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createSellerBankAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const { bankName, accountNumber, accountHolder, isDefault } = req.body;
+
+    if (!bankName || !accountNumber || !accountHolder) {
+      throw createError("Vui lòng điền đầy đủ Tên ngân hàng, Số tài khoản và Tên chủ tài khoản", 400);
+    }
+
+    if (isDefault) {
+      await prisma.sellerBankAccount.updateMany({
+        where: { sellerId },
+        data: { isDefault: false },
+      });
+    }
+
+    const newAccount = await prisma.sellerBankAccount.create({
+      data: {
+        sellerId,
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        accountHolder: accountHolder.trim().toUpperCase(),
+        isDefault: Boolean(isDefault),
+      },
+    });
+
+    res.status(201).json({ success: true, message: "Đã thêm tài khoản ngân hàng thành công", data: newAccount });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateSellerBankAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const { id } = req.params;
+    const { bankName, accountNumber, accountHolder, isDefault } = req.body;
+
+    const existing = await prisma.sellerBankAccount.findFirst({
+      where: { id: id as string, sellerId },
+    });
+    if (!existing) throw createError("Tài khoản ngân hàng không tồn tại", 404);
+
+    if (isDefault) {
+      await prisma.sellerBankAccount.updateMany({
+        where: { sellerId },
+        data: { isDefault: false },
+      });
+    }
+
+    const updated = await prisma.sellerBankAccount.update({
+      where: { id: id as string },
+      data: {
+        ...(bankName && { bankName: bankName.trim() }),
+        ...(accountNumber && { accountNumber: accountNumber.trim() }),
+        ...(accountHolder && { accountHolder: accountHolder.trim().toUpperCase() }),
+        ...(isDefault !== undefined && { isDefault: Boolean(isDefault) }),
+      },
+    });
+
+    res.json({ success: true, message: "Đã cập nhật tài khoản ngân hàng", data: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteSellerBankAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const sellerId = getSellerId(req);
+    const { id } = req.params;
+
+    const existing = await prisma.sellerBankAccount.findFirst({
+      where: { id: id as string, sellerId },
+    });
+    if (!existing) throw createError("Tài khoản ngân hàng không tồn tại", 404);
+
+    await prisma.sellerBankAccount.delete({ where: { id: id as string } });
+
+    res.json({ success: true, message: "Đã xóa tài khoản ngân hàng thành công" });
   } catch (err) {
     next(err);
   }
@@ -848,8 +1177,13 @@ export async function getWithdrawals(
 ): Promise<void> {
   try {
     const sellerId = getSellerId(req);
+    const { status } = req.query as Record<string, string>;
+
     const withdrawals = await prisma.withdrawal.findMany({
-      where: { sellerId },
+      where: {
+        sellerId,
+        ...(status && status !== "ALL" && { status }),
+      },
       orderBy: { createdAt: "desc" },
     });
     res.json({ success: true, data: withdrawals });
@@ -864,13 +1198,47 @@ export async function requestWithdrawal(
 ): Promise<void> {
   try {
     const sellerId = getSellerId(req);
-    const { amount, bankName, accountNumber, accountHolder } = req.body;
+    const { amount, bankName, accountNumber, accountHolder, note } = req.body;
 
-    if (!amount || !bankName || !accountNumber || !accountHolder) {
-      throw createError("Vui lòng điền đầy đủ thông tin rút tiền", 400);
+    const requestedAmount = Number(amount || 0);
+
+    if (!requestedAmount || !bankName || !accountNumber || !accountHolder) {
+      throw createError("Vui lòng điền đầy đủ thông tin rút tiền và chọn tài khoản ngân hàng", 400);
     }
-    if (Number(amount) < 100000) {
+    if (requestedAmount < 100000) {
       throw createError("Số tiền rút tối thiểu là 100,000 ₫", 400);
+    }
+
+    // Check available balance
+    const [totalRevenue, allSettlements, pendingWithdrawals, completedWithdrawals] = await Promise.all([
+      prisma.order.aggregate({
+        where: { event: { sellerId }, status: { in: ["CONFIRMED", "CHECKED_IN"] } },
+        _sum: { total: true },
+      }),
+      prisma.settlement.findMany({ where: { sellerId } }),
+      prisma.withdrawal.aggregate({
+        where: { sellerId, status: { in: ["PENDING", "PROCESSING"] } },
+        _sum: { amount: true },
+      }),
+      prisma.withdrawal.aggregate({
+        where: { sellerId, status: { in: ["APPROVED", "COMPLETED"] } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const gross = Number(totalRevenue._sum.total || 0);
+    const totalSettled = allSettlements
+      .filter(s => ["SETTLED", "COMPLETED", "PAID_OUT"].includes(s.status.toUpperCase()))
+      .reduce((sum, s) => sum + Number(s.netAmount || 0), 0);
+
+    const pendingWithdrawalAmount = Number(pendingWithdrawals._sum.amount || 0);
+    const completedWithdrawalAmount = Number(completedWithdrawals._sum.amount || 0);
+
+    const effectiveSettled = totalSettled > 0 ? totalSettled : Math.round(gross * 0.93);
+    const availableBalance = Math.max(0, effectiveSettled - completedWithdrawalAmount - pendingWithdrawalAmount);
+
+    if (requestedAmount > availableBalance) {
+      throw createError(`Số tiền rút (${requestedAmount.toLocaleString("vi-VN")} ₫) vượt quá số dư khả dụng (${availableBalance.toLocaleString("vi-VN")} ₫)`, 400);
     }
 
     // Check pending withdrawal
@@ -884,19 +1252,19 @@ export async function requestWithdrawal(
     const withdrawal = await prisma.withdrawal.create({
       data: {
         sellerId,
-        amount,
-        bankName,
-        accountNumber,
-        accountHolder,
+        amount: requestedAmount,
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        accountHolder: accountHolder.trim().toUpperCase(),
+        adminNote: note ? note.trim() : undefined,
         status: "PENDING",
       },
     });
 
-    // Send notifications to Seller and Admins
     createNotification(
       sellerId,
       "Yêu cầu rút tiền đã được gửi",
-      `Yêu cầu rút ${Number(amount).toLocaleString("vi-VN")} ₫ của bạn đã được tiếp nhận và chờ xử lý.`,
+      `Yêu cầu rút ${requestedAmount.toLocaleString("vi-VN")} ₫ của bạn đã được tiếp nhận và chờ xử lý.`,
       "WITHDRAWAL_REQUESTED",
       { withdrawalId: withdrawal.id }
     ).catch(console.error);
@@ -904,15 +1272,15 @@ export async function requestWithdrawal(
     createRoleNotification(
       "ADMIN",
       "Yêu cầu rút tiền mới",
-      `Nhà tổ chức vừa gửi yêu cầu rút ${Number(amount).toLocaleString("vi-VN")} ₫.`,
+      `Nhà tổ chức vừa gửi yêu cầu rút ${requestedAmount.toLocaleString("vi-VN")} ₫.`,
       "ADMIN_WITHDRAWAL_REQUESTED",
       { withdrawalId: withdrawal.id }
     ).catch(console.error);
 
     res.status(201).json({
       success: true,
+      message: "Yêu cầu rút tiền đã được gửi thành công!",
       data: withdrawal,
-      message: "Yêu cầu rút tiền đã được gửi. Admin sẽ xử lý trong 1-3 ngày làm việc.",
     });
   } catch (err) {
     next(err);
@@ -934,13 +1302,13 @@ export async function submitEventForApproval(
 
     const updated = await prisma.event.update({
       where: { id: eventId },
-      data: { status: "PENDING_APPROVAL" },
+      data: { status: "PUBLISHED" },
     });
 
     res.json({
       success: true,
       data: updated,
-      message: "Đã gửi sự kiện để Admin xét duyệt.",
+      message: "Đã xuất bản sự kiện thành công.",
     });
   } catch (err) {
     next(err);

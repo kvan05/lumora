@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { BarcodeImage, ETicketModal } from "@/components/ticket/EventTicket";
+import { QRCodeImage, ETicketModal } from "@/components/ticket/EventTicket";
 
 export default function AdminCheckinPage() {
   const queryClient = useQueryClient();
@@ -50,7 +50,7 @@ export default function AdminCheckinPage() {
 
   const tickets = Array.isArray(ticketsData) ? ticketsData : [];
 
-  // 3. Verify Barcode Mutation
+  // 3. Verify QR Code Mutation
   const verifyMutation = useMutation({
     mutationFn: async (code: string) => {
       const res = await api.post("/admin/checkin/verify", { ticketCode: code });
@@ -62,7 +62,7 @@ export default function AdminCheckinPage() {
           description: `Chủ vé: ${data.data.holder} · ${data.data.event}`,
         });
       } else {
-        toast.success("Check-in mã vạch thành công!", {
+        toast.success("Check-in mã QR thành công!", {
           description: `Khán giả: ${data.data.holder} · Loại vé: ${data.data.type}`,
         });
       }
@@ -71,8 +71,8 @@ export default function AdminCheckinPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-checkin-stats"] });
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || err.message || "Mã vạch không hợp lệ hoặc không tồn tại!";
-      toast.error("Lỗi kiểm tra mã vạch", { description: msg });
+      const msg = err.response?.data?.message || err.message || "Mã QR không hợp lệ hoặc không tồn tại!";
+      toast.error("Lỗi kiểm tra mã QR", { description: msg });
       setScanResult(null);
     },
   });
@@ -99,7 +99,7 @@ export default function AdminCheckinPage() {
   const handleScanSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!scanInput.trim()) {
-      toast.error("Vui lòng nhập hoặc quét mã vạch Barcode!");
+      toast.error("Vui lòng nhập hoặc quét mã QR!");
       return;
     }
     verifyMutation.mutate(scanInput.trim());
@@ -144,10 +144,10 @@ export default function AdminCheckinPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <Barcode className="h-7 w-7 text-primary" /> E-ticket & Check-in (Mã Vạch Barcode)
+            <Scan className="h-7 w-7 text-primary" /> E-ticket & Check-in (Mã QR)
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Hệ thống kiểm soát vé mã vạch thời gian thực và ép duyệt Check-in quản trị viên có lưu nhật ký Audit Log.
+            Hệ thống kiểm soát vé mã QR thời gian thực và ép duyệt Check-in quản trị viên có lưu nhật ký Audit Log.
           </p>
         </div>
         <Button
@@ -193,18 +193,18 @@ export default function AdminCheckinPage() {
       <Card className="rounded-3xl border-primary/20 bg-gradient-to-r from-primary/5 via-card to-card shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-extrabold flex items-center gap-2 text-foreground">
-            <Scan className="h-5 w-5 text-primary" /> Máy Quét Mã Vạch Barcode Kiểm Soát Vào Cửa
+            <Scan className="h-5 w-5 text-primary" /> Quét Mã QR Kiểm Soát Vào Cửa
           </CardTitle>
           <CardDescription>
-            Quét mã vạch Barcode CODE128 trên phôi vé điện tử bằng đầu đọc mã vạch hoặc nhập mã vé trực tiếp.
+            Quét mã QR trên phôi vé điện tử bằng camera hoặc nhập mã vé trực tiếp.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleScanSubmit} className="flex gap-2">
             <div className="relative flex-1">
-              <Barcode className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Scan className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Quét hoặc nhập mã vạch Barcode CODE128..."
+                placeholder="Quét hoặc nhập mã vé QR Code..."
                 className="pl-11 h-12 rounded-2xl font-mono text-base tracking-wider bg-background border-border/80 uppercase shadow-xs focus-visible:ring-2 focus-visible:ring-primary"
                 value={scanInput}
                 onChange={(e) => setScanInput(e.target.value)}
@@ -227,7 +227,7 @@ export default function AdminCheckinPage() {
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-black text-xl text-primary">Mã vạch: #{scanResult.id}</span>
+                    <span className="font-mono font-black text-xl text-primary">Mã QR: #{scanResult.id}</span>
                     <Badge className="bg-emerald-500 text-white font-bold rounded-lg px-2.5 py-0.5">
                       Vé Hợp Lệ
                     </Badge>
@@ -240,7 +240,7 @@ export default function AdminCheckinPage() {
                 </div>
 
                 <div className="bg-white p-3 rounded-2xl border border-border/80 shadow-xs flex flex-col items-center shrink-0">
-                  <BarcodeImage text={scanResult.id} height={45} width={1.6} fontSize={11} />
+                  <QRCodeImage text={scanResult.id} size={100} />
                 </div>
               </div>
 
@@ -255,7 +255,7 @@ export default function AdminCheckinPage() {
                   className="rounded-xl h-8 font-bold gap-1.5"
                   onClick={() => handleOpenModal(scanResult)}
                 >
-                  <Eye className="h-3.5 w-3.5" /> Xem Phôi Vé Barcode
+                  <Eye className="h-3.5 w-3.5" /> Xem Phôi Vé QR
                 </Button>
               </div>
             </div>

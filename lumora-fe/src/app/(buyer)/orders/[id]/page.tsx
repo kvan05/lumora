@@ -8,7 +8,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import api from "@/lib/api";
-import { EventTicket } from "@/components/ticket/EventTicket";
+import { EventTicket, downloadTicketImage } from "@/components/ticket/EventTicket";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -42,8 +42,25 @@ export default function OrderDetailPage() {
   const [refundReason, setRefundReason] = useState("");
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
 
-  // Wait for session to be ready before fetching
-  const sessionReady = sessionStatus === "authenticated";
+  // Ready when NextAuth session is authenticated OR when a local token exists (custom login flow)
+  const hasLocalToken =
+    typeof window !== "undefined" &&
+    !!localStorage.getItem("lumora_token");
+  const sessionReady =
+    sessionStatus === "authenticated" || hasLocalToken;
+
+  // Inject local token into api interceptor if NextAuth hasn't synced yet
+  useEffect(() => {
+    const localToken =
+      typeof window !== "undefined"
+        ? localStorage.getItem("lumora_token")
+        : null;
+    if (localToken) {
+      import("@/lib/api").then(({ setMemoryAccessToken }) => {
+        setMemoryAccessToken(localToken);
+      });
+    }
+  }, []);
 
   const {
     data: order,
@@ -183,6 +200,31 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleSaveAllTickets = async () => {
+    if (!order?.items || order.items.length === 0) return;
+    toast.info("Đang tạo ảnh vé điện tử có mã QR...");
+    for (const item of order.items) {
+      const ticketTypeName = item.ticketType?.name || (item.seat ? "Vé Có Số Ghế" : "Vé Tiêu Chuẩn");
+      const seatLabel = item.seat
+        ? `Hàng ${item.seat.row?.rowLabel} — Ghế ${item.seat.seatLabel}${item.seat.row?.section?.name ? ` (${item.seat.row.section.name})` : ""}`
+        : undefined;
+
+      await downloadTicketImage({
+        ticketCode: item.ticketCode || `PENDING-${item.id}`,
+        eventTitle: order.event.title,
+        bannerUrl: order.event.bannerUrl,
+        category: order.event.category || "Sự kiện",
+        ticketType: ticketTypeName,
+        startDate: order.event.startDate,
+        venue: order.event.venue,
+        city: order.event.city,
+        seatInfo: seatLabel,
+        holderName: order.buyer?.name,
+      });
+    }
+    toast.success("Đã tải vé điện tử có mã QR về máy thành công!");
+  };
+
   return (
     <div className="container mx-auto px-4 py-10 max-w-4xl space-y-8">
       {/* ── Top nav ── */}
@@ -210,11 +252,17 @@ export default function OrderDetailPage() {
               </Button>
             )}
             <Button
+              onClick={handleSaveAllTickets}
+              className="rounded-full gap-2 font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-sm"
+            >
+              <Download className="h-4 w-4" /> Lưu vé điện tử (Có QR) về máy
+            </Button>
+            <Button
               variant="outline"
               onClick={() => window.print()}
               className="rounded-full gap-2 font-bold"
             >
-              <Download className="h-4 w-4" /> Tải / In vé (PDF)
+              <Download className="h-4 w-4" /> In vé (PDF)
             </Button>
           </div>
         )}

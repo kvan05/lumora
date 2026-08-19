@@ -1,276 +1,296 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { toast } from "sonner";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import {
+  QrCode, Search, CheckCircle2, XCircle, AlertCircle, RefreshCw,
+  Camera, Volume2, VolumeX, Sparkles, UserCheck, ShieldCheck,
+  Ticket, Users, ScanLine, Eye, AlertTriangle, Clock
+} from "lucide-react";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Barcode, Search, CheckCircle2, XCircle, AlertCircle, RefreshCw,
-  Camera, CameraOff, Volume2, VolumeX, Sparkles, Ticket, ScanLine, Eye,
-  UserCheck, Users, Clock, Filter, ShieldCheck, AlertTriangle, ChevronRight
-} from "lucide-react";
-import { BarcodeImage, ETicketModal } from "@/components/ticket/EventTicket";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { QRCodeImage, ETicketModal } from "@/components/ticket/EventTicket";
 
 export default function SellerCheckinPage() {
-  const queryClient = useQueryClient();
-  const [ticketCode, setTicketCode] = useState("");
   const [selectedEventId, setSelectedEventId] = useState<string>("");
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [checkinResult, setCheckinResult] = useState<any>(null);
-  const [recentCheckins, setRecentCheckins] = useState<any[]>([]);
+  const [ticketCode, setTicketCode] = useState<string>("");
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+  const [scannerReady, setScannerReady] = useState<boolean>(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
 
-  // Attendee Search & Status Filters
-  const [attendeeSearch, setAttendeeSearch] = useState("");
+  // Recent scans log
+  const [recentCheckins, setRecentCheckins] = useState<
+    Array<{
+      ticketCode: string;
+      status: "SUCCESS" | "ALREADY_CHECKED_IN" | "FAILED";
+      message: string;
+      time: string;
+      data?: any;
+    }>
+  >([]);
+
+  // Last checkin result display banner
+  const [checkinResult, setCheckinResult] = useState<{
+    status: "SUCCESS" | "ALREADY_CHECKED_IN" | "FAILED";
+    message: string;
+    ticketCode: string;
+    data?: any;
+  } | null>(null);
+
+  // E-Ticket preview modal state
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  // Gate Lookup Search & Filter state
+  const [attendeeSearch, setAttendeeSearch] = useState<string>("");
   const [attendeeStatus, setAttendeeStatus] = useState<"ALL" | "CHECKED_IN" | "NOT_CHECKED_IN">("ALL");
 
-  // Camera scanner states
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [scannerReady, setScannerReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const scannerRef = useRef<any>(null);
-  const lastScannedCode = useRef<string | null>(null);
-  const lastScannedTime = useRef<number>(0);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
-  // Sound effect on checkin
-  const playBeep = (type: "success" | "warning" | "error") => {
+  // Fetch Seller Events for Event Selector
+  const { data: sellerEvents } = useQuery({
+    queryKey: ["seller-events-checkin"],
+    queryFn: async () => {
+      const res = await api.get("/seller/events");
+      return res.data.data.events;
+    },
+  });
+
+  // Fetch Overall Check-in Stats
+  const { data: checkinStats, refetch: refetchStats } = useQuery({
+    queryKey: ["seller-checkin-stats", selectedEventId],
+    queryFn: async () => {
+      const url = selectedEventId
+        ? `/seller/checkin/stats?eventId=${selectedEventId}`
+        : `/seller/checkin/stats`;
+      const res = await api.get(url);
+      return res.data.data;
+    },
+  });
+
+  // Fetch Attendee Ticket List for Gate Lookup
+  const { data: ticketsData, isLoading: isTicketsLoading, refetch: refetchTickets } = useQuery({
+    queryKey: ["seller-attendee-tickets", selectedEventId, attendeeStatus],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedEventId) params.append("eventId", selectedEventId);
+      if (attendeeStatus !== "ALL") {
+        params.append("isCheckedIn", attendeeStatus === "CHECKED_IN" ? "true" : "false");
+      }
+
+      const res = await api.get(`/seller/checkin/tickets?${params.toString()}`);
+      return res.data.data;
+    },
+  });
+
+  const stats = checkinStats || {
+    totalTickets: 0,
+    checkedInCount: 0,
+    uncheckedCount: 0,
+    checkinRate: 0,
+  };
+
+  // Sound effects feedback
+  const playAudioFeedback = (type: "SUCCESS" | "FAILED") => {
     if (isMuted) return;
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+
       osc.connect(gain);
       gain.connect(ctx.destination);
 
-      if (type === "success") {
-        osc.frequency.value = 880;
-        osc.type = "sine";
-        gain.gain.setValueAtTime(0.4, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+      if (type === "SUCCESS") {
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.3);
-      } else if (type === "warning") {
-        osc.frequency.value = 520;
-        osc.type = "triangle";
-        gain.gain.setValueAtTime(0.4, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.4);
       } else {
-        osc.frequency.value = 240;
-        osc.type = "square";
-        gain.gain.setValueAtTime(0.5, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(220, ctx.currentTime); // A3
+        osc.frequency.setValueAtTime(146.83, ctx.currentTime + 0.15); // D3
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.4);
       }
     } catch {
-      // AudioContext restriction ignored
+      // AudioContext not allowed without user interaction
     }
   };
 
-  // 1. Fetch Seller Events for Event Selector
-  const { data: eventsData } = useQuery({
-    queryKey: ["seller-events-checkin-filter"],
-    queryFn: async () => {
-      const res = await api.get("/seller/events");
-      return res.data.data;
-    },
-  });
-
-  const sellerEvents = eventsData?.events || eventsData || [];
-
-  // 2. Fetch Checkin Real-Time Statistics
-  const { data: statsData, refetch: refetchStats } = useQuery({
-    queryKey: ["seller-checkin-stats", selectedEventId],
-    queryFn: async () => {
-      const res = await api.get("/seller/checkin/stats", {
-        params: { eventId: selectedEventId || undefined },
-      });
-      return res.data.data;
-    },
-  });
-
-  const stats = statsData || { totalTickets: 0, checkedInCount: 0, uncheckedCount: 0, checkinRate: 0 };
-
-  // 3. Fetch Attendee Tickets List
-  const { data: ticketsData, isLoading: isTicketsLoading, refetch: refetchTickets } = useQuery({
-    queryKey: ["seller-checkin-tickets", selectedEventId, attendeeSearch, attendeeStatus],
-    queryFn: async () => {
-      const res = await api.get("/seller/checkin/tickets", {
-        params: {
-          eventId: selectedEventId || undefined,
-          search: attendeeSearch || undefined,
-          isCheckedIn: attendeeStatus === "ALL" ? undefined : attendeeStatus === "CHECKED_IN" ? "true" : "false",
-        },
-      });
-      return res.data.data;
-    },
-  });
-
-  const attendeeTickets = Array.isArray(ticketsData) ? ticketsData : [];
-
-  // Perform Check-in API Call
-  const performCheckin = useCallback(async (code: string) => {
-    const cleanCode = code.trim();
+  // Core Check-in Action
+  const performCheckin = async (codeToSubmit: string) => {
+    const cleanCode = codeToSubmit.trim();
     if (!cleanCode) return;
 
     try {
-      const res = await api.patch(`/seller/orders/items/${encodeURIComponent(cleanCode)}/checkin`);
-      const data = res.data;
-      const timeStr = new Date().toLocaleTimeString("vi-VN");
-
-      if (data.alreadyCheckedIn) {
-        playBeep("warning");
-        toast.warning("Vé này ĐÃ ĐƯỢC CHECK-IN trước đó!", {
-          description: `${data.data?.buyerName || "Khách"} · ${data.data?.eventTitle || ""}`,
-        });
-
-        setCheckinResult({
-          status: "ALREADY_CHECKED_IN",
-          message: data.message || "Vé đã được Check-in trước đó!",
-          ticketCode: cleanCode,
-          time: timeStr,
-          data: data.data,
-        });
-
-        setRecentCheckins((prev) => [
-          { ticketCode: cleanCode, time: timeStr, status: "ALREADY_CHECKED_IN", data: data.data },
-          ...prev.slice(0, 14),
-        ]);
-      } else {
-        playBeep("success");
-        toast.success("Check-in vé hợp lệ!", {
-          description: `Khán giả: ${data.data?.buyerName || "Khách"} · Loại vé: ${data.data?.ticketType || ""}`,
-        });
-
-        setCheckinResult({
-          status: "SUCCESS",
-          message: "Check-in thành công!",
-          ticketCode: cleanCode,
-          time: timeStr,
-          data: data.data,
-        });
-
-        setRecentCheckins((prev) => [
-          { ticketCode: cleanCode, time: timeStr, status: "SUCCESS", data: data.data },
-          ...prev.slice(0, 14),
-        ]);
-        setTicketCode("");
-      }
-
-      // Refresh Stats and Ticket list
-      queryClient.invalidateQueries({ queryKey: ["seller-checkin-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["seller-checkin-tickets"] });
-    } catch (err: any) {
-      playBeep("error");
-      const msg = err?.response?.data?.error?.message || err?.response?.data?.message || "Mã vé không hợp lệ hoặc không tìm thấy";
-      toast.error(msg);
-      const timeStr = new Date().toLocaleTimeString("vi-VN");
-      setCheckinResult({
-        status: "FAILED",
-        message: msg,
+      const res = await api.post("/seller/checkin/verify", {
         ticketCode: cleanCode,
-        time: timeStr,
+      });
+
+      const responseData = res.data;
+      if (responseData.success) {
+        const isAlready = responseData.alreadyCheckedIn;
+        const msg = responseData.message || (isAlready ? "Vé này đã check-in trước đó!" : "Quét vé thành công! Cho phép khán giả vào cổng.");
+        const ticketInfo = responseData.data;
+
+        const checkinStatus = isAlready ? "ALREADY_CHECKED_IN" : "SUCCESS";
+
+        setCheckinResult({
+          status: checkinStatus,
+          message: msg,
+          ticketCode: cleanCode,
+          data: ticketInfo,
+        });
+
+        setRecentCheckins((prev) => [
+          {
+            ticketCode: cleanCode,
+            status: checkinStatus,
+            message: msg,
+            time: format(new Date(), "HH:mm:ss"),
+            data: ticketInfo,
+          },
+          ...prev,
+        ]);
+
+        playAudioFeedback(isAlready ? "FAILED" : "SUCCESS");
+        if (isAlready) {
+          toast.warning(msg);
+        } else {
+          toast.success(msg);
+        }
+        refetchStats();
+        refetchTickets();
+      }
+    } catch (err: any) {
+      const errorResponse = err.response?.data;
+      const status = errorResponse?.error?.code === "ALREADY_CHECKED_IN" ? "ALREADY_CHECKED_IN" : "FAILED";
+      const errorMsg = errorResponse?.error?.message || errorResponse?.message || err.message || "Vé không hợp lệ";
+      const ticketInfo = errorResponse?.data;
+
+      setCheckinResult({
+        status,
+        message: errorMsg,
+        ticketCode: cleanCode,
+        data: ticketInfo,
       });
 
       setRecentCheckins((prev) => [
-        { ticketCode: cleanCode, time: timeStr, status: "FAILED" },
-        ...prev.slice(0, 14),
+        {
+          ticketCode: cleanCode,
+          status,
+          message: errorMsg,
+          time: format(new Date(), "HH:mm:ss"),
+          data: ticketInfo,
+        },
+        ...prev,
       ]);
-    }
-  }, [isMuted, queryClient]);
 
-  // Manual Submit
+      playAudioFeedback("FAILED");
+      toast.error(errorMsg);
+    } finally {
+      setTicketCode("");
+    }
+  };
+
   const handleManualCheckin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticketCode.trim()) {
-      toast.error("Vui lòng nhập mã vé Barcode");
+      toast.error("Vui lòng nhập mã vé QR");
       return;
     }
     performCheckin(ticketCode);
   };
 
-  // Barcode Camera Scanner using @zxing/browser
+  // QR Code Camera Scanner using @zxing/browser
   useEffect(() => {
-    let active = true;
-
-    if (isCameraActive) {
-      setCameraError(null);
-      setScannerReady(false);
-
-      import("@zxing/browser").then(({ BrowserMultiFormatReader }) => {
-        if (!active || !videoRef.current) return;
-
-        const codeReader = new BrowserMultiFormatReader();
-        scannerRef.current = codeReader;
-
-        codeReader.decodeFromVideoDevice(
-          undefined,
-          videoRef.current,
-          (result) => {
-            if (result) {
-              const text = result.getText();
-              const now = Date.now();
-              if (lastScannedCode.current === text && now - lastScannedTime.current < 3000) {
-                return;
-              }
-              lastScannedCode.current = text;
-              lastScannedTime.current = now;
-              performCheckin(text);
-            }
-          }
-        ).then(() => {
-          if (active) setScannerReady(true);
-        }).catch((err: any) => {
-          if (!active) return;
-          console.error("Camera scanner error:", err);
-          setCameraError("Không thể mở Camera. Vui lòng cấp quyền truy cập Camera trên trình duyệt.");
-          setIsCameraActive(false);
-        });
-      });
-    }
-
-    return () => {
-      active = false;
-      if (scannerRef.current) {
-        try {
-          scannerRef.current.reset();
-        } catch {}
-        scannerRef.current = null;
+    if (!isCameraActive) {
+      if (codeReaderRef.current) {
+        codeReaderRef.current = null;
       }
       setScannerReady(false);
+      return;
+    }
+
+    let isSubscribed = true;
+    const codeReader = new BrowserMultiFormatReader();
+    codeReaderRef.current = codeReader;
+
+    setCameraError(null);
+    setScannerReady(false);
+
+    codeReader
+      .decodeFromVideoDevice(undefined, videoRef.current!, (result, err) => {
+        if (!isSubscribed) return;
+        if (result) {
+          const text = result.getText();
+          if (text) {
+            performCheckin(text);
+          }
+        }
+      })
+      .then(() => {
+        if (isSubscribed) setScannerReady(true);
+      })
+      .catch((err) => {
+        if (isSubscribed) {
+          console.error("Camera scanner error:", err);
+          setCameraError("Không thể mở Camera. Vui lòng cấp quyền truy cập Camera trình duyệt.");
+          setIsCameraActive(false);
+        }
+      });
+
+    return () => {
+      isSubscribed = false;
     };
-  }, [isCameraActive, performCheckin]);
+  }, [isCameraActive]);
 
   const handleOpenTicketModal = (item: any) => {
     setSelectedTicket({
       ticketCode: item.ticketCode || item.id,
-      eventTitle: item.eventTitle || "Sự kiện Lumora",
+      eventTitle: item.eventTitle,
       bannerUrl: item.bannerUrl,
       category: item.category || "Sự kiện",
-      ticketType: item.ticketType || "Vé Khách Hàng",
-      startDate: item.startDate ? new Date(item.startDate) : new Date(),
-      venue: item.venue || "Địa điểm Soát vé",
+      ticketType: item.ticketType || "Vé Tiêu Chuẩn",
+      startDate: item.startDate || new Date().toISOString(),
+      venue: item.venue || "Địa điểm sự kiện",
       city: item.city || "Việt Nam",
-      seatInfo: item.seatLabel ? `Ghế ${item.seatLabel}` : null,
-      status: "CONFIRMED",
+      status: item.isCheckedIn ? "CONFIRMED" : "PENDING",
       isCheckedIn: item.isCheckedIn,
       holderName: item.buyerName,
     });
     setIsModalOpen(true);
   };
+
+  const attendeeTickets = (ticketsData || []).filter((t: any) => {
+    if (!attendeeSearch) return true;
+    const q = attendeeSearch.toLowerCase();
+    return (
+      (t.buyerName && t.buyerName.toLowerCase().includes(q)) ||
+      (t.buyerEmail && t.buyerEmail.toLowerCase().includes(q)) ||
+      (t.buyerPhone && t.buyerPhone.toLowerCase().includes(q)) ||
+      (t.ticketCode && t.ticketCode.toLowerCase().includes(q)) ||
+      (t.orderNumber && t.orderNumber.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto p-4 md:p-8 animate-in fade-in duration-300">
@@ -279,14 +299,14 @@ export default function SellerCheckinPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Badge className="bg-[#93C453]/10 text-[#4A7C59] border-[#93C453]/20 font-bold uppercase text-[10px] tracking-wider">
-              CỔNG SOÁT VÉ BARCODE REALTIME
+              CỔNG SOÁT VÉ QR CODE REALTIME
             </Badge>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
-            <Barcode className="h-8 w-8 text-[#93C453]" /> Soát Vé & Check-in Sự Kiện
+            <QrCode className="h-8 w-8 text-[#93C453]" /> Soát Vé & Check-in Sự Kiện
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Quét mã vạch Barcode bằng Camera hoặc kiểm soát khán giả tại cổng bằng danh sách tra cứu 1-Click.
+            Quét mã QR bằng Camera hoặc kiểm soát khán giả tại cổng bằng danh sách tra cứu 1-Click.
           </p>
         </div>
 
@@ -321,77 +341,75 @@ export default function SellerCheckinPage() {
           </Button>
 
           <Button
+            size="sm"
             onClick={() => setIsCameraActive(!isCameraActive)}
-            className={`rounded-2xl h-10 gap-2 font-bold text-xs shadow-sm transition-all ${
+            className={`rounded-2xl h-10 gap-2 text-xs font-bold transition-all ${
               isCameraActive
-                ? "bg-red-600 hover:bg-red-700 text-white"
-                : "bg-[#93C453] hover:bg-[#82b342] text-white"
+                ? "bg-red-500 hover:bg-red-600 text-white"
+                : "bg-[#93C453] hover:bg-[#82b342] text-white shadow-md"
             }`}
           >
-            {isCameraActive ? (
-              <><CameraOff className="h-4 w-4" /> Tắt Camera Scanner</>
-            ) : (
-              <><Camera className="h-4 w-4" /> Bật Camera Scanner</>
-            )}
+            <Camera className="h-4 w-4" />
+            {isCameraActive ? "Tắt Camera Scanner" : "Bật Camera Scanner"}
           </Button>
         </div>
       </div>
 
-      {/* Real-time Stats Cards */}
+      {/* Realtime Checkin Statistics (4 Summary Cards) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="rounded-3xl border border-border/60 bg-card shadow-xs">
+        <Card className="rounded-3xl border border-border/60 shadow-xs bg-card overflow-hidden">
           <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">Tổng Vé Đã Xuất</p>
-              <h3 className="text-2xl font-black mt-1 text-foreground">{stats.totalTickets}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">vé thành công</p>
+            <div className="space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">Tổng vé đã xuất</p>
+              <p className="text-3xl font-black text-foreground">{stats.totalTickets}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">vé thành công</p>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 font-bold">
-              <Ticket className="h-5 w-5" />
+            <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+              <Ticket className="h-6 w-6" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 shadow-xs">
+        <Card className="rounded-3xl border border-border/60 shadow-xs bg-emerald-500/5 dark:bg-emerald-950/20 overflow-hidden border-emerald-500/20">
           <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Đã Check-in</p>
-              <h3 className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400">{stats.checkedInCount}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">lượt vào cổng</p>
+            <div className="space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Đã check-in</p>
+              <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{stats.checkedInCount}</p>
+              <p className="text-[11px] text-emerald-600/80 font-medium">lượt vào cổng</p>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="h-5 w-5" />
+            <div className="p-3 bg-emerald-500/20 text-emerald-600 rounded-2xl">
+              <ShieldCheck className="h-6 w-6" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 shadow-xs">
+        <Card className="rounded-3xl border border-border/60 shadow-xs bg-card overflow-hidden">
           <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Chưa Check-in</p>
-              <h3 className="text-2xl font-black mt-1 text-blue-600 dark:text-blue-400">{stats.uncheckedCount}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">khán giả chưa đến</p>
+            <div className="space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400">Chưa check-in</p>
+              <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{stats.uncheckedCount}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">khán giả chưa đến</p>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
-              <Clock className="h-5 w-5" />
+            <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
+              <Clock className="h-6 w-6" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-[#93C453]/30 bg-[#93C453]/5 shadow-xs">
+        <Card className="rounded-3xl border border-border/60 shadow-xs bg-card overflow-hidden">
           <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-extrabold text-[#4A7C59] dark:text-[#93C453] uppercase tracking-wider">Tỷ Lệ Tiến Độ</p>
-              <h3 className="text-2xl font-black mt-1 text-[#4A7C59] dark:text-[#93C453]">{stats.checkinRate}%</h3>
-              <div className="w-24 h-2 bg-muted rounded-full overflow-hidden mt-1.5">
+            <div className="space-y-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">Tỷ lệ tiến độ</p>
+              <p className="text-3xl font-black text-foreground">{stats.checkinRate}%</p>
+              <div className="w-28 h-2 bg-muted rounded-full overflow-hidden mt-1">
                 <div
-                  className="h-full bg-[#93C453] transition-all duration-500"
+                  className="h-full bg-[#93C453] rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(100, stats.checkinRate)}%` }}
                 />
               </div>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-[#93C453]/20 text-[#4A7C59] flex items-center justify-center shrink-0">
-              <ScanLine className="h-5 w-5" />
+            <div className="p-3 bg-amber-500/10 text-amber-600 rounded-2xl">
+              <ScanLine className="h-6 w-6" />
             </div>
           </CardContent>
         </Card>
@@ -401,7 +419,7 @@ export default function SellerCheckinPage() {
       <Tabs defaultValue="scanner" className="w-full">
         <TabsList className="w-full sm:w-auto grid grid-cols-2 rounded-2xl bg-muted/60 p-1 mb-6">
           <TabsTrigger value="scanner" className="rounded-xl text-xs font-bold px-5">
-            <Barcode className="h-4 w-4 mr-2 text-[#93C453]" /> Quét Mã Vạch Barcode
+            <QrCode className="h-4 w-4 mr-2 text-[#93C453]" /> Quét Mã QR
           </TabsTrigger>
           <TabsTrigger value="attendees" className="rounded-xl text-xs font-bold px-5">
             <Users className="h-4 w-4 mr-2 text-blue-500" /> Tra Cứu Khán Giả Tại Cổng ({stats.totalTickets})
@@ -421,7 +439,7 @@ export default function SellerCheckinPage() {
                   <CardHeader className="pb-2 border-b border-border/40 bg-[#93C453]/10">
                     <CardTitle className="text-sm font-extrabold flex items-center justify-between text-[#4A7C59]">
                       <span className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 animate-pulse" /> Barcode Camera Scanner Live
+                        <Sparkles className="h-4 w-4 animate-pulse" /> QR Code Camera Scanner Live
                       </span>
                       <Badge className={`text-white text-[10px] uppercase font-bold ${scannerReady ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}>
                         {scannerReady ? "Đang quét mã..." : "Đang khởi tạo camera..."}
@@ -450,7 +468,7 @@ export default function SellerCheckinPage() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-3 text-center flex items-center gap-1">
                       <ScanLine className="h-3.5 w-3.5" />
-                      Đưa mã vạch Barcode trên phôi vé điện tử vào khung hình để tự động nhận diện
+                      Đưa mã QR trên vé điện tử vào khung hình để tự động nhận diện
                     </p>
                   </CardContent>
                 </Card>
@@ -467,15 +485,15 @@ export default function SellerCheckinPage() {
               <Card className="rounded-3xl border border-border/70 shadow-md">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-extrabold flex items-center gap-2">
-                    <Search className="h-4 w-4 text-[#93C453]" /> Nhập mã vé Barcode thủ công
+                    <Search className="h-4 w-4 text-[#93C453]" /> Nhập mã vé QR thủ công
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <form onSubmit={handleManualCheckin} className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mã vé (Barcode CODE128 / Ticket Code)</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mã vé (QR Code / Ticket Code)</label>
                       <div className="relative">
-                        <Barcode className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <QrCode className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <Input
                           placeholder="Nhập mã vé, ví dụ: TCK-88X9A21 hoặc dán mã tại đây..."
                           value={ticketCode}
@@ -490,7 +508,7 @@ export default function SellerCheckinPage() {
                       disabled={!ticketCode.trim()}
                       className="w-full h-12 rounded-2xl font-bold text-sm gap-2 bg-[#93C453] hover:bg-[#82b342] text-white shadow-sm"
                     >
-                      <Barcode className="h-5 w-5" /> Xác Nhận Soát Vé Ngay
+                      <QrCode className="h-5 w-5" /> Xác Nhận Soát Vé Ngay
                     </Button>
                   </form>
 
@@ -521,7 +539,7 @@ export default function SellerCheckinPage() {
 
                           <div className="space-y-1">
                             <p className="font-black text-lg">{checkinResult.message}</p>
-                            <p className="text-xs font-mono font-bold">Mã vạch: {checkinResult.ticketCode}</p>
+                            <p className="text-xs font-mono font-bold">Mã QR: {checkinResult.ticketCode}</p>
 
                             {checkinResult.data && (
                               <div className="text-xs pt-1 space-y-0.5 opacity-90">
@@ -535,14 +553,14 @@ export default function SellerCheckinPage() {
 
                         {checkinResult.data && (
                           <div className="bg-white p-3 rounded-2xl border border-border/70 shadow-xs flex flex-col items-center shrink-0 self-start sm:self-auto">
-                            <BarcodeImage text={checkinResult.ticketCode} height={40} width={1.4} fontSize={10} />
+                            <QRCodeImage text={checkinResult.ticketCode} size={90} />
                             <Button
                               size="sm"
                               variant="ghost"
                               className="mt-1 h-7 text-[10px] font-bold text-[#93C453] hover:bg-[#93C453]/10 px-2 rounded-xl"
                               onClick={() => handleOpenTicketModal(checkinResult.data)}
                             >
-                              <Eye className="h-3 w-3 mr-1" /> Xem Phôi Vé Full
+                              <Eye className="h-3 w-3 mr-1" /> Xem Vé QR Full
                             </Button>
                           </div>
                         )}
@@ -569,7 +587,7 @@ export default function SellerCheckinPage() {
                 <CardContent className="p-4">
                   {recentCheckins.length === 0 ? (
                     <div className="py-16 text-center text-muted-foreground text-xs space-y-2">
-                      <Barcode className="h-10 w-10 mx-auto opacity-30" />
+                      <QrCode className="h-10 w-10 mx-auto opacity-30" />
                       <p>Chưa có lượt quét nào trong phiên làm việc này</p>
                     </div>
                   ) : (
@@ -582,7 +600,7 @@ export default function SellerCheckinPage() {
                         >
                           <div className="space-y-0.5">
                             <p className="font-mono font-bold uppercase text-foreground flex items-center gap-1 text-xs">
-                              <Barcode className="h-3.5 w-3.5 text-muted-foreground" /> {item.ticketCode}
+                              <QrCode className="h-3.5 w-3.5 text-muted-foreground" /> {item.ticketCode}
                             </p>
                             {item.data?.buyerName && (
                               <p className="text-[11px] text-muted-foreground truncate max-w-[150px]">
@@ -623,7 +641,7 @@ export default function SellerCheckinPage() {
                     <Users className="h-5 w-5 text-blue-500" /> Tra Cứu Khán Giả & Check-in Tại Cổng
                   </CardTitle>
                   <CardDescription className="text-xs mt-1">
-                    Tìm kiếm khán giả theo tên, email, số điện thoại hoặc mã vé để hỗ trợ soát vé 1-Click khi không mang mã vạch.
+                    Tìm kiếm khán giả theo tên, email, số điện thoại hoặc mã vé để hỗ trợ soát vé 1-Click khi không mang mã QR.
                   </CardDescription>
                 </div>
 
@@ -685,7 +703,7 @@ export default function SellerCheckinPage() {
                 <Table className="text-xs">
                   <TableHeader>
                     <TableRow className="border-b border-border/80 bg-muted/40 font-black uppercase text-muted-foreground">
-                      <TableHead className="p-4 pl-6">Mã Vé Barcode</TableHead>
+                      <TableHead className="p-4 pl-6">Mã Vé QR</TableHead>
                       <TableHead className="p-4">Khán Giả (Buyer)</TableHead>
                       <TableHead className="p-4">Sự Kiện & Loại Vé</TableHead>
                       <TableHead className="p-4">Vị Trí Ghế</TableHead>
@@ -757,7 +775,7 @@ export default function SellerCheckinPage() {
                               onClick={() => handleOpenTicketModal(t)}
                               className="rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground h-8"
                             >
-                              <Eye className="h-3.5 w-3.5 mr-1" /> Phôi vé
+                              <Eye className="h-3.5 w-3.5 mr-1" /> Chi tiết vé
                             </Button>
 
                             {!t.isCheckedIn && (
