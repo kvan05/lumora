@@ -10,14 +10,16 @@ const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
  * Generate access token
  */
 export function generateAccessToken(payload: JwtPayload, expiresIn = JWT_EXPIRES_IN): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn } as jwt.SignOptions);
+  const tokenPayload = { ...payload, nonce: Math.random().toString(36).substring(2) + Date.now().toString(36) };
+  return jwt.sign(tokenPayload, JWT_SECRET, { expiresIn } as jwt.SignOptions);
 }
 
 /**
  * Generate long-lived refresh token (7 days)
  */
 export function generateRefreshToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions);
+  const tokenPayload = { ...payload, nonce: Math.random().toString(36).substring(2) + Date.now().toString(36) };
+  return jwt.sign(tokenPayload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions);
 }
 
 /**

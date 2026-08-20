@@ -9,7 +9,7 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import {
   QrCode, Search, CheckCircle2, XCircle, AlertCircle, RefreshCw,
   Camera, Volume2, VolumeX, Sparkles, UserCheck, ShieldCheck,
-  Ticket, Users, ScanLine, Eye, AlertTriangle, Clock
+  Ticket, Users, ScanLine, Eye, AlertTriangle, Clock, ArrowUpRight
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,7 @@ export default function SellerCheckinPage() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // Gate Lookup Search & Filter state
+  const [activeTab, setActiveTab] = useState<string>("scanner");
   const [attendeeSearch, setAttendeeSearch] = useState<string>("");
   const [attendeeStatus, setAttendeeStatus] = useState<"ALL" | "CHECKED_IN" | "NOT_CHECKED_IN">("ALL");
 
@@ -355,14 +356,24 @@ export default function SellerCheckinPage() {
         </div>
       </div>
 
-      {/* Realtime Checkin Statistics (4 Summary Cards) */}
+      {/* Realtime Checkin Statistics (4 Clickable Summary Cards) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="rounded-3xl border border-border/60 shadow-xs bg-card overflow-hidden">
+        {/* Card 1: Total Issued Tickets */}
+        <Card
+          onClick={() => { setActiveTab("attendees"); setAttendeeStatus("ALL"); }}
+          className={`rounded-3xl cursor-pointer transition-all duration-200 shadow-xs overflow-hidden border ${
+            activeTab === "attendees" && attendeeStatus === "ALL"
+              ? "border-2 border-[#93C453] bg-[#93C453]/15 ring-2 ring-[#93C453]/30 shadow-md scale-[1.02]"
+              : "border-border/60 bg-card hover:border-[#93C453]/50 hover:bg-[#93C453]/5"
+          }`}
+        >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">Tổng vé đã xuất</p>
               <p className="text-3xl font-black text-foreground">{stats.totalTickets}</p>
-              <p className="text-[11px] text-muted-foreground font-medium">vé thành công</p>
+              <p className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
+                <span>Xem tất cả vé bán</span> <ArrowUpRight className="h-3.5 w-3.5" />
+              </p>
             </div>
             <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
               <Ticket className="h-6 w-6" />
@@ -370,12 +381,22 @@ export default function SellerCheckinPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-border/60 shadow-xs bg-emerald-500/5 dark:bg-emerald-950/20 overflow-hidden border-emerald-500/20">
+        {/* Card 2: Checked-in */}
+        <Card
+          onClick={() => { setActiveTab("attendees"); setAttendeeStatus("CHECKED_IN"); }}
+          className={`rounded-3xl cursor-pointer transition-all duration-200 shadow-xs overflow-hidden border ${
+            activeTab === "attendees" && attendeeStatus === "CHECKED_IN"
+              ? "border-2 border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500/30 shadow-md scale-[1.02]"
+              : "border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 hover:border-emerald-500 hover:bg-emerald-500/10"
+          }`}
+        >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Đã check-in</p>
               <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400">{stats.checkedInCount}</p>
-              <p className="text-[11px] text-emerald-600/80 font-medium">lượt vào cổng</p>
+              <p className="text-[11px] text-emerald-600/80 font-semibold flex items-center gap-1">
+                <span>Khán giả đã vào</span> <ArrowUpRight className="h-3.5 w-3.5" />
+              </p>
             </div>
             <div className="p-3 bg-emerald-500/20 text-emerald-600 rounded-2xl">
               <ShieldCheck className="h-6 w-6" />
@@ -383,12 +404,22 @@ export default function SellerCheckinPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-border/60 shadow-xs bg-card overflow-hidden">
+        {/* Card 3: Unchecked */}
+        <Card
+          onClick={() => { setActiveTab("attendees"); setAttendeeStatus("NOT_CHECKED_IN"); }}
+          className={`rounded-3xl cursor-pointer transition-all duration-200 shadow-xs overflow-hidden border ${
+            activeTab === "attendees" && attendeeStatus === "NOT_CHECKED_IN"
+              ? "border-2 border-blue-500 bg-blue-500/15 ring-2 ring-blue-500/30 shadow-md scale-[1.02]"
+              : "border-border/60 bg-card hover:border-blue-500/50 hover:bg-blue-500/5"
+          }`}
+        >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400">Chưa check-in</p>
               <p className="text-3xl font-black text-blue-600 dark:text-blue-400">{stats.uncheckedCount}</p>
-              <p className="text-[11px] text-muted-foreground font-medium">khán giả chưa đến</p>
+              <p className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
+                <span>Khán giả chưa đến</span> <ArrowUpRight className="h-3.5 w-3.5" />
+              </p>
             </div>
             <div className="p-3 bg-blue-500/10 text-blue-600 rounded-2xl">
               <Clock className="h-6 w-6" />
@@ -396,7 +427,15 @@ export default function SellerCheckinPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-3xl border border-border/60 shadow-xs bg-card overflow-hidden">
+        {/* Card 4: Progress Rate */}
+        <Card
+          onClick={() => { setActiveTab("attendees"); setAttendeeStatus("ALL"); }}
+          className={`rounded-3xl cursor-pointer transition-all duration-200 shadow-xs overflow-hidden border ${
+            activeTab === "attendees" && attendeeStatus === "ALL"
+              ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/30 shadow-md scale-[1.02]"
+              : "border-border/60 bg-card hover:border-amber-500/50 hover:bg-amber-500/5"
+          }`}
+        >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">Tỷ lệ tiến độ</p>
@@ -416,7 +455,7 @@ export default function SellerCheckinPage() {
       </div>
 
       {/* Checkin Main Tabs */}
-      <Tabs defaultValue="scanner" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full sm:w-auto grid grid-cols-2 rounded-2xl bg-muted/60 p-1 mb-6">
           <TabsTrigger value="scanner" className="rounded-xl text-xs font-bold px-5">
             <QrCode className="h-4 w-4 mr-2 text-[#93C453]" /> Quét Mã QR

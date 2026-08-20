@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ import {
 import {
   TrendingUp, Wallet, ArrowDownCircle, Clock, CheckCircle2,
   Banknote, RefreshCw, Building2, X, AlertCircle, CreditCard,
-  Plus, Trash2, Edit, ShieldCheck, RotateCcw, AlertTriangle
+  Plus, Trash2, Edit, ShieldCheck, RotateCcw, AlertTriangle, ArrowUpRight
 } from "lucide-react";
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -67,12 +67,13 @@ export default function SellerFinancePage() {
   const [wNote, setWNote] = useState<string>("");
   const [isWithdrawing, setIsWithdrawing] = useState<boolean>(false);
 
-  // Filters
+  // Filters & Selected Card State
+  const [activeCard, setActiveCard] = useState<"AVAILABLE" | "GROSS" | "COMMISSION" | "PENDING" | "SETTLED">("AVAILABLE");
   const [settlementStatus, setSettlementStatus] = useState<string>("ALL");
   const [withdrawalStatus, setWithdrawalStatus] = useState<string>("ALL");
 
-  // Fetch Finance Overview & Settlements
-  const { data: financeData, isLoading: isFinanceLoading, refetch: refetchFinance } = useQuery({
+  // Fetch 100% Real Finance Overview & Settlements from Backend API
+  const { data: financeData, isLoading: isFinanceLoading, refetch: refetchFinance, isFetching } = useQuery({
     queryKey: ["seller-finance", settlementStatus],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -228,8 +229,8 @@ export default function SellerFinancePage() {
 
   if (isFinanceLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
+      <div className="space-y-6 max-w-7xl mx-auto pb-10">
+        <Skeleton className="h-10 w-64 rounded-xl" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
         </div>
@@ -239,96 +240,157 @@ export default function SellerFinancePage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
-            <Wallet className="h-8 w-8 text-primary" /> Quản lý Tài chính & Rút tiền
+          <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
+            <Wallet className="h-7 w-7 text-primary" /> Quản Lý Tài Chính & Rút Tiền
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Theo dõi tổng doanh thu, thực nhận đối soát, số dư khả dụng và yêu cầu rút tiền.
+            Theo dõi tổng doanh thu, thực nhận đối soát, số dư khả dụng và yêu cầu rút tiền về tài khoản ngân hàng.
           </p>
         </div>
 
-        <Button
-          onClick={handleOpenWithdrawModal}
-          disabled={availableBalance <= 0}
-          className="gap-2 rounded-xl font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
-        >
-          <Banknote className="h-4 w-4" /> Yêu cầu rút tiền
-        </Button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl font-bold gap-2 border-border/60 h-10"
+            onClick={() => { refetchFinance(); refetchWithdrawals(); toast.success("Đã làm mới dữ liệu tài chính!"); }}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Làm mới
+          </Button>
+          <Button
+            onClick={handleOpenWithdrawModal}
+            disabled={availableBalance <= 0}
+            className="gap-2 rounded-xl font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 text-white h-10 disabled:opacity-50"
+          >
+            <Banknote className="h-4 w-4" /> Yêu cầu rút tiền
+          </Button>
+        </div>
       </div>
 
-      {/* 5 Summary Cards */}
+      {/* 5 Interactive Clickable Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Card 1: Available Balance (Highlighted) */}
-        <Card className="rounded-2xl border-2 border-emerald-500/50 shadow-md bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-card sm:col-span-2 lg:col-span-1">
+        {/* Card 1: Available Balance */}
+        <Card
+          onClick={() => { setActiveCard("AVAILABLE"); handleOpenWithdrawModal(); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border sm:col-span-2 lg:col-span-1 ${
+            activeCard === "AVAILABLE"
+              ? "border-2 border-emerald-500 bg-emerald-500/15 ring-2 ring-emerald-500/30 shadow-md scale-[1.02]"
+              : "border-2 border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500 hover:bg-emerald-500/10"
+          }`}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Số dư khả dụng</span>
-              <div className="p-2 bg-emerald-500 text-white rounded-xl">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Số Dư Khả Dụng</span>
+              <div className="p-2 bg-emerald-500 text-white rounded-xl shadow-xs">
                 <CreditCard className="h-4 w-4" />
               </div>
             </div>
             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">{fmt(availableBalance)}</p>
-            <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-medium mt-1">Số tiền bạn có thể rút ngay</p>
+            <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 font-bold mt-1.5 flex items-center justify-between">
+              <span>Số tiền có thể rút ngay</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </p>
           </CardContent>
         </Card>
 
         {/* Card 2: Gross Revenue */}
-        <Card className="rounded-2xl border border-border/60 shadow-sm">
+        <Card
+          onClick={() => { setActiveCard("GROSS"); setSettlementStatus("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "GROSS" && settlementStatus === "ALL"
+              ? "border-blue-500 bg-blue-500/15 ring-2 ring-blue-500/30 shadow-md scale-[1.02]"
+              : "border-border/60 bg-card hover:border-blue-500/50 hover:bg-blue-500/5"
+          }`}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tổng doanh thu</span>
+              <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Tổng Doanh Thu</span>
               <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
                 <TrendingUp className="h-4 w-4" />
               </div>
             </div>
             <p className="text-xl font-black text-foreground">{fmt(financeData?.grossRevenue || 0)}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">Tổng tiền bán vé</p>
+            <p className="text-[11px] text-muted-foreground font-semibold mt-1.5 flex items-center justify-between">
+              <span>Tổng tiền bán vé</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </p>
           </CardContent>
         </Card>
 
         {/* Card 3: Platform Fee */}
-        <Card className="rounded-2xl border border-border/60 shadow-sm">
+        <Card
+          onClick={() => { setActiveCard("COMMISSION"); setSettlementStatus("ALL"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "COMMISSION"
+              ? "border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/30 shadow-md scale-[1.02]"
+              : "border-border/60 bg-card hover:border-amber-500/50 hover:bg-amber-500/5"
+          }`}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Hoa hồng Lumora</span>
+              <span className="text-xs font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">Phí Vận Hành Lumora</span>
               <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
                 <Building2 className="h-4 w-4" />
               </div>
             </div>
-            <p className="text-xl font-black text-foreground">{fmt(financeData?.totalCommission || 0)}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">Phí vận hành hệ thống (~7%)</p>
+            <p className="text-xl font-black text-amber-600 dark:text-amber-400">{fmt(financeData?.totalCommission || 0)}</p>
+            <p className="text-[11px] text-muted-foreground font-semibold mt-1.5 flex items-center justify-between">
+              <span>Phí dịch vụ (~5-7%)</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </p>
           </CardContent>
         </Card>
 
         {/* Card 4: Pending Settlement */}
-        <Card className="rounded-2xl border border-border/60 shadow-sm">
+        <Card
+          onClick={() => { setActiveCard("PENDING"); setSettlementStatus("PENDING"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "PENDING" || settlementStatus === "PENDING"
+              ? "border-orange-500 bg-orange-500/15 ring-2 ring-orange-500/30 shadow-md scale-[1.02]"
+              : "border-border/60 bg-card hover:border-orange-500/50 hover:bg-orange-500/5"
+          }`}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Chờ đối soát</span>
+              <span className="text-xs font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-400">Chờ Đối Soát</span>
               <div className="p-2 bg-orange-500/10 text-orange-600 rounded-xl">
                 <Clock className="h-4 w-4" />
               </div>
             </div>
-            <p className="text-xl font-black text-foreground">{fmt(financeData?.pendingSettlement || 0)}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">Đối soát sau sự kiện 3–7 ngày</p>
+            <p className="text-xl font-black text-orange-600 dark:text-orange-400">{fmt(financeData?.pendingSettlement || 0)}</p>
+            <p className="text-[11px] text-muted-foreground font-semibold mt-1.5 flex items-center justify-between">
+              <span>Đối soát sau sự kiện 3–7 ngày</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </p>
           </CardContent>
         </Card>
 
         {/* Card 5: Total Settled */}
-        <Card className="rounded-2xl border border-border/60 shadow-sm">
+        <Card
+          onClick={() => { setActiveCard("SETTLED"); setSettlementStatus("SETTLED"); }}
+          className={`rounded-2xl cursor-pointer transition-all duration-200 shadow-xs border ${
+            activeCard === "SETTLED" || settlementStatus === "SETTLED"
+              ? "border-purple-500 bg-purple-500/15 ring-2 ring-purple-500/30 shadow-md scale-[1.02]"
+              : "border-border/60 bg-card hover:border-purple-500/50 hover:bg-purple-500/5"
+          }`}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Đã đối soát</span>
+              <span className="text-xs font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-400">Đã Đối Soát</span>
               <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
                 <CheckCircle2 className="h-4 w-4" />
               </div>
             </div>
-            <p className="text-xl font-black text-foreground">{fmt(financeData?.totalSettled || 0)}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">Đã cộng vào số dư khả dụng</p>
+            <p className="text-xl font-black text-purple-600 dark:text-purple-400">{fmt(financeData?.totalSettled || 0)}</p>
+            <p className="text-[11px] text-muted-foreground font-semibold mt-1.5 flex items-center justify-between">
+              <span>Đã cộng vào số dư khả dụng</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -343,24 +405,24 @@ export default function SellerFinancePage() {
       </div>
 
       {/* Bank Account Management Section */}
-      <Card className="rounded-2xl border border-border/60 shadow-sm">
-        <CardHeader className="p-4 sm:p-5 border-b border-border/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <Card className="rounded-3xl border border-border/60 shadow-xs">
+        <CardHeader className="p-4 sm:p-5 border-b border-border/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/20">
           <div>
             <CardTitle className="text-base font-extrabold flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" /> Quản lý Tài khoản Ngân hàng nhận tiền
+              <Building2 className="h-5 w-5 text-primary" /> Quản lý Tài khoản Ngân hàng nhận tiền
             </CardTitle>
             <CardDescription className="text-xs mt-0.5">
               Lưu tài khoản ngân hàng chính chủ để phục vụ việc chuyển tiền và rút doanh thu.
             </CardDescription>
           </div>
-          <Button size="sm" onClick={() => handleOpenBankModal()} className="gap-1.5 rounded-xl font-bold text-xs">
+          <Button size="sm" onClick={() => handleOpenBankModal()} className="gap-1.5 rounded-xl font-bold text-xs bg-primary hover:bg-primary/90 text-primary-foreground">
             <Plus className="h-4 w-4" /> Thêm tài khoản mới
           </Button>
         </CardHeader>
         <CardContent className="p-4 sm:p-5">
           {!bankAccounts || bankAccounts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-xs space-y-2">
-              <CreditCard className="h-8 w-8 mx-auto opacity-30" />
+              <CreditCard className="h-8 w-8 mx-auto opacity-30 text-primary" />
               <p className="font-semibold text-sm text-foreground">Chưa có tài khoản ngân hàng nào được lưu</p>
               <p>Vui lòng thêm ít nhất 1 tài khoản ngân hàng để thực hiện yêu cầu rút tiền.</p>
             </div>
@@ -410,11 +472,11 @@ export default function SellerFinancePage() {
       </Card>
 
       {/* Event Settlement Breakdown Table */}
-      <Card className="rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+      <Card className="rounded-3xl border border-border/60 shadow-xs overflow-hidden">
         <CardHeader className="p-4 sm:p-5 border-b border-border/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/20">
           <div>
             <CardTitle className="text-base font-extrabold flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-primary" /> Bảng đối soát theo sự kiện
+              <CheckCircle2 className="h-5 w-5 text-primary" /> Bảng đối soát theo sự kiện
             </CardTitle>
             <CardDescription className="text-xs mt-0.5">
               Chi tiết doanh thu, phí dịch vụ và tiền thực nhận sau khi sự kiện kết thúc.
@@ -489,11 +551,11 @@ export default function SellerFinancePage() {
       </Card>
 
       {/* Withdrawal History Table */}
-      <Card className="rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+      <Card className="rounded-3xl border border-border/60 shadow-xs overflow-hidden">
         <CardHeader className="p-4 sm:p-5 border-b border-border/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/20">
           <div>
             <CardTitle className="text-base font-extrabold flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-primary" /> Lịch sử rút tiền
+              <Banknote className="h-5 w-5 text-primary" /> Lịch sử rút tiền
             </CardTitle>
             <CardDescription className="text-xs mt-0.5">
               Danh sách các yêu cầu rút tiền về tài khoản ngân hàng của bạn.

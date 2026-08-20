@@ -304,13 +304,17 @@ export async function login(
     const accessToken = generateAccessToken(payload, rememberMe ? "30d" : "1d");
     const refreshToken = generateRefreshToken(payload);
 
-    await prisma.userSession.create({
-      data: {
-        userId: user.id,
-        token: accessToken,
-        expiresAt: getExpiryDate(rememberMe ? "30d" : "1d"),
-      },
-    });
+    try {
+      await prisma.userSession.create({
+        data: {
+          userId: user.id,
+          token: accessToken,
+          expiresAt: getExpiryDate(rememberMe ? "30d" : "1d"),
+        },
+      });
+    } catch (sessionErr) {
+      console.warn("User session creation non-critical warning:", sessionErr);
+    }
 
     res.json({
       success: true,
@@ -376,13 +380,17 @@ export async function oauth(
     const accessToken = generateAccessToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
-    await prisma.userSession.create({
-      data: {
-        userId: user.id,
-        token: accessToken,
-        expiresAt: getExpiryDate("1d"),
-      },
-    });
+    try {
+      await prisma.userSession.create({
+        data: {
+          userId: user.id,
+          token: accessToken,
+          expiresAt: getExpiryDate("1d"),
+        },
+      });
+    } catch (sessionErr) {
+      console.warn("User OAuth session creation non-critical warning:", sessionErr);
+    }
 
     res.json({
       success: true,

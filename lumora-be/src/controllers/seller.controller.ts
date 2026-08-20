@@ -1015,7 +1015,7 @@ export async function getFinanceOverview(
 
     const [totalRevenue, allSettlements, pendingWithdrawals, completedWithdrawals] = await Promise.all([
       prisma.order.aggregate({
-        where: { event: { sellerId }, status: { in: ["CONFIRMED", "CHECKED_IN"] } },
+        where: { event: { sellerId }, status: { in: ["CONFIRMED", "PAID", "CHECKED_IN"] } },
         _sum: { total: true },
       }),
       prisma.settlement.findMany({

@@ -21,7 +21,7 @@ import {
   Zap,
   ShieldCheck,
   Flame,
-  Barcode,
+  QrCode,
   TrendingUp,
   Star,
   ChevronRight as ArrowRight,
@@ -493,7 +493,7 @@ export default function BuyerDashboardPage() {
             {[
               { icon: <Zap className="w-5 h-5" />, title: "Giữ chỗ 15 phút", color: "bg-[#93C453]/20 text-[#4A7C59]" },
               { icon: <ShieldCheck className="w-5 h-5" />, title: "Thanh toán VietQR", color: "bg-[#A8C7DC]/30 text-[#2C4A60] dark:text-[#A8C7DC]" },
-              { icon: <Barcode className="w-5 h-5" />, title: "E-Ticket & Check-in", color: "bg-[#EB5B95]/20 text-[#EB5B95]" },
+              { icon: <QrCode className="w-5 h-5" />, title: "E-Ticket & Check-in QR", color: "bg-[#EB5B95]/20 text-[#EB5B95]" },
             ].map((feat) => (
               <div key={feat.title} className="shrink-0 flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${feat.color}`}>
@@ -520,10 +520,10 @@ export default function BuyerDashboardPage() {
                 desc: "Thanh toán chuyển khoản ngân hàng bằng mã QR tự động xác thực trong vài giây.",
               },
               {
-                icon: <Barcode className="h-6 w-6" />,
+                icon: <QrCode className="h-6 w-6" />,
                 iconCls: "bg-[#EB5B95]/20 text-[#EB5B95]",
-                title: "E-Ticket & Check-in Mã Vạch",
-                desc: "Vé điện tử gửi trực tiếp qua Email với mã vạch mã hóa an toàn chống vé giả.",
+                title: "E-Ticket & Check-in QR Code",
+                desc: "Vé điện tử gửi trực tiếp qua Email với mã QR mã hóa an toàn chống vé giả.",
               },
             ].map((f) => (
               <div key={f.title} className="bg-white dark:bg-slate-950 p-6 md:p-8 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-4 shadow-sm hover:shadow-md transition-shadow">
