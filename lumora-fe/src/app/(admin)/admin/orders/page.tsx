@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { ShoppingCart, Search, Eye, RefreshCw, CheckCircle2, Ticket, XCircle, CreditCard, ShieldCheck, DollarSign } from "lucide-react";
+import { ShoppingCart, Search, Eye, RefreshCw, CheckCircle2, Ticket, XCircle, CreditCard, ShieldCheck, DollarSign, QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -343,7 +343,7 @@ export default function AdminOrdersAndPaymentsPage() {
               {/* Barcode Tickets in this Order */}
               <div className="space-y-3">
                 <h4 className="text-xs uppercase font-extrabold tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Ticket className="h-4 w-4 text-primary" /> Vé Mã Vạch Đã Cấp Phát
+                  <QrCode className="h-4 w-4 text-primary" /> Vé Điện Tử QR Code Đã Cấp Phát
                 </h4>
                 <div className="space-y-3">
                   {selectedOrder.items?.map((item: any) => (

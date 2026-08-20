@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Ticket, RefreshCw, Eye, CheckCircle2, XCircle, Clock, History, Barcode, CheckCircle, AlertTriangle } from "lucide-react";
+import { Search, Ticket, RefreshCw, Eye, CheckCircle2, XCircle, Clock, History, QrCode, CheckCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminTicketsPage() {
@@ -69,7 +69,7 @@ export default function AdminTicketsPage() {
   const totalRefunded = tickets.filter((t: any) => t.orderStatus === "REFUNDED").length;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -77,7 +77,7 @@ export default function AdminTicketsPage() {
             <Ticket className="h-7 w-7 text-primary" /> Quản Lý Vé & Ticket Lifecycle
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Xem và quản lý tất cả mã vé điện tử Barcode, kiểm tra lịch sử vòng đời vé (Lifecycle Timeline) và soát vé.
+            Xem và quản lý tất cả mã vé điện tử QR Code, kiểm tra lịch sử vòng đời vé (Lifecycle Timeline) và soát vé.
           </p>
         </div>
         <Button
@@ -129,7 +129,7 @@ export default function AdminTicketsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Tìm theo Mã vé Barcode, Email, Tên sự kiện, Mã đơn..."
+              placeholder="Tìm theo Mã vé QR Code, Email, Tên sự kiện, Mã đơn..."
               className="pl-9 h-10 rounded-xl"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -181,7 +181,7 @@ export default function AdminTicketsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="font-bold text-xs uppercase tracking-wider">Mã Vé Barcode</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider">Mã Vé QR Code</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Sự Kiện & Người Mua</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Hạng Vé & Giá</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Trạng Thái Đơn</TableHead>
@@ -194,7 +194,7 @@ export default function AdminTicketsPage() {
                     <TableRow key={t.id || t.ticketCode} className="hover:bg-muted/20">
                       <TableCell>
                         <div className="space-y-1">
-                          <Badge variant="outline" className="font-mono font-bold text-xs bg-muted/40">
+                          <Badge variant="outline" className="font-mono font-bold text-xs bg-muted/40 text-primary border-primary/30">
                             {t.ticketCode || t.id}
                           </Badge>
                           <p className="text-[10px] text-muted-foreground">Mã đơn: #{t.orderNumber}</p>
@@ -261,8 +261,8 @@ export default function AdminTicketsPage() {
 
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="rounded-xl h-8 w-8 p-0"
+                            variant="outline"
+                            className="rounded-xl h-8 text-xs font-bold gap-1 border-emerald-500/40 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10"
                             onClick={() =>
                               setSelectedTicket({
                                 ticketCode: t.ticketCode,
@@ -278,9 +278,9 @@ export default function AdminTicketsPage() {
                                 holderName: t.buyerName,
                               })
                             }
-                            title="Xem phôi vé mã vạch"
+                            title="Xem phôi vé mã QR Code"
                           >
-                            <Barcode className="h-4 w-4 text-foreground" />
+                            <QrCode className="h-3.5 w-3.5" /> Phôi vé QR
                           </Button>
                         </div>
                       </TableCell>
@@ -293,7 +293,7 @@ export default function AdminTicketsPage() {
         </CardContent>
       </Card>
 
-      {/* Barcode ETicket Preview Modal */}
+      {/* QR Code ETicket Preview Modal */}
       <ETicketModal
         open={!!selectedTicket}
         onOpenChange={(open) => !open && setSelectedTicket(null)}
@@ -308,7 +308,7 @@ export default function AdminTicketsPage() {
               <History className="h-5 w-5 text-primary" /> Ticket Lifecycle Timeline — Vòng Đời Mã Vé
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Lịch sử phát hành mã vạch Barcode, thanh toán PayOS và tiến trình soát vé vào cửa.
+              Lịch sử phát hành mã vé QR Code, thanh toán PayOS và tiến trình soát vé vào cửa.
             </DialogDescription>
           </DialogHeader>
 
@@ -323,7 +323,7 @@ export default function AdminTicketsPage() {
               <div className="bg-muted/40 p-3 rounded-2xl border space-y-1">
                 <p className="font-bold text-foreground">Sự kiện: {timelineData.ticket.eventTitle}</p>
                 <p>Khách hàng: <span className="font-bold text-primary">{timelineData.ticket.buyerName}</span></p>
-                <p>Mã vé Barcode: <span className="font-mono font-bold text-foreground">{timelineData.ticket.ticketCode}</span></p>
+                <p>Mã vé QR Code: <span className="font-mono font-bold text-foreground">{timelineData.ticket.ticketCode}</span></p>
               </div>
 
               {/* Timeline Stepper */}

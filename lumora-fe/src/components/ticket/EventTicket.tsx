@@ -357,26 +357,24 @@ export function EventTicket({
   return (
     <div className="space-y-2">
       <div
-        className={`relative w-full rounded-2xl overflow-hidden shadow-2xl flex flex-row ${className}`}
-        style={{ minHeight: 220, fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
+        className={`relative w-full rounded-2xl overflow-hidden shadow-xl flex flex-row ${className}`}
+        style={{ minHeight: 200, fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
       >
         {/* Notch cutouts */}
         <div
-          className="absolute top-0 right-[27%] -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full z-30 hidden sm:block"
+          className="absolute top-0 right-[140px] -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full z-30 hidden sm:block"
           style={{ background: "#f3f4f6" }}
         />
         <div
-          className="absolute bottom-0 right-[27%] -translate-x-1/2 translate-y-1/2 w-6 h-6 rounded-full z-30 hidden sm:block"
+          className="absolute bottom-0 right-[140px] -translate-x-1/2 translate-y-1/2 w-6 h-6 rounded-full z-30 hidden sm:block"
           style={{ background: "#f3f4f6" }}
         />
 
-        {/* LEFT 73% — Coloured body */}
+        {/* LEFT Body — Flex 1 */}
         <div
-          className="relative overflow-hidden flex flex-col justify-between p-5"
+          className="relative overflow-hidden flex flex-col justify-between p-4 sm:p-5 flex-1 min-w-0"
           style={{
-            flex: "0 0 73%",
-            minWidth: 0,
-            minHeight: 220,
+            minHeight: 200,
             background: bannerUrl
               ? undefined
               : "linear-gradient(135deg, #7C3AED 0%, #6366F1 45%, #3B82F6 100%)",
@@ -454,14 +452,12 @@ export function EventTicket({
           </div>
         </div>
 
-        {/* RIGHT 27% — White stub */}
+        {/* RIGHT Stub — Fixed 140px */}
         <div
-          className="flex flex-col items-center justify-between py-4 px-4"
+          className="flex flex-col items-center justify-between py-4 px-3 shrink-0 w-[140px]"
           style={{
-            flex: "0 0 27%",
-            minWidth: 0,
             background: "#ffffff",
-            borderLeft: "2px dashed #d1d5db",
+            borderLeft: "2px dashed #e2e8f0",
           }}
         >
           <span

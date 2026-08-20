@@ -7,8 +7,20 @@ import { createNotification } from "./notification.controller";
 export async function getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const totalUsers = await prisma.user.count();
-    const totalBuyers = await prisma.user.count({ where: { role: "BUYER" } });
-    const totalSellers = await prisma.user.count({ where: { role: "SELLER" } });
+    const totalSellers = await prisma.user.count({
+      where: {
+        OR: [
+          { role: "SELLER" },
+          { OrganizerProfile: { verifyStatus: "APPROVED" } },
+        ],
+      },
+    });
+    const totalBuyers = await prisma.user.count({
+      where: {
+        role: "BUYER",
+        NOT: { OrganizerProfile: { verifyStatus: "APPROVED" } },
+      },
+    });
     const totalEvents = await prisma.event.count();
     const totalOrders = await prisma.order.count();
 
@@ -43,14 +55,11 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
     const { role, search } = req.query;
 
     const where: any = {};
-    if (role) {
-      where.role = role as string;
-    }
     if (search) {
       where.OR = [
-        { name: { contains: search as string } },
-        { email: { contains: search as string } },
-        { username: { contains: search as string } },
+        { name: { contains: search as string, mode: "insensitive" } },
+        { email: { contains: search as string, mode: "insensitive" } },
+        { username: { contains: search as string, mode: "insensitive" } },
       ];
     }
 
@@ -64,14 +73,34 @@ export async function getUsers(req: Request, res: Response, next: NextFunction):
         role: true,
         isVerified: true,
         createdAt: true,
+        OrganizerProfile: {
+          select: {
+            verifyStatus: true,
+            orgName: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const formattedUsers = users.map((u) => ({
-      ...u,
-      isBlocked: !u.isVerified,
-    }));
+    let formattedUsers = users.map((u) => {
+      const isApprovedSeller = u.role === "SELLER" || u.OrganizerProfile?.verifyStatus === "APPROVED";
+      return {
+        id: u.id,
+        email: u.email,
+        username: u.username,
+        name: u.name,
+        role: isApprovedSeller ? "SELLER" : u.role,
+        isVerified: u.isVerified,
+        createdAt: u.createdAt,
+        isBlocked: !u.isVerified,
+        orgName: u.OrganizerProfile?.orgName,
+      };
+    });
+
+    if (role && role !== "ALL") {
+      formattedUsers = formattedUsers.filter((u) => u.role === role);
+    }
 
     res.json({ success: true, data: formattedUsers });
   } catch (err) {
@@ -1466,8 +1495,20 @@ export async function getControlCenterData(req: Request, res: Response, next: Ne
 
     // Core Counts
     const totalUsers = await prisma.user.count();
-    const totalBuyers = await prisma.user.count({ where: { role: "BUYER" } });
-    const totalSellers = await prisma.user.count({ where: { role: "SELLER" } });
+    const totalSellers = await prisma.user.count({
+      where: {
+        OR: [
+          { role: "SELLER" },
+          { OrganizerProfile: { verifyStatus: "APPROVED" } },
+        ],
+      },
+    });
+    const totalBuyers = await prisma.user.count({
+      where: {
+        role: "BUYER",
+        NOT: { OrganizerProfile: { verifyStatus: "APPROVED" } },
+      },
+    });
     const totalEvents = await prisma.event.count();
     const totalOrders = await prisma.order.count();
     const totalTickets = await prisma.orderItem.count();

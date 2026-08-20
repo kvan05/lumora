@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { 
-  Barcode, Search, CheckCircle2, XCircle, Clock, ShieldCheck, Eye, Ticket as TicketIcon, Scan, RefreshCw, AlertTriangle
+  QrCode, Search, CheckCircle2, XCircle, Clock, ShieldCheck, Eye, Ticket as TicketIcon, Scan, RefreshCw, AlertTriangle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,11 +99,19 @@ export default function AdminCheckinPage() {
   const handleScanSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!scanInput.trim()) {
-      toast.error("Vui lòng nhập hoặc quét mã QR!");
+      toast.error("Vui lòng nhập mã QR trên phôi vé");
       return;
     }
     verifyMutation.mutate(scanInput.trim());
   };
+
+  const filteredTickets = tickets.filter((t: any) => {
+    if (statusFilter === "CHECKED_IN" && !t.isCheckedIn) return false;
+    if (statusFilter === "NOT_CHECKED_IN" && t.isCheckedIn) return false;
+    return true;
+  });
+
+  const stats = statsData || { totalTickets: 0, checkedInCount: 0, uncheckedCount: 0, checkinRate: 0 };
 
   const handleOpenModal = (ticket: any) => {
     setModalTicket({
@@ -111,92 +119,81 @@ export default function AdminCheckinPage() {
       eventTitle: ticket.eventTitle || ticket.event,
       bannerUrl: ticket.bannerUrl,
       category: ticket.category || "Sự kiện",
-      ticketType: ticket.ticketType || ticket.type,
-      startDate: ticket.startDate ? new Date(ticket.startDate) : new Date(),
+      ticketType: ticket.ticketType || ticket.type || "Vé Tiêu Chuẩn",
+      startDate: ticket.startDate || new Date(),
       venue: ticket.venue || "Địa điểm sự kiện",
       city: ticket.city || "Việt Nam",
       seatInfo: ticket.seatInfo,
-      status: ticket.orderStatus || "CONFIRMED",
+      status: ticket.status || "CONFIRMED",
       isCheckedIn: ticket.isCheckedIn,
       holderName: ticket.buyerName || ticket.holder,
     });
     setIsModalOpen(true);
   };
 
-  const filteredTickets = tickets.filter((t: any) => {
-    const matchesSearch =
-      !search ||
-      t.ticketCode?.toLowerCase().includes(search.toLowerCase()) ||
-      t.buyerName?.toLowerCase().includes(search.toLowerCase()) ||
-      t.eventTitle?.toLowerCase().includes(search.toLowerCase()) ||
-      t.orderNumber?.toLowerCase().includes(search.toLowerCase());
-
-    if (statusFilter === "CHECKED_IN") return matchesSearch && t.isCheckedIn;
-    if (statusFilter === "NOT_CHECKED_IN") return matchesSearch && !t.isCheckedIn;
-    return matchesSearch;
-  });
-
-  const stats = statsData || { totalTickets: 0, checkedInCount: 0, uncheckedCount: 0, checkinRate: 0 };
-
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <Scan className="h-7 w-7 text-primary" /> E-ticket & Check-in (Mã QR)
+            <QrCode className="h-7 w-7 text-primary" /> E-ticket & Trung Tâm Check-in QR Code
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Hệ thống kiểm soát vé mã QR thời gian thực và ép duyệt Check-in quản trị viên có lưu nhật ký Audit Log.
+            Quét mã QR Code kiểm soát vào cổng, tra cứu phôi vé điện tử và xử lý override check-in thời gian thực.
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="rounded-xl font-bold gap-2 self-start sm:self-auto border-border/60 hover:bg-muted"
+          className="rounded-xl font-bold gap-2 border-border/60 self-start sm:self-auto"
           onClick={() => refetch()}
           disabled={isFetching}
         >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Làm mới dữ liệu
+          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          Làm mới
         </Button>
       </div>
 
-      {/* Real Statistics Overview */}
+      {/* Real Check-in Summary Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tổng số vé đã xuất</p>
-            <p className="text-2xl font-black mt-1 text-foreground">{stats.totalTickets}</p>
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase">Tổng Số Vé Phát Hành</p>
+            <p className="text-2xl font-black text-foreground mt-1">{stats.totalTickets}</p>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-950/20 shadow-xs">
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Đã Check-in</p>
-            <p className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400">{stats.checkedInCount}</p>
+
+        <Card className="rounded-2xl border-emerald-500/20 bg-emerald-500/5 shadow-xs">
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Đã Check-in Vào Cổng</p>
+            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{stats.checkedInCount}</p>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 shadow-xs">
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Chưa Check-in</p>
-            <p className="text-2xl font-black mt-1 text-blue-600 dark:text-blue-400">{stats.uncheckedCount}</p>
+
+        <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 shadow-xs">
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold uppercase">Chưa Check-in</p>
+            <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{stats.uncheckedCount}</p>
           </CardContent>
         </Card>
+
         <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-xs">
-          <CardContent className="pt-4 pb-3 px-4">
-            <p className="text-xs font-semibold text-primary uppercase tracking-wider">Tỷ lệ Check-in</p>
+          <CardContent className="pt-4 pb-4 px-4">
+            <p className="text-xs text-primary font-semibold uppercase">Tỷ Lệ Check-in (%)</p>
             <p className="text-2xl font-black mt-1 text-primary">{stats.checkinRate}%</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Barcode Scanner Form */}
+      {/* QR Code Scanner Form */}
       <Card className="rounded-3xl border-primary/20 bg-gradient-to-r from-primary/5 via-card to-card shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-extrabold flex items-center gap-2 text-foreground">
-            <Scan className="h-5 w-5 text-primary" /> Quét Mã QR Kiểm Soát Vào Cửa
+            <Scan className="h-5 w-5 text-primary" /> Quét Mã QR Code Kiểm Soát Vào Cửa
           </CardTitle>
           <CardDescription>
-            Quét mã QR trên phôi vé điện tử bằng camera hoặc nhập mã vé trực tiếp.
+            Quét mã QR Code trên phôi vé điện tử bằng camera hoặc nhập mã vé trực tiếp.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -221,83 +218,65 @@ export default function AdminCheckinPage() {
             </Button>
           </form>
 
-          {/* Scan Result Feedback */}
+          {/* Last Check-in Result Card */}
           {scanResult && (
-            <div className="border border-border/60 rounded-2xl p-5 space-y-4 bg-background shadow-xs">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-black text-xl text-primary">Mã QR: #{scanResult.id}</span>
-                    <Badge className="bg-emerald-500 text-white font-bold rounded-lg px-2.5 py-0.5">
-                      Vé Hợp Lệ
-                    </Badge>
-                  </div>
-                  <p className="text-base font-bold text-foreground">{scanResult.event}</p>
-                  <p className="text-xs text-muted-foreground">{scanResult.venue}, {scanResult.city}</p>
-                  <p className="text-sm font-semibold mt-1 text-foreground">
-                    Chủ vé: <span className="text-primary font-bold">{scanResult.holder}</span> ({scanResult.type})
-                  </p>
-                </div>
-
-                <div className="bg-white p-3 rounded-2xl border border-border/80 shadow-xs flex flex-col items-center shrink-0">
-                  <QRCodeImage text={scanResult.id} size={100} />
-                </div>
+            <div className="p-4 rounded-2xl bg-card border border-emerald-500/30 flex items-start gap-4 animate-in fade-in">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                <CheckCircle2 className="h-6 w-6" />
               </div>
-
-              <div className="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-sm bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  Đã ghi nhận Check-in lúc {new Date(scanResult.checkedInAt).toLocaleTimeString("vi-VN")}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <p className="font-extrabold text-sm text-foreground">{scanResult.event}</p>
+                  <Badge variant="outline" className="font-mono text-xs text-primary border-primary/30">
+                    {scanResult.ticketCode}
+                  </Badge>
                 </div>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="rounded-xl h-8 font-bold gap-1.5"
-                  onClick={() => handleOpenModal(scanResult)}
-                >
-                  <Eye className="h-3.5 w-3.5" /> Xem Phôi Vé QR
-                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Chủ vé: <strong className="text-foreground">{scanResult.holder}</strong> ({scanResult.email}) · Hạng vé: <strong className="text-primary">{scanResult.type}</strong>
+                </p>
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                  ✓ Cho phép khán giả qua cổng kiểm soát.
+                </p>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Ticket Table */}
-      <Card className="rounded-3xl border-border/50 overflow-hidden shadow-xs">
+      {/* Tickets List Table */}
+      <Card className="rounded-3xl border-border/50 bg-card shadow-xs overflow-hidden">
         <CardHeader className="pb-3 border-b border-border/40">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <TicketIcon className="h-5 w-5 text-primary" /> Danh Sách Phôi Vé Điện Tử Toàn Hệ Thống
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <TicketIcon className="h-5 w-5 text-primary" /> Tra Cứu Danh Sách Phôi Vé Điện Tử
               </CardTitle>
-              <CardDescription>Tra cứu danh sách vé phát hành từ dữ liệu PostgreSQL Neon.</CardDescription>
+              <CardDescription>Danh sách mã vé QR Code đã thanh toán trên hệ thống.</CardDescription>
             </div>
-
-            <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-2xl border border-border/40 text-xs font-semibold">
+            <div className="flex items-center gap-2">
               <Button
-                variant={statusFilter === "ALL" ? "default" : "ghost"}
+                variant={statusFilter === "ALL" ? "default" : "outline"}
                 size="sm"
-                className="rounded-xl h-7 px-3 text-xs"
+                className="rounded-xl text-xs font-bold h-8"
                 onClick={() => setStatusFilter("ALL")}
               >
                 Tất cả ({tickets.length})
               </Button>
               <Button
-                variant={statusFilter === "CHECKED_IN" ? "default" : "ghost"}
+                variant={statusFilter === "CHECKED_IN" ? "default" : "outline"}
                 size="sm"
-                className="rounded-xl h-7 px-3 text-xs"
+                className="rounded-xl text-xs font-bold h-8 text-emerald-600 border-emerald-500/30"
                 onClick={() => setStatusFilter("CHECKED_IN")}
               >
-                Đã Check-in
+                Đã Check-in ({stats.checkedInCount})
               </Button>
               <Button
-                variant={statusFilter === "NOT_CHECKED_IN" ? "default" : "ghost"}
+                variant={statusFilter === "NOT_CHECKED_IN" ? "default" : "outline"}
                 size="sm"
-                className="rounded-xl h-7 px-3 text-xs"
+                className="rounded-xl text-xs font-bold h-8 text-amber-600 border-amber-500/30"
                 onClick={() => setStatusFilter("NOT_CHECKED_IN")}
               >
-                Chưa Check-in
+                Chưa Check-in ({stats.uncheckedCount})
               </Button>
             </div>
           </div>
@@ -307,7 +286,7 @@ export default function AdminCheckinPage() {
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Tìm kiếm vé theo mã vạch Barcode, tên chủ vé, email, tên sự kiện..."
+              placeholder="Tìm kiếm vé theo mã QR Code, tên chủ vé, email, tên sự kiện..."
               className="pl-11 h-10 rounded-xl bg-card border-border/60"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -325,7 +304,7 @@ export default function AdminCheckinPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="font-bold text-xs uppercase tracking-wider">Mã Vạch Barcode</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider">Mã Vé QR Code</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider hidden sm:table-cell">Sự kiện</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider hidden md:table-cell">Chủ vé (Buyer)</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Trạng thái</TableHead>
@@ -374,10 +353,10 @@ export default function AdminCheckinPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="rounded-xl h-8 text-xs font-bold gap-1 border-primary/40 text-primary"
+                              className="rounded-xl h-8 text-xs font-bold gap-1 border-emerald-500/40 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10"
                               onClick={() => handleOpenModal(t)}
                             >
-                              <Barcode className="h-3.5 w-3.5" /> Xem Phôi Vé
+                              <QrCode className="h-3.5 w-3.5" /> Phôi vé QR
                             </Button>
                             {!t.isCheckedIn && (
                               <Button
@@ -412,14 +391,14 @@ export default function AdminCheckinPage() {
               <AlertTriangle className="h-5 w-5" /> Ép Duyệt Check-in Thủ Công (Admin Override)
             </DialogTitle>
             <DialogDescription className="pt-2 text-xs">
-              Thao tác này sẽ bỏ qua quá trình quét mã vạch Barcode và trực tiếp chuyển trạng thái vé sang ĐÃ CHECK-IN. Thao tác sẽ được ghi vết nhật ký Audit Log.
+              Thao tác này sẽ bỏ qua quá trình quét mã vé QR Code và trực tiếp chuyển trạng thái vé sang ĐÃ CHECK-IN. Thao tác sẽ được ghi vết nhật ký Audit Log.
             </DialogDescription>
           </DialogHeader>
 
           {overrideTicket && (
             <div className="space-y-4 py-2 text-sm">
               <div className="p-3 bg-muted/40 rounded-xl space-y-1 border border-border/50 text-xs">
-                <p>Mã vé: <span className="font-mono font-bold text-primary">{overrideTicket.ticketCode || overrideTicket.id}</span></p>
+                <p>Mã vé QR Code: <span className="font-mono font-bold text-primary">{overrideTicket.ticketCode || overrideTicket.id}</span></p>
                 <p>Khán giả: <span className="font-bold">{overrideTicket.buyerName || overrideTicket.holder}</span></p>
                 <p>Sự kiện: <span className="font-semibold">{overrideTicket.eventTitle || overrideTicket.event}</span></p>
               </div>
@@ -454,7 +433,7 @@ export default function AdminCheckinPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Barcode Ticket Modal */}
+      {/* QR Code ETicket Preview Modal */}
       <ETicketModal open={isModalOpen} onOpenChange={setIsModalOpen} ticket={modalTicket} />
     </div>
   );

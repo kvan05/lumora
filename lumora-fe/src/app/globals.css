@@ -5,19 +5,25 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #FAF7F2; /* Warm Cream Ivory Base */
-  --foreground: #0F172A; /* Slate Dark Text */
+  --background: #FAF7F2;
+  /* Warm Cream Ivory Base */
+  --foreground: #0F172A;
+  /* Slate Dark Text */
   --card: #FFFFFF;
   --card-foreground: #0F172A;
   --popover: #FFFFFF;
   --popover-foreground: #0F172A;
-  --primary: #93C453; /* Tone 1: Fresh Lime Green */
+  --primary: #93C453;
+  /* Tone 1: Fresh Lime Green */
   --primary-foreground: #0F172A;
-  --secondary: #A8C7DC; /* Tone 2: Sky Powder Blue */
+  --secondary: #A8C7DC;
+  /* Tone 2: Sky Powder Blue */
   --secondary-foreground: #0F172A;
-  --accent: #EB5B95; /* Tone 3: Candy Pop Pink */
+  --accent: #EB5B95;
+  /* Tone 3: Candy Pop Pink */
   --accent-foreground: #FFFFFF;
-  --muted: #EBF4FA; /* Soft Powder Blue Tint */
+  --muted: #EBF4FA;
+  /* Soft Powder Blue Tint */
   --muted-foreground: #475569;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
@@ -30,17 +36,22 @@
 }
 
 .dark {
-  --background: #0F172A; /* Sleek Dark Charcoal */
+  --background: #0F172A;
+  /* Sleek Dark Charcoal */
   --foreground: #F8FAFC;
-  --card: #1E293B; /* Slate Card Background */
+  --card: #1E293B;
+  /* Slate Card Background */
   --card-foreground: #F8FAFC;
   --popover: #1E293B;
   --popover-foreground: #F8FAFC;
-  --primary: #93C453; /* Vibrant Lime Green */
+  --primary: #93C453;
+  /* Vibrant Lime Green */
   --primary-foreground: #0F172A;
-  --secondary: #2C4A60; /* Dark Sky Powder Blue */
+  --secondary: #2C4A60;
+  /* Dark Sky Powder Blue */
   --secondary-foreground: #F8FAFC;
-  --accent: #EB5B95; /* Candy Pop Pink */
+  --accent: #EB5B95;
+  /* Candy Pop Pink */
   --accent-foreground: #FFFFFF;
   --muted: #1E293B;
   --muted-foreground: #94A3B8;
@@ -85,6 +96,7 @@
   * {
     border-color: var(--border);
   }
+
   body {
     background-color: var(--background);
     color: var(--foreground);
@@ -94,7 +106,18 @@
 
 /* Barcode scanner animation */
 @keyframes scan {
-  0% { transform: translateY(-60px); opacity: 0.8; }
-  50% { transform: translateY(60px); opacity: 1; }
-  100% { transform: translateY(-60px); opacity: 0.8; }
+  0% {
+    transform: translateY(-60px);
+    opacity: 0.8;
+  }
+
+  50% {
+    transform: translateY(60px);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-60px);
+    opacity: 0.8;
+  }
 }
