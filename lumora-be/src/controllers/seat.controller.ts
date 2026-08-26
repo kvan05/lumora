@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../prisma/client";
 import { createError } from "../middleware/errorHandler";
+import { cleanupExpiredReservations } from "./order.controller";
 
 // ─── Get Full Seat Map ──────────────────────────────────────────────────
 export async function getSeatMap(
@@ -10,6 +11,9 @@ export async function getSeatMap(
 ): Promise<void> {
   try {
     const eventId = req.params.eventId as string;
+
+    // Passive cleanup: free any expired seat holds for this event before returning data
+    await cleanupExpiredReservations(eventId);
 
     const sections = await prisma.seatSection.findMany({
       where: { eventId },

@@ -17,7 +17,8 @@ import {
   CheckCircle2, 
   AlertCircle,
   Send,
-  Clock
+  Clock,
+  Calendar
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ export default function SellerEventDetailPage() {
   const [isAddingTicket, setIsAddingTicket] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [newTicketEventDate, setNewTicketEventDate] = useState<string>("");
 
   // Fetch all seller events to get the specific event
   const { data: event, isLoading: isLoadingEvent, refetch: refetchEvent } = useQuery({
@@ -100,9 +102,17 @@ export default function SellerEventDetailPage() {
   async function onCreateTicket(values: z.infer<typeof ticketSchema>) {
     setIsSubmitting(true);
     try {
-      await api.post(`/events/${eventId}/tickets`, values);
+      const payload: any = {
+        ...values,
+        quantity: values.capacity,
+        maxPerOrder: values.maxPerUser,
+      };
+      // Only include eventDate if it has a value
+      if (newTicketEventDate) payload.eventDate = newTicketEventDate;
+      await api.post(`/events/${eventId}/tickets`, payload);
       toast.success("Thêm loại vé thành công!");
       setIsAddingTicket(false);
+      setNewTicketEventDate("");
       form.reset();
       refetchTickets();
     } catch (error: any) {
@@ -284,6 +294,28 @@ export default function SellerEventDetailPage() {
                           </FormItem>
                         )}
                       />
+                      {/* eventDate field - only shown for multi-day events */}
+                      {event?.startDate && event?.endDate &&
+                        new Date(event.startDate).toDateString() !== new Date(event.endDate).toDateString() && (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5" /> Ngày áp dụng vé
+                              <span className="text-muted-foreground font-normal text-xs">(tùy chọn - để trống = mọi ngày)</span>
+                            </FormLabel>
+                            <Input
+                              type="date"
+                              value={newTicketEventDate}
+                              min={new Date(event.startDate).toISOString().split("T")[0]}
+                              max={new Date(event.endDate).toISOString().split("T")[0]}
+                              onChange={(e) => setNewTicketEventDate(e.target.value)}
+                            />
+                            {newTicketEventDate && (
+                              <p className="text-xs text-primary/80 font-semibold">
+                                ✓ Vé chỉ dùng cho ngày {new Date(newTicketEventDate + "T00:00:00").toLocaleDateString("vi-VN")}
+                              </p>
+                            )}
+                          </FormItem>
+                        )}
                       <div className="flex justify-end pt-4">
                         <Button type="submit" disabled={isSubmitting} className="rounded-xl w-full">
                           {isSubmitting ? "Đang lưu..." : "Xác nhận tạo"}
@@ -315,6 +347,7 @@ export default function SellerEventDetailPage() {
               <TableHeader>
                 <TableRow className="bg-muted/30">
                   <TableHead className="font-bold">Loại Vé</TableHead>
+                  <TableHead className="font-bold">Ngày</TableHead>
                   <TableHead className="font-bold text-right">Giá</TableHead>
                   <TableHead className="font-bold text-center">Số lượng</TableHead>
                   <TableHead className="font-bold text-center">Đã bán</TableHead>
@@ -342,15 +375,25 @@ export default function SellerEventDetailPage() {
                         <div className="font-bold">{ticket.name}</div>
                         {ticket.description && <div className="text-xs text-muted-foreground">{ticket.description}</div>}
                       </TableCell>
+                      <TableCell>
+                        {ticket.eventDate ? (
+                          <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 font-semibold text-xs">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {new Date(ticket.eventDate).toLocaleDateString("vi-VN")}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Mọi ngày</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-semibold text-primary">
                         {Number(ticket.price).toLocaleString("vi-VN")} ₫
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline">{ticket.inventory?.capacity || 0}</Badge>
+                        <Badge variant="outline">{ticket.inventory?.totalQty || ticket.quantity || 0}</Badge>
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="secondary">
-                          {(ticket.inventory?.capacity || 0) - (ticket.inventory?.quantityAvailable || 0)}
+                          {(ticket.inventory?.soldQty || 0) + (ticket.inventory?.reservedQty || 0)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

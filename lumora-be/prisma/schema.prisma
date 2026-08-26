@@ -135,6 +135,7 @@ model TicketType {
   status        String           @default("ACTIVE")
   sortOrder     Int              @default(0)
   color         String?
+  eventDate     DateTime?        // Ngày áp dụng vé (null = áp dụng mọi ngày của sự kiện)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   orderItems    OrderItem[]
@@ -237,6 +238,7 @@ model OrderItem {
   ticketCode   String?     @unique
   isCheckedIn  Boolean     @default(false)
   checkedInAt  DateTime?
+  eventDate    DateTime?   // Ngày vé khách đã chọn (cho sự kiện nhiều ngày)
   createdAt    DateTime    @default(now())
   order        Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   seat         Seat?       @relation(fields: [seatId], references: [id], onDelete: NoAction, onUpdate: NoAction)

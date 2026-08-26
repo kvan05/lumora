@@ -58,11 +58,11 @@ export default function AdminCheckinPage() {
     },
     onSuccess: (data) => {
       if (data.alreadyCheckedIn) {
-        toast.warning("Vé này ĐÃ ĐƯỢC CHECK-IN trước đó!", {
+        toast.warning("Vé này ĐÃ ĐƯỢC SOÁT VÉ trước đó!", {
           description: `Chủ vé: ${data.data.holder} · ${data.data.event}`,
         });
       } else {
-        toast.success("Check-in mã QR thành công!", {
+        toast.success("Soát vé mã QR thành công!", {
           description: `Khán giả: ${data.data.holder} · Loại vé: ${data.data.type}`,
         });
       }
@@ -84,14 +84,14 @@ export default function AdminCheckinPage() {
       return res.data;
     },
     onSuccess: (data) => {
-      toast.success(data.message || "Đã ép duyệt Check-in thành công!");
+      toast.success(data.message || "Đã duyệt soát vé thành công!");
       setOverrideTicket(null);
       setOverrideReason("");
       queryClient.invalidateQueries({ queryKey: ["admin-checkin-tickets"] });
       queryClient.invalidateQueries({ queryKey: ["admin-checkin-stats"] });
     },
     onError: (err: any) => {
-      const msg = err.response?.data?.message || err.message || "Lỗi ép duyệt Check-in";
+      const msg = err.response?.data?.message || err.message || "Lỗi duyệt soát vé";
       toast.error(msg);
     },
   });
@@ -137,10 +137,10 @@ export default function AdminCheckinPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <QrCode className="h-7 w-7 text-primary" /> E-ticket & Trung Tâm Check-in QR Code
+            <QrCode className="h-7 w-7 text-primary" /> Vé Điện Tử & Trung Tâm Soát Vé
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Quét mã QR Code kiểm soát vào cổng, tra cứu phôi vé điện tử và xử lý override check-in thời gian thực.
+            Quét mã QR Code kiểm soát vào cổng, tra cứu phôi vé điện tử và xử lý duyệt soát vé khẩn cấp thời gian thực.
           </p>
         </div>
         <Button
@@ -166,21 +166,21 @@ export default function AdminCheckinPage() {
 
         <Card className="rounded-2xl border-emerald-500/20 bg-emerald-500/5 shadow-xs">
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Đã Check-in Vào Cổng</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Đã Soát Vé Vào Cổng</p>
             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{stats.checkedInCount}</p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5 shadow-xs">
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold uppercase">Chưa Check-in</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold uppercase">Chưa Soát Vé</p>
             <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{stats.uncheckedCount}</p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-primary/20 bg-primary/5 shadow-xs">
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs text-primary font-semibold uppercase">Tỷ Lệ Check-in (%)</p>
+            <p className="text-xs text-primary font-semibold uppercase">Tỷ Lệ Soát Vé (%)</p>
             <p className="text-2xl font-black mt-1 text-primary">{stats.checkinRate}%</p>
           </CardContent>
         </Card>
@@ -193,7 +193,7 @@ export default function AdminCheckinPage() {
             <Scan className="h-5 w-5 text-primary" /> Quét Mã QR Code Kiểm Soát Vào Cửa
           </CardTitle>
           <CardDescription>
-            Quét mã QR Code trên phôi vé điện tử bằng camera hoặc nhập mã vé trực tiếp.
+            Quét mã QR Code trên phôi vé điện tử bằng máy quét/camera hoặc nhập mã vé trực tiếp.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -268,7 +268,7 @@ export default function AdminCheckinPage() {
                 className="rounded-xl text-xs font-bold h-8 text-emerald-600 border-emerald-500/30"
                 onClick={() => setStatusFilter("CHECKED_IN")}
               >
-                Đã Check-in ({stats.checkedInCount})
+                Đã soát vé ({stats.checkedInCount})
               </Button>
               <Button
                 variant={statusFilter === "NOT_CHECKED_IN" ? "default" : "outline"}
@@ -276,7 +276,7 @@ export default function AdminCheckinPage() {
                 className="rounded-xl text-xs font-bold h-8 text-amber-600 border-amber-500/30"
                 onClick={() => setStatusFilter("NOT_CHECKED_IN")}
               >
-                Chưa Check-in ({stats.uncheckedCount})
+                Chưa soát vé ({stats.uncheckedCount})
               </Button>
             </div>
           </div>
@@ -306,7 +306,7 @@ export default function AdminCheckinPage() {
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Mã Vé QR Code</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider hidden sm:table-cell">Sự kiện</TableHead>
-                    <TableHead className="font-bold text-xs uppercase tracking-wider hidden md:table-cell">Chủ vé (Buyer)</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider hidden md:table-cell">Chủ vé</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Trạng thái</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Thao tác Admin</TableHead>
                   </TableRow>
@@ -344,7 +344,7 @@ export default function AdminCheckinPage() {
                                 : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30"
                             }`}
                           >
-                            {t.isCheckedIn ? "✓ Đã Check-in" : "Chưa Check-in"}
+                            {t.isCheckedIn ? "✓ Đã soát vé" : "Chưa soát vé"}
                           </Badge>
                         </TableCell>
 
@@ -368,7 +368,7 @@ export default function AdminCheckinPage() {
                                   setOverrideReason("");
                                 }}
                               >
-                                Ép Check-in
+                                Duyệt Soát Vé
                               </Button>
                             )}
                           </div>
@@ -388,10 +388,10 @@ export default function AdminCheckinPage() {
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="h-5 w-5" /> Ép Duyệt Check-in Thủ Công (Admin Override)
+              <AlertTriangle className="h-5 w-5" /> Duyệt Soát Vé Trực Tiếp (Ghi Đè Soát Vé)
             </DialogTitle>
             <DialogDescription className="pt-2 text-xs">
-              Thao tác này sẽ bỏ qua quá trình quét mã vé QR Code và trực tiếp chuyển trạng thái vé sang ĐÃ CHECK-IN. Thao tác sẽ được ghi vết nhật ký Audit Log.
+              Thao tác này sẽ bỏ qua quá trình quét mã vé QR Code và trực tiếp chuyển trạng thái vé sang ĐÃ SOÁT VÉ. Thao tác sẽ được ghi vết nhật ký hệ thống.
             </DialogDescription>
           </DialogHeader>
 
@@ -404,9 +404,9 @@ export default function AdminCheckinPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">Lý do ép duyệt Check-in (Bắt buộc) *</label>
+                <label className="text-xs font-bold text-foreground">Lý do duyệt trực tiếp (Bắt buộc) *</label>
                 <Textarea
-                  placeholder="Ví dụ: Khách hàng mang CCCD đối soát chính chủ do lỗi scanner tại cổng..."
+                  placeholder="Ví dụ: Khách hàng xuất trình CCCD đối soát chính chủ do lỗi scanner tại cổng..."
                   className="rounded-xl text-xs min-h-[80px]"
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
@@ -427,7 +427,7 @@ export default function AdminCheckinPage() {
               }
               disabled={overrideMutation.isPending || overrideReason.trim().length < 5}
             >
-              {overrideMutation.isPending ? "Đang xử lý..." : "Xác nhận Override Check-in"}
+              {overrideMutation.isPending ? "Đang xử lý..." : "Xác nhận duyệt soát vé"}
             </Button>
           </DialogFooter>
         </DialogContent>

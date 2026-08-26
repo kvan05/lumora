@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { vi } from "date-fns/locale";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { io, Socket } from "socket.io-client";
@@ -15,7 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MapPin, Info, Tag, Armchair, Plus, Minus, ZoomIn, ZoomOut, Maximize, Lock, ShoppingCart, Star, Flag, Send, Image as ImageIcon } from "lucide-react";
+import { Calendar, MapPin, Info, Tag, Armchair, Plus, Minus, ZoomIn, ZoomOut, Maximize, Lock, ShoppingCart, Star, Flag, Send, Image as ImageIcon, CalendarDays, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ export default function EventDetailPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const slug = params.slug as string;
+  const dateSelectorRef = useRef<HTMLDivElement>(null);
 
   const [event, setEvent] = useState<any>(null);
   const [sections, setSections] = useState<any[]>([]);
@@ -39,14 +41,21 @@ export default function EventDetailPage() {
   const [selectedTickets, setSelectedTickets] = useState<Record<string, number>>({});
   const [isBooking, setIsBooking] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
+  // Multi-day: selected date (ISO date string "YYYY-MM-DD" or null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const fetchEvent = async () => {
     try {
       const res = await api.get(`/events/${slug}`);
       if (res.data.success) {
-        setEvent(res.data.data);
-        if (res.data.data.hasSeatMap) {
-          fetchSeatMap(res.data.data.id);
+        const eventData = res.data.data;
+        setEvent(eventData);
+        // Auto-select first date if multi-day event
+        if (eventData.isMultiDay && eventData.eventDates?.length > 0) {
+          setSelectedDate(eventData.eventDates[0]);
+        }
+        if (eventData.hasSeatMap) {
+          fetchSeatMap(eventData.id);
         }
       }
     } catch (error) {
@@ -74,7 +83,7 @@ export default function EventDetailPage() {
 
   // Real-time socket connection for inventory updates
   useEffect(() => {
-    if (event?.hasSeatMap) {
+    if (event?.id) {
       const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5001", {
         withCredentials: true,
       });
@@ -83,11 +92,15 @@ export default function EventDetailPage() {
         newSocket.emit("join:event", event.id);
       });
 
-      newSocket.on("inventory:update", (data) => {
-        if (data.eventId === event.id) {
+      const handleUpdate = () => {
+        if (event.hasSeatMap) {
           fetchSeatMap(event.id);
         }
-      });
+        fetchEvent();
+      };
+
+      newSocket.on("inventory:update", handleUpdate);
+      newSocket.on("seats:update", handleUpdate);
 
       setSocket(newSocket);
 
@@ -96,7 +109,7 @@ export default function EventDetailPage() {
         newSocket.disconnect();
       };
     }
-  }, [event]);
+  }, [event?.id, event?.hasSeatMap]);
 
   const getAvailableQty = (ticketType: any) => {
     const inv = ticketType.inventory;
@@ -132,7 +145,30 @@ export default function EventDetailPage() {
     });
   };
 
+  // ── Multi-day: filter visible ticket types by selected date ──────────
+  const getVisibleTicketTypes = () => {
+    if (!event?.ticketTypes) return [];
+    if (!event.isMultiDay || !selectedDate) return event.ticketTypes;
+    return event.ticketTypes.filter((tt: any) => {
+      if (!tt.eventDate) return true; // null = applies to all days
+      const ttDateStr = new Date(tt.eventDate).toISOString().split("T")[0];
+      return ttDateStr === selectedDate;
+    });
+  };
+
+  // ── Format ISO date to Vietnamese label ──────────────────────────────
+  const formatDateLabel = (dateStr: string, compact = false) => {
+    const d = parseISO(dateStr);
+    if (compact) return format(d, "dd/MM", { locale: vi });
+    return format(d, "EEEE, dd/MM/yyyy", { locale: vi });
+  };
+
   const handleCheckout = async () => {
+    if (event?.canPurchase === false) {
+      toast.error("Sự kiện này đã kết thúc, không thể tiếp tục đặt vé.");
+      return;
+    }
+
     if (!session) {
       toast.info("Vui lòng đăng nhập để tiếp tục");
       router.push(`/login?callbackUrl=/events/${slug}`);
@@ -155,14 +191,23 @@ export default function EventDetailPage() {
       const items = event.hasSeatMap
         ? selectedSeats.map(seatId => ({
             seatId: seatId,
-            quantity: 1
+            quantity: 1,
+            ...(selectedDate && { eventDate: selectedDate }),
           }))
         : Object.entries(selectedTickets)
             .filter(([_, qty]) => qty > 0)
-            .map(([ticketTypeId, qty]) => ({
-              ticketTypeId,
-              quantity: qty
-            }));
+            .map(([ticketTypeId, qty]) => {
+              // Determine which date this ticket belongs to
+              const tt = event.ticketTypes?.find((t: any) => t.id === ticketTypeId);
+              const ticketEventDate = tt?.eventDate
+                ? new Date(tt.eventDate).toISOString().split("T")[0]
+                : selectedDate || undefined;
+              return {
+                ticketTypeId,
+                quantity: qty,
+                ...(ticketEventDate && { eventDate: ticketEventDate }),
+              };
+            });
 
       const res = await api.post("/orders", {
         eventId: event.id,
@@ -201,10 +246,13 @@ export default function EventDetailPage() {
 
   if (!event) return null;
 
+  // ── Compute visible ticket types based on selected date ──────────────
+  const visibleTicketTypes = getVisibleTicketTypes();
+
   // Calculate totals for rendering in sticky bar
   const totalSelectedTickets = event.hasSeatMap
     ? selectedSeats.length
-    : Object.values(selectedTickets).reduce((a, b) => a + b, 0);
+    : Object.values(selectedTickets).reduce((a: number, b: unknown) => a + (b as number), 0);
 
   let totalPrice = 0;
   if (event.hasSeatMap) {
@@ -221,7 +269,7 @@ export default function EventDetailPage() {
     Object.entries(selectedTickets).forEach(([ticketTypeId, qty]) => {
       const ticketType = event.ticketTypes?.find((t: any) => t.id === ticketTypeId);
       if (ticketType) {
-        totalPrice += Number(ticketType.price) * qty;
+        totalPrice += Number(ticketType.price) * (qty as number);
       }
     });
   }
@@ -239,22 +287,50 @@ export default function EventDetailPage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/60 to-transparent flex items-end p-8">
           <div className="max-w-3xl">
-            <Badge className="mb-4 bg-primary text-primary-foreground text-sm px-3 py-1 font-bold tracking-wide uppercase shadow-sm">
-              {event.category}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <Badge className="bg-primary text-primary-foreground text-sm px-3 py-1 font-bold tracking-wide uppercase shadow-sm">
+                {event.category}
+              </Badge>
+              {event.canPurchase === false && (
+                <Badge variant="destructive" className="text-sm px-3 py-1 font-bold tracking-wide uppercase shadow-sm flex items-center gap-1.5 bg-red-600 hover:bg-red-600 text-white">
+                  <Clock className="w-3.5 h-3.5" />
+                  {event.daysSinceEnd > 30 ? "Đã kết thúc" : "Sự kiện đã kết thúc"}
+                </Badge>
+              )}
+            </div>
             <h1 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight drop-shadow-md mb-4 leading-tight">
               {event.title}
             </h1>
             <div className="flex flex-wrap items-center gap-6 text-foreground/90 font-medium">
               <div className="flex items-center gap-2 bg-background/30 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50">
-                <Calendar className="h-4 w-4 text-primary" />
-                <span className="text-sm">{format(new Date(event.startDate), "EEEE, dd/MM/yyyy • HH:mm")}</span>
+                <Calendar className="h-4 w-4 text-primary shrink-0" />
+                <span className="text-sm">
+                  {(() => {
+                    const start = new Date(event.startDate);
+                    const end = new Date(event.endDate);
+                    const sameDay = start.toDateString() === end.toDateString();
+                    if (sameDay) {
+                      // Same day: "Thứ Sáu, 08/08/2027 • 02:00 – 05:00"
+                      return `${format(start, "EEEE, dd/MM/yyyy", { locale: vi })} • ${format(start, "HH:mm")} – ${format(end, "HH:mm")}`;
+                    } else {
+                      // Multi-day: show start and end separately
+                      return (
+                        <>
+                          <span>{format(start, "EEEE, dd/MM/yyyy", { locale: vi })} • {format(start, "HH:mm")}</span>
+                          <span className="mx-1.5 opacity-50">→</span>
+                          <span>{format(end, "EEEE, dd/MM/yyyy", { locale: vi })} • {format(end, "HH:mm")}</span>
+                        </>
+                      );
+                    }
+                  })()}
+                </span>
               </div>
               <div className="flex items-center gap-2 bg-background/30 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50">
                 <MapPin className="h-4 w-4 text-primary" />
                 <span className="text-sm">{event.venue}, {event.city}</span>
               </div>
             </div>
+
           </div>
           {/* Favorite button overlay on hero */}
           <div className="absolute top-4 right-4">
@@ -353,88 +429,223 @@ export default function EventDetailPage() {
             </div>
           </section>
 
-          {!event.hasSeatMap && (
-            <section className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
-              <h2 className="text-2xl font-extrabold flex items-center gap-2 mb-6">
-                <Tag className="h-6 w-6 text-primary" /> Chọn vé
-              </h2>
-              
-              <div className="space-y-4">
-                {event.ticketTypes?.map((ticketType: any) => {
-                  const available = getAvailableQty(ticketType);
-                  const isSoldOut = ticketType.status === "SOLD_OUT" || available <= 0;
-                  const selectedQty = selectedTickets[ticketType.id] || 0;
+          {/* ── EXPIRED EVENT CALLOUT / TICKET SELECTION ── */}
+          {event.canPurchase === false ? (
+            <section className="bg-card rounded-2xl p-8 shadow-sm border border-border/60 text-center space-y-6 animate-in fade-in">
+              <div className="w-16 h-16 rounded-full bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20 shadow-inner">
+                <Clock className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-foreground">Sự kiện đã kết thúc</h2>
+                <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                  Sự kiện này đã kết thúc vào{" "}
+                  <span className="font-bold text-foreground">
+                    {format(new Date(event.endDate), "EEEE, dd/MM/yyyy • HH:mm", { locale: vi })}
+                  </span>
+                  . Cổng bán vé đã chính thức đóng, quý khách không thể chọn và mua vé cho sự kiện này nữa.
+                </p>
+              </div>
 
-                  return (
-                    <div 
-                      key={ticketType.id} 
-                      className={`flex flex-col md:flex-row justify-between items-start md:items-center p-5 border rounded-2xl bg-muted/20 hover:bg-muted/40 transition-colors gap-4 ${isSoldOut ? 'opacity-50 grayscale' : ''}`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-lg">{ticketType.name}</span>
-                          {ticketType.color && (
-                            <Badge style={{ backgroundColor: ticketType.color, color: '#fff' }} className="shadow-sm">
-                              {ticketType.name}
-                            </Badge>
-                          )}
-                          {isSoldOut && <Badge variant="destructive">Hết vé</Badge>}
+              {event.ticketTypes && event.ticketTypes.length > 0 && (
+                <div className="pt-6 border-t border-border/50 text-left">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                    <Tag className="h-3.5 w-3.5 text-muted-foreground" /> Danh sách các hạng vé (Đã khóa)
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {event.ticketTypes.map((tt: any) => (
+                      <div key={tt.id} className="p-4 rounded-xl border bg-muted/30 flex justify-between items-center opacity-70">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-sm text-foreground">{tt.name}</p>
+                          {tt.description && <p className="text-xs text-muted-foreground line-clamp-1">{tt.description}</p>}
                         </div>
-                        {ticketType.description && (
-                          <p className="text-sm text-muted-foreground">{ticketType.description}</p>
-                        )}
-                        <div className="text-xs font-semibold text-muted-foreground flex gap-3">
-                          <span>Còn trống: {available}</span>
-                          <span>•</span>
-                          <span>Tối đa {ticketType.maxPerOrder} vé/đơn</span>
+                        <div className="text-right">
+                          <span className="font-bold text-sm text-primary">{Number(tt.price).toLocaleString("vi-VN")} ₫</span>
+                          <p className="text-[10px] text-muted-foreground font-semibold">Đã ngưng bán</p>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                      <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
-                        <div className="flex flex-col items-end">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xl font-extrabold text-primary">
-                              {Number(ticketType.price).toLocaleString("vi-VN")} ₫
-                            </span>
-                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 font-bold">
-                              Giá tham khảo
-                            </Badge>
-                          </div>
-                          {ticketType.originalPrice && Number(ticketType.originalPrice) > Number(ticketType.price) && (
-                            <span className="text-sm text-muted-foreground line-through font-medium">
-                              {Number(ticketType.originalPrice).toLocaleString("vi-VN")} ₫
-                            </span>
-                          )}
-                        </div>
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  className="rounded-xl font-bold gap-2 px-6"
+                  onClick={() => router.push("/events")}
+                >
+                  <ChevronLeft className="h-4 w-4" /> Khám phá các sự kiện đang mở bán
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <>
+              {!event.hasSeatMap && (
+                <section className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
+                  <h2 className="text-2xl font-extrabold flex items-center gap-2 mb-6">
+                    <Tag className="h-6 w-6 text-primary" /> Chọn vé
+                  </h2>
 
-                        <div className="flex items-center gap-3 bg-background border rounded-full p-1 shadow-sm">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
-                            onClick={() => handleUpdateTicketQty(ticketType.id, selectedQty - 1, ticketType)}
-                            disabled={selectedQty <= 0 || isSoldOut}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="font-extrabold text-lg w-6 text-center">{selectedQty}</span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
-                            onClick={() => handleUpdateTicketQty(ticketType.id, selectedQty + 1, ticketType)}
-                            disabled={selectedQty >= Math.min(ticketType.maxPerOrder, available) || isSoldOut}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+              {/* ── DATE SELECTOR (chỉ hiện khi sự kiện nhiều ngày) ─────────────── */}
+              {event.isMultiDay && event.eventDates?.length > 0 && (
+                <div className="mb-6 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <CalendarDays className="h-4 w-4 text-primary" />
+                    <span>Chọn ngày tham dự</span>
+                  </div>
+
+                  {/* Scrollable date pills */}
+                  <div
+                    ref={dateSelectorRef}
+                    className="flex gap-2 overflow-x-auto pb-2 scrollbar-none"
+                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                  >
+                    {event.eventDates.map((dateStr: string, idx: number) => {
+                      const isSelected = selectedDate === dateStr;
+                      const d = parseISO(dateStr);
+                      const dayName = format(d, "EEEE", { locale: vi });
+                      const dayNum = format(d, "dd");
+                      const monthYear = format(d, "MM/yyyy");
+                      return (
+                        <button
+                          key={dateStr}
+                          id={`date-pill-${idx}`}
+                          onClick={() => {
+                            setSelectedDate(dateStr);
+                            // Clear tickets from other dates when switching
+                            setSelectedTickets({});
+                          }}
+                          className={`flex-shrink-0 flex flex-col items-center px-5 py-3 rounded-2xl border-2 transition-all duration-200 cursor-pointer focus:outline-none
+                            ${isSelected
+                              ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20 scale-105"
+                              : "bg-background border-border hover:border-primary/50 hover:bg-primary/5"
+                            }`}
+                        >
+                          <span className={`text-[11px] font-semibold capitalize ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                            {dayName}
+                          </span>
+                          <span className={`text-2xl font-black leading-none ${isSelected ? "text-primary-foreground" : "text-foreground"}`}>
+                            {dayNum}
+                          </span>
+                          <span className={`text-[11px] font-semibold ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                            {monthYear}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Applied date label */}
+                  {selectedDate && (
+                    <div className="flex items-center gap-2 bg-primary/8 border border-primary/20 text-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
+                      <Calendar className="h-4 w-4 shrink-0" />
+                      <span>
+                        Vé áp dụng cho ngày:{" "}
+                        <span className="font-black">{formatDateLabel(selectedDate)}</span>
+                      </span>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
+              )}
+
+              {/* ── TICKET LIST ────────────────────────────────────────────────── */}
+              <div className="space-y-4">
+                {visibleTicketTypes.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-xl bg-muted/20">
+                    <Tag className="h-10 w-10 mx-auto mb-3 opacity-30 text-primary" />
+                    <p className="font-medium text-sm">
+                      {event.isMultiDay && selectedDate
+                        ? "Không có vé nào cho ngày này."
+                        : "Sự kiện chưa có vé nào."}
+                    </p>
+                  </div>
+                ) : (
+                  visibleTicketTypes.map((ticketType: any) => {
+                    const available = getAvailableQty(ticketType);
+                    const isSoldOut = ticketType.status === "SOLD_OUT" || available <= 0;
+                    const selectedQty = selectedTickets[ticketType.id] || 0;
+
+                    return (
+                      <div
+                        key={ticketType.id}
+                        className={`flex flex-col md:flex-row justify-between items-start md:items-center p-5 border rounded-2xl bg-muted/20 hover:bg-muted/40 transition-colors gap-4 ${isSoldOut ? "opacity-50 grayscale" : ""}`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-lg">{ticketType.name}</span>
+                            {ticketType.color && (
+                              <Badge style={{ backgroundColor: ticketType.color, color: "#fff" }} className="shadow-sm">
+                                {ticketType.name}
+                              </Badge>
+                            )}
+                            {isSoldOut && <Badge variant="destructive">Hết vé</Badge>}
+                          </div>
+                          {ticketType.description && (
+                            <p className="text-sm text-muted-foreground">{ticketType.description}</p>
+                          )}
+                          <div className="text-xs font-semibold text-muted-foreground flex gap-3 flex-wrap">
+                            <span>Còn trống: {available}</span>
+                            <span>•</span>
+                            <span>Tối đa {ticketType.maxPerOrder} vé/đơn</span>
+                            {/* Show the ticket's date if it has one (useful when viewing all dates) */}
+                            {ticketType.eventDate && !event.isMultiDay && (
+                              <>
+                                <span>•</span>
+                                <span className="text-primary/70">
+                                  {formatDateLabel(new Date(ticketType.eventDate).toISOString().split("T")[0], true)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                          <div className="flex flex-col items-end">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xl font-extrabold text-primary">
+                                {Number(ticketType.price).toLocaleString("vi-VN")} ₫
+                              </span>
+                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 font-bold">
+                                Giá tham khảo
+                              </Badge>
+                            </div>
+                            {ticketType.originalPrice && Number(ticketType.originalPrice) > Number(ticketType.price) && (
+                              <span className="text-sm text-muted-foreground line-through font-medium">
+                                {Number(ticketType.originalPrice).toLocaleString("vi-VN")} ₫
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 bg-background border rounded-full p-1 shadow-sm">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                              onClick={() => handleUpdateTicketQty(ticketType.id, selectedQty - 1, ticketType)}
+                              disabled={selectedQty <= 0 || isSoldOut}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="font-extrabold text-lg w-6 text-center">{selectedQty}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                              onClick={() => handleUpdateTicketQty(ticketType.id, selectedQty + 1, ticketType)}
+                              disabled={selectedQty >= Math.min(ticketType.maxPerOrder, available) || isSoldOut}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </section>
           )}
+
 
           {event.hasSeatMap && (
             <section className="bg-card rounded-2xl p-6 shadow-sm border border-border/60">
@@ -456,10 +667,16 @@ export default function EventDetailPage() {
                   <span className="text-sm font-semibold text-primary">Đang chọn</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-md bg-muted-foreground/20 flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-md bg-amber-500/20 border-2 border-amber-500/50 flex items-center justify-center">
+                    <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Đang giữ tạm (15p)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-muted flex items-center justify-center border border-border">
                     <Lock className="w-3 h-3 text-muted-foreground/60" />
                   </div>
-                  <span className="text-sm font-semibold text-muted-foreground opacity-70">Đã bán/Giữ</span>
+                  <span className="text-sm font-semibold text-muted-foreground opacity-70">Đã bán</span>
                 </div>
               </div>
 
@@ -524,6 +741,8 @@ export default function EventDetailPage() {
                                         {row.seats?.map((seat: any) => {
                                           const isSelected = selectedSeats.includes(seat.id);
                                           const isAvailable = seat.status === 'AVAILABLE';
+                                          const isReserved = seat.status === 'RESERVED';
+                                          const isSold = seat.status === 'SOLD';
                                           
                                           return (
                                             <Tooltip key={seat.id} delayDuration={0}>
@@ -532,16 +751,21 @@ export default function EventDetailPage() {
                                                   onClick={() => toggleSeatSelection(seat.id, seat.status)}
                                                   disabled={!isAvailable}
                                                   className={`w-9 h-9 rounded-t-xl rounded-b-md flex items-center justify-center text-[11px] font-bold transition-all duration-200 outline-none
-                                                    ${isAvailable ? 'cursor-pointer hover:-translate-y-1 hover:shadow-md' : 'opacity-40 cursor-not-allowed'}
-                                                    ${isSelected ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-110 z-10 ring-2 ring-primary ring-offset-2 ring-offset-background' : 'bg-muted border border-border/80'}
+                                                    ${isAvailable ? 'cursor-pointer hover:-translate-y-1 hover:shadow-md' : 'cursor-not-allowed'}
+                                                    ${isSelected ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-110 z-10 ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
+                                                    ${isReserved ? 'bg-amber-500/20 border-2 border-amber-500/60 text-amber-700 dark:text-amber-400 animate-pulse' : ''}
+                                                    ${isSold ? 'bg-muted border border-border/80 opacity-40 text-muted-foreground' : ''}
+                                                    ${!isAvailable && !isSelected && !isReserved && !isSold ? 'bg-muted border border-border/80 opacity-40' : ''}
                                                   `}
                                                   style={{ 
-                                                    backgroundColor: isSelected ? undefined : (isAvailable ? `${section.color}20` : undefined),
-                                                    borderColor: isSelected ? undefined : (isAvailable ? section.color : undefined),
-                                                    color: isSelected ? undefined : (isAvailable ? section.color : undefined)
+                                                    backgroundColor: isSelected ? undefined : (isReserved ? undefined : (isAvailable ? `${section.color}20` : undefined)),
+                                                    borderColor: isSelected ? undefined : (isReserved ? undefined : (isAvailable ? section.color : undefined)),
+                                                    color: isSelected ? undefined : (isReserved ? undefined : (isAvailable ? section.color : undefined))
                                                   }}
                                                 >
-                                                  {!isAvailable && !isSelected ? (
+                                                  {isReserved ? (
+                                                    <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                                  ) : !isAvailable && !isSelected ? (
                                                     <Lock className="w-3 h-3 opacity-50" />
                                                   ) : (
                                                     seat.seatNumber
@@ -555,7 +779,13 @@ export default function EventDetailPage() {
                                                     <span className="font-bold">Ghế {seat.seatLabel}</span>
                                                   </div>
                                                   <div className="text-primary font-black">{Number(section.price).toLocaleString("vi-VN")} ₫</div>
-                                                  {!isAvailable && <span className="text-xs text-destructive">Đã được mua/giữ</span>}
+                                                  {isReserved && (
+                                                    <span className="text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1">
+                                                      <Clock className="w-3 h-3" /> Đang được giữ tạm (10-15 phút)
+                                                    </span>
+                                                  )}
+                                                  {isSold && <span className="text-xs text-destructive font-bold">Đã bán</span>}
+                                                  {!isAvailable && !isReserved && !isSold && <span className="text-xs text-muted-foreground font-bold">Tạm khóa</span>}
                                                 </div>
                                               </TooltipContent>
                                             </Tooltip>
@@ -577,7 +807,9 @@ export default function EventDetailPage() {
               </div>
             </section>
           )}
-        </div>
+        </>
+      )}
+    </div>
 
         {/* Right Column: Checkout Sidebar (Desktop) */}
         <div className="hidden lg:block lg:col-span-1">
@@ -589,7 +821,25 @@ export default function EventDetailPage() {
                 </h3>
               </div>
               <CardContent className="p-6">
-                {event.hasSeatMap ? (
+                {event.canPurchase === false ? (
+                  <div className="text-center py-6 space-y-4">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
+                      <Lock className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="font-extrabold text-base text-foreground">Đã đóng cổng bán vé</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Sự kiện đã kết thúc. Toàn bộ tính năng chọn vé và thanh toán đã bị vô hiệu hóa.
+                      </p>
+                    </div>
+                    <Button 
+                      className="w-full h-12 font-bold rounded-xl shadow-sm"
+                      onClick={() => router.push("/events")}
+                    >
+                      Khám phá sự kiện khác
+                    </Button>
+                  </div>
+                ) : event.hasSeatMap ? (
                   selectedSeats.length === 0 ? (
                     <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-xl bg-muted/20">
                       <Armchair className="h-10 w-10 mx-auto mb-3 opacity-40 text-primary" />
@@ -654,21 +904,39 @@ export default function EventDetailPage() {
                     </div>
                   ) : (
                     <div className="space-y-5">
+                      {/* Show selected date badge for multi-day events */}
+                      {event.isMultiDay && selectedDate && (
+                        <div className="flex items-center gap-2 bg-primary/8 border border-primary/20 text-primary rounded-xl px-3 py-2 text-xs font-semibold">
+                          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                          <span>Ngày: <span className="font-black">{formatDateLabel(selectedDate)}</span></span>
+                        </div>
+                      )}
                       <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                         {Object.entries(selectedTickets).map(([ticketTypeId, qty]) => {
-                          if (qty <= 0) return null;
+                          if ((qty as number) <= 0) return null;
                           const ticketType = event.ticketTypes?.find((t: any) => t.id === ticketTypeId);
                           if (!ticketType) return null;
+                          // Determine date label for this ticket
+                          const ticketDateStr = ticketType.eventDate
+                            ? new Date(ticketType.eventDate).toISOString().split("T")[0]
+                            : selectedDate || null;
 
                           return (
                             <div key={ticketTypeId} className="flex justify-between items-center text-sm p-3 bg-muted/40 rounded-xl border border-border/50">
-                              <div className="flex flex-col">
+                              <div className="flex flex-col gap-0.5">
                                 <span className="font-bold flex items-center gap-2 text-foreground/80">
-                                  <Tag className="h-4 w-4 text-primary" /> {ticketType.name}
+                                  <Tag className="h-4 w-4 text-primary shrink-0" /> {ticketType.name}
                                 </span>
-                                <span className="text-xs font-semibold text-muted-foreground mt-1 bg-background w-fit px-2 py-0.5 rounded-md border">SL: {qty}</span>
+                                <div className="flex gap-1.5 flex-wrap">
+                                  <span className="text-xs font-semibold text-muted-foreground bg-background w-fit px-2 py-0.5 rounded-md border">SL: {qty as number}</span>
+                                  {ticketDateStr && event.isMultiDay && (
+                                    <span className="text-xs font-semibold text-primary/80 bg-primary/8 w-fit px-2 py-0.5 rounded-md border border-primary/20">
+                                      {formatDateLabel(ticketDateStr, true)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <span className="font-extrabold">{(Number(ticketType.price) * qty).toLocaleString("vi-VN")} ₫</span>
+                              <span className="font-extrabold">{(Number(ticketType.price) * (qty as number)).toLocaleString("vi-VN")} ₫</span>
                             </div>
                           );
                         })}
@@ -700,13 +968,14 @@ export default function EventDetailPage() {
                   )
                 )}
               </CardContent>
+
             </Card>
           </div>
         </div>
       </div>
 
       {/* Mobile Sticky Checkout Bar */}
-      {totalSelectedTickets > 0 && (
+      {event.canPurchase !== false && totalSelectedTickets > 0 && (
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t shadow-[0_-10px_40px_rgba(0,0,0,0.1)] p-4 z-50 animate-in slide-in-from-bottom-full duration-300">
           <div className="container mx-auto flex items-center justify-between gap-4">
             <div className="flex flex-col">

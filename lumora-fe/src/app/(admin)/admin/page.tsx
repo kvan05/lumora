@@ -51,7 +51,7 @@ export default function AdminControlCenter() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <Activity className="h-7 w-7 text-primary" /> Admin Control Center
+            <Activity className="h-7 w-7 text-primary" /> Trung tâm điều khiển Admin
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Trung tâm điều hành hệ thống toàn diện Lumora — Giám sát giao dịch, chỉ số vé và rủi ro thời gian thực.
@@ -82,11 +82,11 @@ export default function AdminControlCenter() {
         <Card className="rounded-2xl border-amber-500/30 bg-amber-500/5 shadow-xs overflow-hidden">
           <CardHeader className="pb-2 pt-3 px-4 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-amber-500" /> System Alerts — Cảnh Báo Điều Hành Hệ Thống ({systemAlerts.length})
+              <ShieldAlert className="h-4 w-4 text-amber-500" /> Cảnh Báo Hệ Thống & Điều Hành ({systemAlerts.length})
             </CardTitle>
             <Link href="/admin/risk-alerts">
               <Button variant="ghost" size="sm" className="h-6 text-xs text-amber-600 font-bold hover:bg-amber-500/10">
-                Xem Risk Center <ArrowRight className="h-3 w-3 ml-1" />
+                Xem Trung tâm rủi ro <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
             </Link>
           </CardHeader>
@@ -115,7 +115,7 @@ export default function AdminControlCenter() {
             <CardContent className="pt-3.5 pb-3.5 px-3.5 flex flex-col justify-between h-full">
               <div>
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-emerald-600">Tổng GMV</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase group-hover:text-emerald-600">Tổng Giá Trị (GMV)</p>
                   <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:text-emerald-600 transition-all" />
                 </div>
                 {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> : (
@@ -158,7 +158,7 @@ export default function AdminControlCenter() {
                   <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">{summary.totalUsers} thành viên</p>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Buyers: {summary.totalBuyers} · Sellers: {summary.totalSellers}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Người mua: {summary.totalBuyers} · Ban tổ chức: {summary.totalSellers}</p>
             </CardContent>
           </Card>
         </Link>
@@ -176,7 +176,7 @@ export default function AdminControlCenter() {
                   <p className="text-lg font-black text-orange-500 mt-0.5">{summary.totalEvents} sự kiện</p>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Trên hệ thống</p>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Trên toàn hệ thống</p>
             </CardContent>
           </Card>
         </Link>
@@ -214,7 +214,7 @@ export default function AdminControlCenter() {
                   <p className="text-lg font-black text-red-500 mt-0.5">{summary.totalRefund.toLocaleString("vi-VN")} ₫</p>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Đã chấp thuận refund</p>
+              <p className="text-[10px] text-muted-foreground font-semibold mt-1.5">Đã chấp thuận hoàn tiền</p>
             </CardContent>
           </Card>
         </Link>
@@ -227,10 +227,10 @@ export default function AdminControlCenter() {
             <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
               <TrendingUp className="h-5 w-5 text-emerald-500" /> Biểu Đồ Doanh Thu Tổng Theo Chu Kỳ ({period})
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Giá trị giao dịch Gross GMV tính theo ngày từ CSDL thực tế</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Tổng giá trị giao dịch tính theo ngày từ cơ sở dữ liệu thực tế</p>
           </div>
           <Badge variant="outline" className="font-mono text-xs text-emerald-600 bg-emerald-500/10 border-emerald-500/30 w-fit">
-            Platform Fee: 5%
+            Phí sàn: 5%
           </Badge>
         </div>
 
@@ -252,7 +252,7 @@ export default function AdminControlCenter() {
                       <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] p-1.5 rounded-lg border shadow-md whitespace-nowrap z-20 pointer-events-none">
                         <p className="font-bold">{item.date}</p>
                         <p className="text-emerald-500 font-black">{item.revenue.toLocaleString("vi-VN")} ₫</p>
-                        <p className="text-muted-foreground">Phí: {item.fee.toLocaleString("vi-VN")} ₫</p>
+                        <p className="text-muted-foreground">Phí sàn: {item.fee.toLocaleString("vi-VN")} ₫</p>
                       </div>
                     </div>
                   </div>
@@ -276,28 +276,28 @@ export default function AdminControlCenter() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base font-bold flex items-center gap-2 group-hover:text-purple-600">
-                  <Ticket className="h-5 w-5 text-purple-500" /> Ticket Analytics & Check-in Rate <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Ticket className="h-5 w-5 text-purple-500" /> Thống Kê Vé & Tỷ Lệ Soát Vé <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </CardTitle>
                 <Badge variant="secondary" className="bg-purple-500/15 text-purple-600 font-bold text-xs">
-                  Check-in Rate: {ticketAnalytics.checkinRate}%
+                  Tỷ lệ soát vé: {ticketAnalytics.checkinRate}%
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-muted/30 p-3 rounded-2xl border">
-                  <p className="text-xs text-muted-foreground font-semibold">Vé đã bán (Sold)</p>
+                  <p className="text-xs text-muted-foreground font-semibold">Vé đã bán</p>
                   <p className="text-xl font-black text-foreground mt-0.5">{ticketAnalytics.sold} vé</p>
                 </div>
                 <div className="bg-muted/30 p-3 rounded-2xl border">
-                  <p className="text-xs text-muted-foreground font-semibold">Vé đã Check-in</p>
+                  <p className="text-xs text-muted-foreground font-semibold">Vé đã soát cổng</p>
                   <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{ticketAnalytics.checkedIn} vé</p>
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span>Tỷ lệ vé đã soát cổng (Checked-in)</span>
+                  <span>Tỷ lệ vé đã soát cổng</span>
                   <span>{ticketAnalytics.checkedIn} / {ticketAnalytics.sold} ({ticketAnalytics.checkinRate}%)</span>
                 </div>
                 <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
@@ -314,10 +314,10 @@ export default function AdminControlCenter() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base font-bold flex items-center gap-2 group-hover:text-blue-600">
-                  <ShoppingCart className="h-5 w-5 text-blue-500" /> Payment Analytics & Success Rate <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ShoppingCart className="h-5 w-5 text-blue-500" /> Thống Kê Thanh Toán & Tỷ Lệ Thành Công <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </CardTitle>
                 <Badge variant="secondary" className="bg-blue-500/15 text-blue-600 font-bold text-xs">
-                  Success Rate: {paymentAnalytics.successRate}%
+                  Tỷ lệ thành công: {paymentAnalytics.successRate}%
                 </Badge>
               </div>
             </CardHeader>
@@ -343,7 +343,7 @@ export default function AdminControlCenter() {
 
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span>Tỷ lệ thanh toán thành công (Payment Success)</span>
+                  <span>Tỷ lệ thanh toán thành công</span>
                   <span>{paymentAnalytics.successRate}%</span>
                 </div>
                 <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
@@ -360,7 +360,7 @@ export default function AdminControlCenter() {
         <CardHeader className="pb-3 border-b border-border/40">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-orange-500" /> Top Events — Sự Kiện Có Doanh Thu & Check-in Cao Nhất
+              <Calendar className="h-5 w-5 text-orange-500" /> Sự Kiện Tiêu Biểu — Doanh Thu & Soát Vé Cao Nhất
             </CardTitle>
             <Link href="/admin/events">
               <Button variant="ghost" size="sm" className="h-8 text-xs font-bold gap-1 text-primary">
@@ -390,10 +390,10 @@ export default function AdminControlCenter() {
                   <div className="flex items-center gap-4 text-right shrink-0">
                     <div>
                       <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{ev.gmv.toLocaleString("vi-VN")} ₫</p>
-                      <p className="text-[10px] text-muted-foreground">{ev.ticketsSold} vé bán</p>
+                      <p className="text-[10px] text-muted-foreground">{ev.ticketsSold} vé đã bán</p>
                     </div>
                     <div>
-                      <Badge variant="outline" className="text-[10px] font-bold">Check-in: {ev.checkedInCount}</Badge>
+                      <Badge variant="outline" className="text-[10px] font-bold">Đã soát vé: {ev.checkedInCount}</Badge>
                     </div>
                   </div>
                 </div>
@@ -407,21 +407,21 @@ export default function AdminControlCenter() {
       <div className="grid sm:grid-cols-3 gap-3">
         <Link href="/admin/risk-alerts">
           <Button variant="outline" className="w-full h-12 rounded-2xl justify-between font-bold text-xs border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-600">
-            <span className="flex items-center gap-2"><ShieldAlert className="h-4 w-4" /> Fraud Risk Detection Center</span>
+            <span className="flex items-center gap-2"><ShieldAlert className="h-4 w-4" /> Trung tâm phát hiện rủi ro</span>
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Link>
 
         <Link href="/admin/reconciliation">
           <Button variant="outline" className="w-full h-12 rounded-2xl justify-between font-bold text-xs border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary">
-            <span className="flex items-center gap-2"><Scale className="h-4 w-4" /> Financial Reconciliation Center</span>
+            <span className="flex items-center gap-2"><Scale className="h-4 w-4" /> Trung tâm đối soát tài chính</span>
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Link>
 
         <Link href="/admin/audit-logs">
           <Button variant="outline" className="w-full h-12 rounded-2xl justify-between font-bold text-xs border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 text-purple-600">
-            <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> System Audit Logs</span>
+            <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Nhật ký hệ thống</span>
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Link>

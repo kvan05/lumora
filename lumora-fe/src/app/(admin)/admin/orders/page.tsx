@@ -80,7 +80,7 @@ export default function AdminOrdersAndPaymentsPage() {
             <ShoppingCart className="h-7 w-7 text-primary" /> Quản Lý Đơn Hàng & Thanh Toán
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Module quản lý hợp nhất tất cả đơn hàng, giao dịch PayOS VietQR, phí sàn 5% và doanh thu Seller.
+            Quản lý hợp nhất tất cả đơn hàng, giao dịch thanh toán, phí sàn 5% và doanh thu Ban tổ chức.
           </p>
         </div>
         <Button
@@ -301,7 +301,7 @@ export default function AdminOrdersAndPaymentsPage() {
             <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 <div className="bg-muted/30 p-2.5 rounded-xl border">
-                  <p className="text-muted-foreground font-semibold">Khách Hàng (Buyer)</p>
+                  <p className="text-muted-foreground font-semibold">Khách Hàng</p>
                   <p className="font-bold text-foreground mt-0.5">{selectedOrder.buyer?.name || "N/A"}</p>
                   <p className="text-[10px] text-muted-foreground truncate">{selectedOrder.buyer?.email}</p>
                 </div>
@@ -325,7 +325,7 @@ export default function AdminOrdersAndPaymentsPage() {
               {/* Financial Calculation Breakdown */}
               <div className="bg-muted/20 border rounded-2xl p-4 space-y-2 text-xs">
                 <div className="flex justify-between font-medium">
-                  <span>Tổng tiền thanh toán (GMV)</span>
+                  <span>Tổng tiền thanh toán</span>
                   <span className="font-bold text-sm">{Number(selectedOrder.total || 0).toLocaleString("vi-VN")} ₫</span>
                 </div>
                 <div className="flex justify-between text-primary">
@@ -333,7 +333,7 @@ export default function AdminOrdersAndPaymentsPage() {
                   <span className="font-bold">+ {(Number(selectedOrder.total || 0) * 0.05).toLocaleString("vi-VN")} ₫</span>
                 </div>
                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                  <span>Doanh thu Seller nhận được (95%)</span>
+                  <span>Doanh thu Ban tổ chức nhận được (95%)</span>
                   <span className="font-bold">{(Number(selectedOrder.total || 0) * 0.95).toLocaleString("vi-VN")} ₫</span>
                 </div>
               </div>

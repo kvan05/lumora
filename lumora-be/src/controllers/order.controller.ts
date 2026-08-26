@@ -3,11 +3,13 @@ import prisma from "../prisma/client";
 import { createError } from "../middleware/errorHandler";
 import { generateOrderNumber, generateTicketCode } from "../utils/orderUtils";
 import { getSocketIO } from "../socket";
+import { computeEventExpiry } from "../utils/eventStatus";
 
 export interface OrderItemInput {
   ticketTypeId?: string;
   seatId?: string;
   quantity: number;
+  eventDate?: string; // ISO date string for multi-day events (e.g. "2026-08-29")
 }
 
 // ─── Create Order ───────────────────────────────────────────────────────
@@ -33,6 +35,12 @@ export async function createOrder(
     }
     if (event.status !== "PUBLISHED") {
       throw createError("Sự kiện hiện không khả dụng để đặt vé", 400, "EVENT_NOT_AVAILABLE");
+    }
+
+    // ── Check event expiry ──────────────────────────────────────────────
+    const expiry = computeEventExpiry(event.endDate);
+    if (!expiry.canPurchase) {
+      throw createError("Sự kiện này đã kết thúc, không thể tiếp tục đặt vé.", 400, "EVENT_ENDED");
     }
 
     // ── Atomic transaction: check availability + reserve ────────────────
@@ -72,6 +80,7 @@ export async function createOrder(
             unitPrice: price,
             subtotal: price,
             ticketCode: generateTicketCode(),
+            ...(item.eventDate && { eventDate: new Date(item.eventDate) }),
           });
         }
 
@@ -124,6 +133,8 @@ export async function createOrder(
               unitPrice: ticketType.price,
               subtotal: ticketType.price,
               ticketCode: generateTicketCode(),
+              // Save the selected event date for multi-day events
+              ...(item.eventDate && { eventDate: new Date(item.eventDate) }),
             });
           }
         }
@@ -280,43 +291,188 @@ export async function cancelOrder(
 
     if (!order) throw createError("Order not found", 404);
     if (!["PENDING"].includes(order.status)) {
-      throw createError("Only pending orders can be cancelled", 400, "INVALID_STATUS");
+      throw createError("Chỉ có thể hủy đơn hàng đang chờ thanh toán", 400, "INVALID_STATUS");
     }
 
-    await releaseInventory(order.items, order.id);
+    await releaseInventory(order.items, order.id, order.eventId);
 
-    res.json({ success: true, message: "Order cancelled successfully" });
+    res.json({ success: true, message: "Đã hủy đơn hàng và nhả ghế/vé thành công" });
   } catch (err) {
     next(err);
   }
 }
 
-// ─── Release inventory (used by cancel and timeout job) ─────────────────
+// ─── Release inventory (used by cancel, failure and timeout job) ─────────
 export async function releaseInventory(
   items: any[],
-  orderId: string
+  orderId: string,
+  eventId?: string
 ): Promise<void> {
+  const seatIds: string[] = [];
+  const ticketTypeCounts: Record<string, number> = {};
+
+  for (const item of items) {
+    if (item.seatId) {
+      seatIds.push(item.seatId);
+    }
+    if (item.ticketTypeId) {
+      ticketTypeCounts[item.ticketTypeId] = (ticketTypeCounts[item.ticketTypeId] || 0) + 1;
+    }
+  }
+
+  let resolvedEventId = eventId;
+
   await prisma.$transaction(async (tx) => {
-    for (const item of items) {
-      if (item.seatId) {
-        await tx.seat.update({
-          where: { id: item.seatId },
-          data: { status: "AVAILABLE", reservedBy: null, reservedAt: null, expiresAt: null },
-        });
-      }
-      if (item.ticketTypeId) {
+    // 1. Release seats
+    if (seatIds.length > 0) {
+      await tx.seat.updateMany({
+        where: { id: { in: seatIds } },
+        data: {
+          status: "AVAILABLE",
+          reservedBy: null,
+          reservedAt: null,
+          expiresAt: null,
+        },
+      });
+    }
+
+    // 2. Decrement reservedQty for ticket inventories safely
+    for (const [ttId, qty] of Object.entries(ticketTypeCounts)) {
+      const inv = await tx.ticketInventory.findUnique({
+        where: { ticketTypeId: ttId },
+      });
+      if (inv) {
+        const newReserved = Math.max(0, inv.reservedQty - qty);
         await tx.ticketInventory.update({
-          where: { ticketTypeId: item.ticketTypeId },
-          data: { reservedQty: { decrement: 1 } },
+          where: { ticketTypeId: ttId },
+          data: { reservedQty: newReserved },
         });
       }
     }
 
-    await tx.order.update({
-      where: { id: orderId },
-      data: { status: "CANCELLED" },
-    });
+    // 3. Update Order status
+    if (orderId) {
+      const updatedOrder = await tx.order.update({
+        where: { id: orderId },
+        data: { status: "CANCELLED" },
+        select: { eventId: true, orderNumber: true },
+      });
+      if (!resolvedEventId) {
+        resolvedEventId = updatedOrder.eventId;
+      }
+    }
+
+    // 4. Update Payment if exists and still PENDING
+    if (orderId) {
+      await tx.payment.updateMany({
+        where: { orderId, status: "PENDING" },
+        data: { status: "FAILED" },
+      });
+    }
   });
+
+  console.log(`[Inventory] 🔄 Released inventory for Order ${orderId} (Seats: [${seatIds.join(", ")}], Tickets: ${JSON.stringify(ticketTypeCounts)})`);
+
+  // 5. Broadcast Socket.io realtime updates to event room
+  if (resolvedEventId) {
+    try {
+      const io = getSocketIO();
+      io.to(`event:${resolvedEventId}`).emit("inventory:update", {
+        eventId: resolvedEventId,
+        reason: "inventory_released",
+        releasedSeats: seatIds,
+      });
+      io.to(`event:${resolvedEventId}`).emit("seats:update", {
+        eventId: resolvedEventId,
+        releasedSeats: seatIds,
+      });
+    } catch (e) {
+      console.warn("[Inventory] Socket emit failed:", e);
+    }
+  }
+}
+
+// ─── Clean up expired reservations (Passive & Scheduled) ─────────────────
+export async function cleanupExpiredReservations(
+  targetEventId?: string
+): Promise<{ releasedOrders: number; releasedSeats: number }> {
+  const now = new Date();
+  let totalOrdersReleased = 0;
+  let totalSeatsReleased = 0;
+
+  try {
+    // 1. Find and release expired PENDING orders
+    const orderWhere: any = {
+      status: "PENDING",
+      expiresAt: { lt: now },
+      ...(targetEventId && { eventId: targetEventId }),
+    };
+
+    const expiredOrders = await prisma.order.findMany({
+      where: orderWhere,
+      include: { items: true },
+      take: 100,
+    });
+
+    for (const order of expiredOrders) {
+      try {
+        await releaseInventory(order.items, order.id, order.eventId);
+        totalOrdersReleased++;
+      } catch (err) {
+        console.error(`[Cleanup] Error releasing expired order ${order.id}:`, err);
+      }
+    }
+
+    // 2. Find and reset any orphaned RESERVED seats past expiresAt
+    const seatWhere: any = {
+      status: "RESERVED",
+      expiresAt: { lt: now },
+      ...(targetEventId && {
+        row: { section: { eventId: targetEventId } },
+      }),
+    };
+
+    const orphanedSeats = await prisma.seat.findMany({
+      where: seatWhere,
+      select: { id: true, row: { select: { section: { select: { eventId: true } } } } },
+      take: 200,
+    });
+
+    if (orphanedSeats.length > 0) {
+      const seatIds = orphanedSeats.map((s) => s.id);
+      await prisma.seat.updateMany({
+        where: { id: { in: seatIds } },
+        data: {
+          status: "AVAILABLE",
+          reservedBy: null,
+          reservedAt: null,
+          expiresAt: null,
+        },
+      });
+
+      totalSeatsReleased += seatIds.length;
+      console.log(`[Cleanup] 🪑 Freed ${seatIds.length} orphaned reserved seats.`);
+
+      // Group by eventId and emit socket
+      const eventIds = new Set(orphanedSeats.map((s) => s.row.section.eventId));
+      try {
+        const io = getSocketIO();
+        for (const eId of eventIds) {
+          io.to(`event:${eId}`).emit("inventory:update", {
+            eventId: eId,
+            reason: "expired_seats_cleared",
+          });
+          io.to(`event:${eId}`).emit("seats:update", { eventId: eId });
+        }
+      } catch (e) {
+        console.warn("[Cleanup] Socket emit failed:", e);
+      }
+    }
+  } catch (err) {
+    console.error("[Cleanup] Error during expired reservations cleanup:", err);
+  }
+
+  return { releasedOrders: totalOrdersReleased, releasedSeats: totalSeatsReleased };
 }
 
 // ─── Apply Voucher ────────────────────────────────────────────────────────

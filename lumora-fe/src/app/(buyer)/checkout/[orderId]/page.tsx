@@ -39,6 +39,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
 
@@ -70,8 +71,8 @@ export default function CheckoutPage() {
           const fetchedOrder = res.data.data;
 
           if (fetchedOrder.status !== "PENDING") {
-            toast.info("Đơn hàng này đã được xử lý.");
-            router.push(`/orders/${fetchedOrder.id}`);
+            toast.info("Đơn hàng này đã được xử lý hoặc đã hủy.");
+            router.push(`/events/${fetchedOrder.event?.slug || fetchedOrder.event?.id || ""}`);
             return;
           }
 
@@ -93,18 +94,34 @@ export default function CheckoutPage() {
     if (session) fetchOrder();
   }, [orderId, router, session]);
 
-  // Countdown timer
+  // Countdown timer with automatic release
   useEffect(() => {
+    if (loading || !order) return;
     if (timeLeft <= 0) {
       if (order?.status === "PENDING") {
-        toast.error("Đặt chỗ đã hết hạn. Vui lòng đặt vé lại.");
+        api.post(`/orders/${order.id}/cancel`).catch(() => null);
+        toast.error("Thời gian giữ chỗ (15 phút) đã hết. Ghế/vé đã được nhả lại.");
         router.push(`/events/${order.event?.slug || order.event?.id}`);
       }
       return;
     }
     const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, order, router]);
+  }, [timeLeft, order, loading, router]);
+
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    setIsCancelling(true);
+    try {
+      await api.post(`/orders/${order.id}/cancel`);
+      toast.success("Đã huỷ đặt vé và nhả lại ghế/vé thành công.");
+    } catch (e) {
+      console.warn("Cancel order error:", e);
+    } finally {
+      setIsCancelling(false);
+      router.push(`/events/${order.event?.slug || order.event?.id || ""}`);
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -445,10 +462,11 @@ export default function CheckoutPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-12 rounded-xl font-bold border-[#93C453] text-[#4A7C59] dark:text-[#93C453] hover:bg-[#93C453]/10"
-                    onClick={() => router.back()}
+                    className="h-12 rounded-xl font-bold border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={handleCancelOrder}
+                    disabled={isCancelling || isProcessing}
                   >
-                    Huỷ bỏ
+                    {isCancelling ? "Đang huỷ..." : "Huỷ đặt vé"}
                   </Button>
 
                   <Button

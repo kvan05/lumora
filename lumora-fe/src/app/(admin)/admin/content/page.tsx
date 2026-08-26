@@ -106,7 +106,7 @@ export default function ContentPage() {
           }`}
         >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Banner Nổi Bật (Featured)</p>
+            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Banner Nổi Bật</p>
             <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{featuredCount}</p>
           </CardContent>
         </Card>

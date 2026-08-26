@@ -93,10 +93,10 @@ export default function FinancialReconciliationPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <Scale className="h-7 w-7 text-primary" /> Financial Reconciliation Center
+            <Scale className="h-7 w-7 text-primary" /> Trung Tâm Đối Soát Tài Chính
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Đối soát tài chính toàn sàn — Tự động kiểm tra khớp sổ sách Orders ↔ Payments ↔ Refunds ↔ Platform Fee (5%) ↔ Withdrawals.
+            Đối soát tài chính toàn sàn — Tự động kiểm tra khớp sổ sách Đơn hàng ↔ Thanh toán ↔ Hoàn tiền ↔ Phí sàn (5%) ↔ Yêu cầu rút tiền.
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -150,11 +150,11 @@ export default function FinancialReconciliationPage() {
             </div>
             <div>
               <h2 className={`text-xl font-extrabold ${isBalanced ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {isBalanced ? "✓ Financial records are balanced (Dữ liệu tài chính cân bằng 100%)" : "Financial discrepancy detected (Phát hiện chênh lệch tài chính)"}
+                {isBalanced ? "✓ Dữ liệu tài chính cân bằng 100%" : "Phát hiện chênh lệch tài chính"}
               </h2>
               <p className="text-xs text-muted-foreground mt-1">
                 {isBalanced
-                  ? "Tất cả giao dịch Đơn hàng, Cổng thanh toán PayOS, Phí sàn 5% và Tiền trả Seller khớp tuyệt đối."
+                  ? "Tất cả giao dịch Đơn hàng, Cổng thanh toán, Phí sàn 5% và Tiền trả Ban tổ chức khớp tuyệt đối."
                   : `Phát hiện chênh lệch sổ sách: ${fmt(current.discrepancy)}. Vui lòng kiểm tra lại.`}
               </p>
             </div>
@@ -165,7 +165,7 @@ export default function FinancialReconciliationPage() {
               isBalanced ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
             }`}
           >
-            {isBalanced ? "STATUS: BALANCED" : "STATUS: DISCREPANCY"}
+            {isBalanced ? "TRẠNG THÁI: CÂN BẰNG" : "TRẠNG THÁI: CÓ CHÊNH LỆCH"}
           </Badge>
         </CardContent>
       </Card>
@@ -197,7 +197,7 @@ export default function FinancialReconciliationPage() {
           }`}
         >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Gross Revenue</p>
+            <p className="text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Tổng Doanh Thu</p>
             <p className="text-lg font-black text-foreground mt-0.5">{fmt(current.grossRevenue)}</p>
           </CardContent>
         </Card>
@@ -212,7 +212,7 @@ export default function FinancialReconciliationPage() {
           }`}
         >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Hoàn Tiền (Refund)</p>
+            <p className="text-[11px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Hoàn Tiền</p>
             <p className="text-lg font-black text-red-600 dark:text-red-400 mt-0.5">-{fmt(current.refundedAmount)}</p>
           </CardContent>
         </Card>
@@ -227,7 +227,7 @@ export default function FinancialReconciliationPage() {
           }`}
         >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Phí Sàn Lumora (5%)</p>
+            <p className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Phí Sàn (5%)</p>
             <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{fmt(current.platformFee)}</p>
           </CardContent>
         </Card>
@@ -242,7 +242,7 @@ export default function FinancialReconciliationPage() {
           }`}
         >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Seller Payout (95%)</p>
+            <p className="text-[11px] font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Ban Tổ Chức (95%)</p>
             <p className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">{fmt(current.sellerPayout)}</p>
           </CardContent>
         </Card>
@@ -257,7 +257,7 @@ export default function FinancialReconciliationPage() {
           }`}
         >
           <CardContent className="pt-3.5 pb-3.5 px-3.5">
-            <p className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Đã Chi Trả (Withdraw)</p>
+            <p className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Đã Chi Trả Rút Tiền</p>
             <p className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">{fmt(current.paidWithdrawalsAmount)}</p>
           </CardContent>
         </Card>
@@ -270,14 +270,14 @@ export default function FinancialReconciliationPage() {
             <div>
               <CardTitle className="text-base font-extrabold text-primary flex items-center gap-2">
                 <Receipt className="h-5 w-5" />
-                {activeCard === "GROSS" && "Chi Tiết Doanh Thu Gross (Gross Revenue Breakdown)"}
-                {activeCard === "REFUND" && "Chi Tiết Đơn Hoàn Tiền (Refunded Orders Audit)"}
-                {activeCard === "FEE" && "Chi Tiết Phí Nền Tảng Sàn 5% (Platform Fee Breakdown)"}
-                {activeCard === "PAYOUT" && "Chi Tiết Phân Phối Doanh Thu Seller (Seller Payout 95%)"}
-                {activeCard === "WITHDRAW" && "Chi Tiết Đã Chi Trả Rút Tiền (Completed Withdrawals Audit)"}
+                {activeCard === "GROSS" && "Chi Tiết Tổng Doanh Thu"}
+                {activeCard === "REFUND" && "Chi Tiết Đơn Hoàn Tiền"}
+                {activeCard === "FEE" && "Chi Tiết Phí Sàn 5%"}
+                {activeCard === "PAYOUT" && "Chi Tiết Phân Phối Doanh Thu Ban Tổ Chức (95%)"}
+                {activeCard === "WITHDRAW" && "Chi Tiết Lệnh Rút Tiền Đã Chi Trả"}
               </CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Bảng phân tích chi tiết dữ liệu thực tế từ các dòng giao dịch CSDL PostgreSQL.
+                Bảng phân tích chi tiết dữ liệu thực tế từ các dòng giao dịch cơ sở dữ liệu.
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" className="rounded-xl text-xs font-bold" onClick={() => setActiveCard("ALL")}>
@@ -296,9 +296,9 @@ export default function FinancialReconciliationPage() {
                       <TableRow className="bg-muted/40 hover:bg-muted/40">
                         <TableHead className="font-bold text-xs uppercase">Mã Đơn</TableHead>
                         <TableHead className="font-bold text-xs uppercase">Sự Kiện & Khách Hàng</TableHead>
-                        <TableHead className="font-bold text-xs uppercase text-right">Tổng Tiền (Gross)</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-right">Tổng Tiền</TableHead>
                         <TableHead className="font-bold text-xs uppercase text-right">Phí Sàn 5%</TableHead>
-                        <TableHead className="font-bold text-xs uppercase text-right">Thực Nhận Seller 95%</TableHead>
+                        <TableHead className="font-bold text-xs uppercase text-right">Thực Nhận BTC 95%</TableHead>
                         <TableHead className="font-bold text-xs uppercase text-center">Trạng Thái</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -394,9 +394,9 @@ export default function FinancialReconciliationPage() {
       <Card className="rounded-3xl border-border/50 bg-card shadow-xs overflow-hidden">
         <CardHeader className="pb-3 border-b border-border/40">
           <CardTitle className="text-base font-bold flex items-center gap-2">
-            <History className="h-5 w-5 text-primary" /> Lịch Sử Các Kỳ Đối Soát Đã Chốt (Reconciliation History)
+            <History className="h-5 w-5 text-primary" /> Lịch Sử Các Kỳ Đối Soát Đã Chốt
           </CardTitle>
-          <CardDescription>Bản ghi lưu trữ đối soát tài chính từ CSDL PostgreSQL.</CardDescription>
+          <CardDescription>Bản ghi lưu trữ đối soát tài chính từ cơ sở dữ liệu hệ thống.</CardDescription>
         </CardHeader>
 
         <CardContent className="p-4">
@@ -417,7 +417,7 @@ export default function FinancialReconciliationPage() {
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Tên Kỳ Đối Soát</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Khoảng Thời Gian</TableHead>
-                    <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Gross GMV</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Tổng Doanh Thu</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Phí Sàn (5%)</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Chênh Lệch</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-center">Trạng Thái</TableHead>
@@ -447,7 +447,7 @@ export default function FinancialReconciliationPage() {
                             h.status === "BALANCED" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
                           }`}
                         >
-                          {h.status}
+                          {h.status === "BALANCED" ? "CÂN BẰNG" : h.status}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -467,20 +467,20 @@ export default function FinancialReconciliationPage() {
               <Scale className="h-5 w-5 text-primary" /> Chốt Bản Ghi Kỳ Đối Soát Tài Chính
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Lưu bản ghi chốt kỳ đối soát tài chính của sàn vào CSDL PostgreSQL.
+              Lưu bản ghi chốt kỳ đối soát tài chính của sàn vào cơ sở dữ liệu.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-xs">
             <div className="bg-muted/40 p-3 rounded-xl border space-y-1">
               <p>Chu kỳ: <span className="font-bold text-foreground">{period}</span></p>
-              <p>Gross GMV: <span className="font-extrabold text-primary">{fmt(current.grossRevenue)}</span></p>
+              <p>Tổng doanh thu: <span className="font-extrabold text-primary">{fmt(current.grossRevenue)}</span></p>
               <p>Phí sàn 5%: <span className="font-bold text-emerald-600">{fmt(current.platformFee)}</span></p>
-              <p>Trạng thái đối soát: <span className="font-bold text-emerald-600">{current.status}</span></p>
+              <p>Trạng thái đối soát: <span className="font-bold text-emerald-600">{current.status === "BALANCED" ? "CÂN BẰNG" : current.status}</span></p>
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-foreground">Ghi chú kỳ đối soát (Notes):</label>
+              <label className="font-bold text-foreground">Ghi chú kỳ đối soát:</label>
               <Textarea
                 placeholder="Nhập ghi chú chốt sổ tài chính..."
                 className="rounded-xl min-h-[70px]"
@@ -499,7 +499,7 @@ export default function FinancialReconciliationPage() {
               onClick={() => snapshotMutation.mutate()}
               disabled={snapshotMutation.isPending}
             >
-              {snapshotMutation.isPending ? "Đang lưu..." : "Xác Nhận Lưu Snapshot"}
+              {snapshotMutation.isPending ? "Đang lưu..." : "Xác Nhận Lưu Kỳ Đối Soát"}
             </Button>
           </DialogFooter>
         </DialogContent>

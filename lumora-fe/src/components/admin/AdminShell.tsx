@@ -24,22 +24,22 @@ const NAV_GROUPS = [
   {
     label: "Tổng quan",
     items: [
-      { href: "/admin", icon: LayoutDashboard, label: "Control Center", exact: true },
+      { href: "/admin", icon: LayoutDashboard, label: "Trung tâm điều khiển", exact: true },
     ],
   },
   {
     label: "Điều hành & Giám sát",
     items: [
-      { href: "/admin/risk-alerts", icon: ShieldAlert, label: "Phát hiện rủi ro (Risk)" },
+      { href: "/admin/risk-alerts", icon: ShieldAlert, label: "Trung tâm phát hiện rủi ro" },
       { href: "/admin/reconciliation", icon: Scale, label: "Đối soát tài chính" },
-      { href: "/admin/audit-logs", icon: History, label: "System Audit Logs" },
+      { href: "/admin/audit-logs", icon: History, label: "Nhật ký hệ thống" },
     ],
   },
   {
     label: "Người dùng",
     items: [
       { href: "/admin/users", icon: Users, label: "Quản lý tài khoản" },
-      { href: "/admin/users/organizers", icon: ShieldCheck, label: "Nhà tổ chức" },
+      { href: "/admin/users/organizers", icon: ShieldCheck, label: "Ban tổ chức sự kiện" },
     ],
   },
   {
@@ -47,7 +47,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/events", icon: Calendar, label: "Quản lý sự kiện" },
       { href: "/admin/tickets", icon: Ticket, label: "Quản lý vé" },
-      { href: "/admin/checkin", icon: Barcode, label: "E-ticket & Check-in" },
+      { href: "/admin/checkin", icon: Barcode, label: "Vé điện tử & Check-in" },
     ],
   },
   {

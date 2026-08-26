@@ -67,16 +67,42 @@ export default function RiskAlertsPage() {
     toast.success("Đã đặt lại tất cả bộ lọc");
   };
 
+  const getRiskLevelBadge = (level: string) => {
+    switch (level) {
+      case "CRITICAL":
+        return { label: "Nghiêm trọng", color: "bg-red-600 text-white" };
+      case "HIGH":
+        return { label: "Cao", color: "bg-amber-600 text-white" };
+      case "MEDIUM":
+        return { label: "Trung bình", color: "bg-blue-600 text-white" };
+      default:
+        return { label: "Thấp", color: "bg-slate-600 text-white" };
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "OPEN":
+        return { label: "Mới phát hiện", color: "bg-blue-500/15 text-blue-600" };
+      case "REVIEWING":
+        return { label: "Đang điều tra", color: "bg-amber-500/15 text-amber-600" };
+      case "RESOLVED":
+        return { label: "Đã xử lý", color: "bg-emerald-500/15 text-emerald-600" };
+      default:
+        return { label: "Đã bỏ qua", color: "bg-gray-500/15 text-gray-600" };
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <ShieldAlert className="h-7 w-7 text-red-500" /> Fraud / Risk Detection Center
+            <ShieldAlert className="h-7 w-7 text-red-500" /> Trung Tâm Phát Hiện Rủi Ro
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Hệ thống phát hiện rủi ro Rule-Based — Đánh giá điểm Risk Score (0-100) cho Đơn hàng, Mã vé, Seller và Sự kiện.
+            Hệ thống phát hiện rủi ro tự động — Đánh giá điểm rủi ro (0-100) cho Đơn hàng, Mã vé, Ban tổ chức và Sự kiện.
           </p>
         </div>
         <Button
@@ -117,7 +143,7 @@ export default function RiskAlertsPage() {
           }`}
         >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Mức Độ CRITICAL (80-100)</p>
+            <p className="text-xs font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Mức Nghiêm Trọng (80 - 100)</p>
             <p className="text-2xl font-black text-red-600 dark:text-red-400 mt-1">{criticalCount}</p>
           </CardContent>
         </Card>
@@ -132,7 +158,7 @@ export default function RiskAlertsPage() {
           }`}
         >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Mức Độ HIGH (60-79)</p>
+            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Mức Rủi Ro Cao (60 - 79)</p>
             <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{highCount}</p>
           </CardContent>
         </Card>
@@ -147,7 +173,7 @@ export default function RiskAlertsPage() {
           }`}
         >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Cần Admin Xử Lý (OPEN)</p>
+            <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Cần Xử Lý Ngay (Mới)</p>
             <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{openCount}</p>
           </CardContent>
         </Card>
@@ -163,23 +189,23 @@ export default function RiskAlertsPage() {
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="ALL" className="text-xs font-bold">Tất cả trạng thái</SelectItem>
-                <SelectItem value="OPEN" className="text-xs">Mới phát hiện (OPEN)</SelectItem>
-                <SelectItem value="REVIEWING" className="text-xs">Đang điều tra (REVIEWING)</SelectItem>
-                <SelectItem value="RESOLVED" className="text-xs">Đã giải quyết (RESOLVED)</SelectItem>
-                <SelectItem value="IGNORED" className="text-xs">Bỏ qua (IGNORED)</SelectItem>
+                <SelectItem value="OPEN" className="text-xs">Mới phát hiện</SelectItem>
+                <SelectItem value="REVIEWING" className="text-xs">Đang điều tra</SelectItem>
+                <SelectItem value="RESOLVED" className="text-xs">Đã giải quyết</SelectItem>
+                <SelectItem value="IGNORED" className="text-xs">Bỏ qua</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={levelFilter} onValueChange={setLevelFilter}>
-              <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl text-xs font-semibold">
+              <SelectTrigger className="w-full sm:w-52 h-10 rounded-xl text-xs font-semibold">
                 <SelectValue placeholder="Mức độ rủi ro" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="ALL" className="text-xs font-bold">Tất cả mức độ</SelectItem>
-                <SelectItem value="CRITICAL" className="text-xs">CRITICAL (80 - 100)</SelectItem>
-                <SelectItem value="HIGH" className="text-xs">HIGH (60 - 79)</SelectItem>
-                <SelectItem value="MEDIUM" className="text-xs">MEDIUM (30 - 59)</SelectItem>
-                <SelectItem value="LOW" className="text-xs">LOW (0 - 29)</SelectItem>
+                <SelectItem value="CRITICAL" className="text-xs">Nghiêm trọng (80 - 100)</SelectItem>
+                <SelectItem value="HIGH" className="text-xs">Cao (60 - 79)</SelectItem>
+                <SelectItem value="MEDIUM" className="text-xs">Trung bình (30 - 59)</SelectItem>
+                <SelectItem value="LOW" className="text-xs">Thấp (0 - 29)</SelectItem>
               </SelectContent>
             </Select>
 
@@ -215,12 +241,14 @@ export default function RiskAlertsPage() {
           <Card className="rounded-3xl p-12 text-center text-muted-foreground border-border/50">
             <ShieldCheck className="h-12 w-12 mx-auto mb-3 text-emerald-500" />
             <p className="text-base font-bold text-foreground">Không phát hiện rủi ro bất thường nào</p>
-            <p className="text-xs mt-1">Toàn bộ hệ thống giao dịch, mã vé và nhà tổ chức đang hoạt động an toàn.</p>
+            <p className="text-xs mt-1">Toàn bộ hệ thống giao dịch, mã vé và ban tổ chức đang hoạt động an toàn.</p>
           </Card>
         ) : (
           alerts.map((alert: any) => {
             const isCritical = alert.riskLevel === "CRITICAL";
             const isHigh = alert.riskLevel === "HIGH";
+            const levelInfo = getRiskLevelBadge(alert.riskLevel);
+            const statusInfo = getStatusBadge(alert.status);
 
             return (
               <Card
@@ -236,31 +264,14 @@ export default function RiskAlertsPage() {
                 <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="space-y-2 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge
-                        className={`font-black text-xs px-2.5 py-0.5 rounded-lg ${
-                          isCritical
-                            ? "bg-red-600 text-white"
-                            : isHigh
-                            ? "bg-amber-600 text-white"
-                            : "bg-blue-600 text-white"
-                        }`}
-                      >
-                        Risk Score: {alert.riskScore}/100 ({alert.riskLevel})
+                      <Badge className={`font-black text-xs px-2.5 py-0.5 rounded-lg ${levelInfo.color}`}>
+                        Điểm rủi ro: {alert.riskScore}/100 ({levelInfo.label})
                       </Badge>
                       <Badge variant="outline" className="text-xs font-mono">
-                        Entity: {alert.entityType} #{alert.entityId}
+                        Đối tượng: {alert.entityType} #{alert.entityId}
                       </Badge>
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] font-bold ${
-                          alert.status === "OPEN"
-                            ? "bg-blue-500/15 text-blue-600"
-                            : alert.status === "RESOLVED"
-                            ? "bg-emerald-500/15 text-emerald-600"
-                            : "bg-gray-500/15 text-gray-600"
-                        }`}
-                      >
-                        {alert.status}
+                      <Badge variant="secondary" className={`text-[10px] font-bold ${statusInfo.color}`}>
+                        {statusInfo.label}
                       </Badge>
                     </div>
 
@@ -303,10 +314,10 @@ export default function RiskAlertsPage() {
         <DialogContent className="max-w-lg rounded-2xl p-6">
           <DialogHeader>
             <DialogTitle className="font-bold text-lg flex items-center gap-2 text-red-600">
-              <ShieldAlert className="h-5 w-5" /> Điều Tra Cảnh Báo Rủi Ro (Risk Investigation)
+              <ShieldAlert className="h-5 w-5" /> Điều Tra Cảnh Báo Rủi Ro
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Chi tiết điểm số rủi ro, phân tích nguyên nhân và quyết định xử lý từ Admin.
+              Chi tiết điểm số rủi ro, phân tích nguyên nhân và quyết định xử lý từ Quản trị viên.
             </DialogDescription>
           </DialogHeader>
 
@@ -314,15 +325,15 @@ export default function RiskAlertsPage() {
             <div className="space-y-4 text-xs">
               <div className="bg-muted/40 p-3 rounded-xl border space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-foreground">Đối tượng (Entity): {selectedAlert.entityType}</span>
-                  <Badge className="bg-red-600 text-white font-extrabold">Score: {selectedAlert.riskScore}/100</Badge>
+                  <span className="font-bold text-foreground">Đối tượng: {selectedAlert.entityType}</span>
+                  <Badge className="bg-red-600 text-white font-extrabold">Điểm rủi ro: {selectedAlert.riskScore}/100</Badge>
                 </div>
-                <p>Entity ID: <span className="font-mono">{selectedAlert.entityId}</span></p>
-                <p>Mức độ rủi ro: <span className="font-bold text-red-500">{selectedAlert.riskLevel}</span></p>
+                <p>Mã đối tượng: <span className="font-mono">{selectedAlert.entityId}</span></p>
+                <p>Mức độ rủi ro: <span className="font-bold text-red-500">{getRiskLevelBadge(selectedAlert.riskLevel).label}</span></p>
               </div>
 
               <div className="space-y-1">
-                <p className="font-bold text-foreground">Lý do hệ thống cảnh báo (Risk Factors):</p>
+                <p className="font-bold text-foreground">Yếu tố rủi ro phát hiện:</p>
                 <div className="bg-red-500/5 p-3 rounded-xl border border-red-500/20 space-y-1">
                   {Array.isArray(selectedAlert.reasons) &&
                     selectedAlert.reasons.map((r: string, idx: number) => (
@@ -340,15 +351,15 @@ export default function RiskAlertsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="REVIEWING">REVIEWING — Đang tiến hành điều tra</SelectItem>
-                    <SelectItem value="RESOLVED">RESOLVED — Đã xử lý / Khắc phục xong</SelectItem>
-                    <SelectItem value="IGNORED">IGNORED — Bỏ qua (Đã xác minh an toàn)</SelectItem>
+                    <SelectItem value="REVIEWING">Đang tiến hành điều tra</SelectItem>
+                    <SelectItem value="RESOLVED">Đã xử lý / Khắc phục xong</SelectItem>
+                    <SelectItem value="IGNORED">Bỏ qua (Đã xác minh an toàn)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-bold text-foreground">Ghi chú xử lý của Admin (Admin Note):</label>
+                <label className="font-bold text-foreground">Ghi chú xử lý của Quản trị viên:</label>
                 <Textarea
                   placeholder="Nhập nội dung ghi chú kết quả điều tra..."
                   className="rounded-xl min-h-[80px]"

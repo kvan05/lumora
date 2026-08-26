@@ -193,10 +193,10 @@ export default function EventsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5">
-            <Calendar className="h-8 w-8 text-primary" /> Quản Lý Sự Kiện (Events)
+            <Calendar className="h-8 w-8 text-primary" /> Quản Lý Sự Kiện
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Quản lý trạng thái xuất bản mở bán, duyệt hiển thị sự kiện và hỗ trợ Nhà tổ chức.
+            Quản lý trạng thái xuất bản mở bán, duyệt hiển thị sự kiện và hỗ trợ Ban tổ chức.
           </p>
         </div>
         <div className="flex gap-2">
@@ -458,10 +458,10 @@ export default function EventsPage() {
                               variant="outline"
                               size="sm"
                               className="h-8 rounded-xl text-xs font-bold gap-1 border-emerald-500/30 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10"
-                              title="Xem Health Score"
+                              title="Xem Điểm sức khỏe"
                               onClick={() => { setSelectedEvent(event); setDetailOpen(true); }}
                             >
-                              <Activity className="h-3.5 w-3.5" /> Score
+                              <Activity className="h-3.5 w-3.5" /> Điểm sức khỏe
                             </Button>
 
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" title="Xem chi tiết" onClick={() => { setSelectedEvent(event); setDetailOpen(true); setApprovalNote(""); }}>

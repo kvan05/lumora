@@ -4,6 +4,12 @@ import { createError } from "../middleware/errorHandler";
 // @ts-ignore - TS Server caching issue
 import { generateSlug } from "../utils/slug";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import {
+  computeEventExpiry,
+  activeEventWhereClause,
+  searchableEventWhereClause,
+} from "../utils/eventStatus";
+import { cleanupExpiredReservations } from "./order.controller";
 
 // ─── List Events (with filter + pagination) ────────────────────────────
 export async function listEvents(
@@ -25,8 +31,16 @@ export async function listEvents(
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    // Filter rule:
+    // - If searching: hide events ended > 30 days (searchableEventWhereClause)
+    // - If browsing normal list: hide events ended > 7 days (activeEventWhereClause)
+    const expiryFilter = search
+      ? searchableEventWhereClause()
+      : activeEventWhereClause();
+
     const where: any = {
       status: "PUBLISHED",
+      ...expiryFilter,
       ...(category && { category: { contains: category } }),
       ...(city && { city: { contains: city } }),
       ...(search && {
@@ -103,6 +117,7 @@ export async function listEvents(
       data: {
         events: events.map((e: any) => ({
           ...e,
+          ...computeEventExpiry(e.endDate),
           minPrice: e.ticketTypes[0]?.price ?? null,
           ticketTypes: undefined,
         })),
@@ -127,7 +142,11 @@ export async function getFeaturedEvents(
 ): Promise<void> {
   try {
     const events = await prisma.event.findMany({
-      where: { status: "PUBLISHED", isFeatured: true },
+      where: {
+        status: "PUBLISHED",
+        isFeatured: true,
+        ...activeEventWhereClause(),
+      },
       take: 6,
       orderBy: { startDate: "asc" },
       select: {
@@ -153,6 +172,7 @@ export async function getFeaturedEvents(
       success: true,
       data: events.map((e: any) => ({
         ...e,
+        ...computeEventExpiry(e.endDate),
         minPrice: e.ticketTypes[0]?.price ?? null,
         ticketTypes: undefined,
       })),
@@ -191,13 +211,20 @@ export async function getHomepageEvents(
 
     const [featured, allEvents] = await Promise.all([
       prisma.event.findMany({
-        where: { status: "PUBLISHED", isFeatured: true },
+        where: {
+          status: "PUBLISHED",
+          isFeatured: true,
+          ...activeEventWhereClause(),
+        },
         take: 6,
         orderBy: { startDate: "asc" },
         select: selectFields,
       }),
       prisma.event.findMany({
-        where: { status: "PUBLISHED" },
+        where: {
+          status: "PUBLISHED",
+          ...activeEventWhereClause(),
+        },
         take: 8,
         orderBy: { createdAt: "desc" },
         select: selectFields,
@@ -206,6 +233,7 @@ export async function getHomepageEvents(
 
     const mapMinPrice = (e: any) => ({
       ...e,
+      ...computeEventExpiry(e.endDate),
       minPrice: e.ticketTypes[0]?.price ?? null,
       ticketTypes: undefined,
     });
@@ -234,7 +262,7 @@ export async function getEventBySlug(
   try {
     const slug = req.params.slug as string;
 
-    const event = await prisma.event.findUnique({
+    let event = await prisma.event.findUnique({
       where: { slug },
       include: {
         seller: {
@@ -242,7 +270,7 @@ export async function getEventBySlug(
         },
         ticketTypes: {
           where: { status: { in: ["ACTIVE", "SOLD_OUT"] } },
-          orderBy: { sortOrder: "asc" },
+          orderBy: [{ eventDate: "asc" }, { sortOrder: "asc" }],
           include: { inventory: true },
         },
         seatSections: {
@@ -261,7 +289,77 @@ export async function getEventBySlug(
       throw createError("Event not found", 404, "EVENT_NOT_FOUND");
     }
 
-    res.json({ success: true, data: event });
+    // Passive cleanup: clean up expired holds for this event
+    const cleaned = await cleanupExpiredReservations(event.id);
+    if (cleaned.releasedOrders > 0 || cleaned.releasedSeats > 0) {
+      // Re-fetch fresh event data with updated inventories & seat statuses
+      event = await prisma.event.findUnique({
+        where: { slug },
+        include: {
+          seller: {
+            select: { id: true, name: true, avatar: true, email: true },
+          },
+          ticketTypes: {
+            where: { status: { in: ["ACTIVE", "SOLD_OUT"] } },
+            orderBy: [{ eventDate: "asc" }, { sortOrder: "asc" }],
+            include: { inventory: true },
+          },
+          seatSections: {
+            orderBy: { sortOrder: "asc" },
+            include: {
+              rows: {
+                orderBy: { sortOrder: "asc" },
+                include: { seats: true },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (!event) {
+      throw createError("Event not found", 404, "EVENT_NOT_FOUND");
+    }
+
+    // ── Compute event expiry metadata ────────────────────────────────────
+    const expiry = computeEventExpiry(event.endDate);
+
+    // ── Compute multi-day metadata ───────────────────────────────────────
+    const startDay = event.startDate.toISOString().split("T")[0];
+    const endDay = event.endDate.toISOString().split("T")[0];
+    const isMultiDay = startDay !== endDay;
+
+    // Collect distinct event dates from ticket types (sorted ascending)
+    const dateSet = new Set<string>();
+    for (const tt of event.ticketTypes) {
+      if ((tt as any).eventDate) {
+        dateSet.add(new Date((tt as any).eventDate).toISOString().split("T")[0]);
+      }
+    }
+
+    // If no tickets have specific dates but event is multi-day,
+    // generate all calendar dates from startDate to endDate
+    let eventDates: string[] = Array.from(dateSet).sort();
+    if (isMultiDay && eventDates.length === 0) {
+      const cur = new Date(event.startDate);
+      cur.setUTCHours(0, 0, 0, 0);
+      const end = new Date(event.endDate);
+      end.setUTCHours(0, 0, 0, 0);
+      while (cur <= end) {
+        eventDates.push(cur.toISOString().split("T")[0]);
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...event,
+        ...expiry,
+        isMultiDay,
+        eventDates, // ["2026-08-29", "2026-08-30", ...]
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -280,7 +378,10 @@ export async function getCategories(
 
     const eventCounts = await prisma.event.groupBy({
       by: ["category"],
-      where: { status: "PUBLISHED" },
+      where: {
+        status: "PUBLISHED",
+        ...activeEventWhereClause(),
+      },
       _count: { category: true },
     });
 
@@ -312,7 +413,10 @@ export async function getCities(
   try {
     const result = await prisma.event.groupBy({
       by: ["city"],
-      where: { status: "PUBLISHED" },
+      where: {
+        status: "PUBLISHED",
+        ...activeEventWhereClause(),
+      },
       _count: { city: true },
       orderBy: { _count: { city: "desc" } },
     });

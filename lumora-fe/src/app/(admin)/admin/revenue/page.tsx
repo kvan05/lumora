@@ -167,7 +167,7 @@ export default function AdminFinancePage() {
             <Wallet className="h-6 w-6 text-primary" /> Quản lý Tài chính & Rút tiền
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Duyệt yêu cầu rút tiền của Organizer và quản lý các bảng đối soát sự kiện (Escrow).
+            Duyệt yêu cầu rút tiền của Ban tổ chức và quản lý các bảng đối soát doanh thu sự kiện.
           </p>
         </div>
       </div>
@@ -216,7 +216,7 @@ export default function AdminFinancePage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <TabsList className="bg-muted/60 p-1 rounded-xl">
             <TabsTrigger value="withdrawals" className="rounded-lg font-bold text-sm gap-2">
-              <Banknote className="h-4 w-4" /> Rút tiền (Organizer)
+              <Banknote className="h-4 w-4" /> Rút tiền (Ban tổ chức)
               {pendingWithdrawalsCount > 0 && (
                 <Badge className="bg-amber-500 text-white ml-1 px-1.5 py-0 text-[10px]">
                   {pendingWithdrawalsCount}
@@ -265,7 +265,7 @@ export default function AdminFinancePage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
-                    <TableHead className="font-bold text-xs uppercase">Organizer</TableHead>
+                    <TableHead className="font-bold text-xs uppercase">Ban tổ chức</TableHead>
                     <TableHead className="font-bold text-xs uppercase">Số tiền rút</TableHead>
                     <TableHead className="font-bold text-xs uppercase">Ngân hàng & Số tài khoản</TableHead>
                     <TableHead className="font-bold text-xs uppercase">Thời gian gửi</TableHead>

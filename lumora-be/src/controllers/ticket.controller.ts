@@ -10,6 +10,7 @@ export async function getTicketTypes(
 ): Promise<void> {
   try {
     const eventId = req.params.eventId as string;
+    const { date } = req.query as Record<string, string>;
 
     const ticketTypes = await prisma.ticketType.findMany({
       where: { eventId },
@@ -21,7 +22,20 @@ export async function getTicketTypes(
       },
     });
 
-    const enriched = ticketTypes.map((t: any) => ({
+    // Filter by date if provided: include tickets with no eventDate (apply all days)
+    // or tickets whose eventDate matches the requested date
+    let filtered = ticketTypes;
+    if (date) {
+      const requestedDate = new Date(date);
+      const requestedDateStr = requestedDate.toISOString().split("T")[0];
+      filtered = ticketTypes.filter((t: any) => {
+        if (!t.eventDate) return true; // null = applies to all days
+        const ticketDateStr = new Date(t.eventDate).toISOString().split("T")[0];
+        return ticketDateStr === requestedDateStr;
+      });
+    }
+
+    const enriched = filtered.map((t: any) => ({
       ...t,
       available: t.inventory
         ? t.inventory.totalQty - t.inventory.reservedQty - t.inventory.soldQty
@@ -59,6 +73,7 @@ export async function createTicketType(
       saleEnd,
       color,
       sortOrder = 0,
+      eventDate, // New: specific date this ticket applies to (null = all days)
     } = req.body;
 
     if (!name || !price || !quantity) {
@@ -79,6 +94,7 @@ export async function createTicketType(
           saleEnd: saleEnd ? new Date(saleEnd) : null,
           color,
           sortOrder,
+          eventDate: eventDate ? new Date(eventDate) : null,
         },
       });
 
@@ -119,13 +135,27 @@ export async function updateTicketType(
     });
     if (!existing) throw createError("Ticket type not found", 404);
 
-    const { name, description, price, originalPrice, quantity, maxPerOrder, saleStart, saleEnd, status, color, sortOrder } =
+    const { name, description, price, originalPrice, quantity, maxPerOrder, saleStart, saleEnd, status, color, sortOrder, eventDate } =
       req.body;
 
     const updated = await prisma.$transaction(async (tx) => {
       const tt = await tx.ticketType.update({
         where: { id: ticketId },
-        data: { name, description, price, originalPrice, quantity, maxPerOrder, saleStart, saleEnd, status, color, sortOrder },
+        data: {
+          name,
+          description,
+          price,
+          originalPrice,
+          quantity,
+          maxPerOrder,
+          saleStart,
+          saleEnd,
+          status,
+          color,
+          sortOrder,
+          // Allow explicit null to clear eventDate, undefined to keep unchanged
+          ...(eventDate !== undefined && { eventDate: eventDate ? new Date(eventDate) : null }),
+        },
       });
 
       // Sync inventory totalQty if quantity changed

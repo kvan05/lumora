@@ -1,52 +1,56 @@
 import cron from "node-cron";
 import prisma from "../prisma/client";
-import { releaseInventory } from "../controllers/order.controller";
+import { releaseInventory, cleanupExpiredReservations } from "../controllers/order.controller";
 import { getSocketIO } from "../socket";
 
 /**
- * Order timeout job — runs every minute.
- * Finds PENDING orders past their expiresAt and releases reserved inventory.
+ * Order timeout job — runs every 30 seconds.
+ * Finds PENDING orders past their expiresAt, releases reserved inventory,
+ * and cleans up any orphaned expired seat holds.
  */
 export function startOrderTimeoutJob(): void {
-  console.log("⏰ Order timeout job started (runs every minute)");
+  console.log("⏰ Order & Seat timeout job started (runs every 30s)");
 
-  cron.schedule("* * * * *", async () => {
+  // Run every 30 seconds
+  cron.schedule("*/30 * * * * *", async () => {
     try {
+      const now = new Date();
       const expiredOrders = await prisma.order.findMany({
         where: {
           status: "PENDING",
-          expiresAt: { lt: new Date() },
+          expiresAt: { lt: now },
         },
         include: { items: true },
-        take: 50, // Process in batches
+        take: 50,
       });
 
-      if (expiredOrders.length === 0) return;
+      if (expiredOrders.length > 0) {
+        console.log(`⏰ [TimeoutJob] Releasing ${expiredOrders.length} expired order(s)...`);
 
-      console.log(`⏰ Releasing ${expiredOrders.length} expired order(s)...`);
+        for (const order of expiredOrders) {
+          try {
+            await releaseInventory(order.items, order.id, order.eventId);
 
-      for (const order of expiredOrders) {
-        try {
-          await releaseInventory(order.items, order.id);
+            // Notify buyer their reservation expired
+            try {
+              const io = getSocketIO();
+              io.to(`user:${order.buyerId}`).emit("order:expired", {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+              });
+            } catch (e) {
+              console.warn("[TimeoutJob] Socket emit error:", e);
+            }
 
-          // Notify event room of freed inventory
-          const io = getSocketIO();
-          io.to(`event:${order.eventId}`).emit("inventory:update", {
-            eventId: order.eventId,
-            reason: "order_timeout",
-          });
-
-          // Notify buyer their reservation expired
-          io.to(`user:${order.buyerId}`).emit("order:expired", {
-            orderId: order.id,
-            orderNumber: order.orderNumber,
-          });
-
-          console.log(`  ✓ Released order ${order.orderNumber}`);
-        } catch (err) {
-          console.error(`  ✗ Failed to release order ${order.id}:`, err);
+            console.log(`  ✓ Auto-released expired order ${order.orderNumber}`);
+          } catch (err) {
+            console.error(`  ✗ Failed to release order ${order.id}:`, err);
+          }
         }
       }
+
+      // Also clean up any orphaned expired seat holds
+      await cleanupExpiredReservations();
     } catch (err) {
       console.error("[OrderTimeoutJob] Error:", err);
     }

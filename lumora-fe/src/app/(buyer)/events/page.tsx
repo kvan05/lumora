@@ -275,10 +275,15 @@ export default function EventsPage() {
                   </div>
                 )}
 
-                <div className="absolute top-3.5 left-3.5 flex gap-2 z-10">
+                <div className="absolute top-3.5 left-3.5 flex flex-wrap gap-1.5 z-10 max-w-[70%]">
                   <Badge className="bg-[#93C453] text-slate-900 shadow-md text-xs px-3 py-1 rounded-full font-extrabold border-none">
                     {event.category || "Sự kiện"}
                   </Badge>
+                  {event.canPurchase === false && (
+                    <Badge variant="destructive" className="shadow-md text-[11px] px-2.5 py-0.5 rounded-full font-bold border-none bg-red-600/90 text-white">
+                      Đã kết thúc
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="absolute top-3.5 right-3.5 z-10">

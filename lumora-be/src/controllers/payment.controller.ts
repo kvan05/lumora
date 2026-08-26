@@ -341,6 +341,27 @@ export async function handleWebhook(
 
         console.log(`[PayOS Webhook] 🎉 ORDER CONFIRMED & TICKETS ISSUED SUCCESSFULLY! Order #${payment.order.orderNumber}`);
       } else {
+        // Payment failed: Release all reserved seats and ticket inventories
+        for (const item of payment.order.items) {
+          if (item.seatId) {
+            await tx.seat.update({
+              where: { id: item.seatId },
+              data: { status: "AVAILABLE", reservedBy: null, reservedAt: null, expiresAt: null },
+            });
+          }
+          if (item.ticketTypeId) {
+            const inv = await tx.ticketInventory.findUnique({
+              where: { ticketTypeId: item.ticketTypeId },
+            });
+            if (inv) {
+              await tx.ticketInventory.update({
+                where: { ticketTypeId: item.ticketTypeId },
+                data: { reservedQty: Math.max(0, inv.reservedQty - 1) },
+              });
+            }
+          }
+        }
+
         await tx.payment.update({
           where: { id: payment.id },
           data: { status: "FAILED" },
@@ -351,7 +372,7 @@ export async function handleWebhook(
           data: { status: "CANCELLED" },
         });
 
-        console.log(`[PayOS Webhook] ❌ Payment failed for Order #${payment.order.orderNumber}`);
+        console.log(`[PayOS Webhook] ❌ Payment failed for Order #${payment.order.orderNumber}. Released seats and inventory.`);
       }
     });
 
@@ -364,6 +385,10 @@ export async function handleWebhook(
     });
 
     io.to(`event:${payment.order.eventId}`).emit("inventory:update", {
+      eventId: payment.order.eventId,
+      reason: isSuccess ? "order_confirmed" : "payment_failed_released",
+    });
+    io.to(`event:${payment.order.eventId}`).emit("seats:update", {
       eventId: payment.order.eventId,
     });
 
@@ -378,7 +403,7 @@ export async function handleWebhook(
       success: true,
       message: isSuccess
         ? "Thanh toán thành công. Đơn hàng đã được xác nhận và phát hành vé."
-        : "Thanh toán không thành công.",
+        : "Thanh toán không thành công. Ghế/vé đã được nhả lại.",
       data: {
         orderId: payment.orderId,
         orderNumber: payment.order.orderNumber,
@@ -421,10 +446,10 @@ export async function cancelPayment(
     }
 
     // Release inventory + cancel order
-    await releaseInventory(payment.order.items, orderId);
+    await releaseInventory(payment.order.items, orderId, payment.order.eventId);
     await prisma.payment.update({ where: { id: payment.id }, data: { status: "FAILED" } });
 
-    res.json({ success: true, message: "Payment cancelled" });
+    res.json({ success: true, message: "Payment cancelled and inventory released" });
   } catch (err) {
     next(err);
   }

@@ -175,10 +175,10 @@ export default function OrganizersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <Building2 className="h-8 w-8 text-primary" /> Quản Lý Nhà Tổ Chức (Organizer)
+            <Building2 className="h-8 w-8 text-primary" /> Quản Lý Ban Tổ Chức Sự Kiện
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Duyệt đơn đăng ký doanh nghiệp, kiểm tra giấy phép kinh doanh, theo dõi doanh thu và quản lý tài khoản Seller.
+            Duyệt đơn đăng ký doanh nghiệp, kiểm tra giấy phép kinh doanh, theo dõi doanh thu và quản lý tài khoản Ban tổ chức.
           </p>
         </div>
 

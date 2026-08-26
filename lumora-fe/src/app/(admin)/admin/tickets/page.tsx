@@ -74,10 +74,10 @@ export default function AdminTicketsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <Ticket className="h-7 w-7 text-primary" /> Quản Lý Vé & Ticket Lifecycle
+            <Ticket className="h-7 w-7 text-primary" /> Quản Lý Vé & Vòng Đời Vé
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Xem và quản lý tất cả mã vé điện tử QR Code, kiểm tra lịch sử vòng đời vé (Lifecycle Timeline) và soát vé.
+            Xem và quản lý tất cả mã vé điện tử QR Code, kiểm tra lịch sử vòng đời vé và kiểm soát soát vé vào cổng.
           </p>
         </div>
         <Button
@@ -96,21 +96,21 @@ export default function AdminTicketsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-border/50 bg-card shadow-xs">
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs text-muted-foreground font-semibold uppercase">Tổng Số Vé Đã Khởi Tạo</p>
+            <p className="text-xs text-muted-foreground font-semibold uppercase">Tổng Số Vé Đã Tạo</p>
             <p className="text-2xl font-black text-foreground mt-1">{totalTickets}</p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-emerald-500/20 bg-emerald-500/5 shadow-xs">
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Vé Hợp Lệ (Paid)</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Vé Hợp Lệ (Đã Thanh Toán)</p>
             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{totalConfirmed}</p>
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl border-blue-500/20 bg-blue-500/5 shadow-xs">
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold uppercase">Đã Check-in Vào Cổng</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold uppercase">Đã Soát Vé Vào Cổng</p>
             <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{totalCheckedIn}</p>
           </CardContent>
         </Card>
@@ -305,10 +305,10 @@ export default function AdminTicketsPage() {
         <DialogContent className="max-w-lg rounded-3xl p-6">
           <DialogHeader>
             <DialogTitle className="font-bold text-lg flex items-center gap-2">
-              <History className="h-5 w-5 text-primary" /> Ticket Lifecycle Timeline — Vòng Đời Mã Vé
+              <History className="h-5 w-5 text-primary" /> Lịch Sử Vòng Đời Mã Vé
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Lịch sử phát hành mã vé QR Code, thanh toán PayOS và tiến trình soát vé vào cửa.
+              Lịch sử phát hành mã vé QR Code, thanh toán và tiến trình soát vé vào cửa.
             </DialogDescription>
           </DialogHeader>
 

@@ -26,6 +26,10 @@ export default function PaymentStatusPage() {
   useEffect(() => {
     if (isCancelled) {
       setStatus("CANCELLED");
+      // Explicitly trigger release on backend
+      api.post(`/orders/${orderId}/cancel`).catch(() => {
+        api.post(`/payment/${orderId}/cancel`).catch(() => null);
+      });
       return;
     }
 
@@ -57,6 +61,8 @@ export default function PaymentStatusPage() {
             attemptsRef.current++;
             if (attemptsRef.current >= maxAttempts && !isPayosSuccess) {
               setStatus("FAILED");
+              // Release expired/failed order on max attempts
+              api.post(`/orders/${orderId}/cancel`).catch(() => null);
               if (pollRef.current) clearInterval(pollRef.current);
             }
           }
@@ -64,6 +70,7 @@ export default function PaymentStatusPage() {
           attemptsRef.current++;
           if (attemptsRef.current >= maxAttempts && !isPayosSuccess) {
             setStatus("FAILED");
+            api.post(`/orders/${orderId}/cancel`).catch(() => null);
             if (pollRef.current) clearInterval(pollRef.current);
           }
         }
@@ -71,6 +78,7 @@ export default function PaymentStatusPage() {
         attemptsRef.current++;
         if (attemptsRef.current >= maxAttempts && !isPayosSuccess) {
           setStatus("FAILED");
+          api.post(`/orders/${orderId}/cancel`).catch(() => null);
           if (pollRef.current) clearInterval(pollRef.current);
         }
       }
@@ -166,30 +174,30 @@ export default function PaymentStatusPage() {
 
         {(status === "FAILED" || status === "CANCELLED") && (
           <div className="rounded-3xl border border-destructive/20 bg-card shadow-xl p-10 flex flex-col items-center text-center space-y-6 animate-in fade-in zoom-in duration-500">
-            <div className="w-28 h-28 rounded-full bg-destructive/10 flex items-center justify-center">
-              <XCircle className="h-16 w-16 text-destructive" />
+            <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center">
+              <XCircle className="h-14 w-14 text-destructive" />
             </div>
-            <div>
+            <div className="space-y-2">
               <h2 className="text-2xl font-extrabold text-destructive">
-                {status === "CANCELLED" ? "Thanh toán đã bị hủy" : "Thanh toán thất bại"}
+                {status === "CANCELLED" ? "Giao dịch thanh toán đã bị hủy" : "Thanh toán không thành công"}
               </h2>
-              <p className="text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                 {status === "CANCELLED"
-                  ? "Bạn đã hủy quá trình thanh toán. Bạn có thể thử lại."
-                  : "Chúng tôi không thể xác minh thanh toán của bạn. Nếu bạn đã bị trừ tiền, hãy liên hệ hỗ trợ."}
+                  ? "Bạn đã hủy quá trình thanh toán. Toàn bộ số ghế và vé giữ tạm của đơn hàng này đã được tự động nhả lại trên sơ đồ."
+                  : "Giao dịch không thành công hoặc thời gian giữ chỗ (15 phút) đã hết. Ghế và vé giữ tạm đã được nhả lại."}
               </p>
             </div>
-            <div className="w-full space-y-3">
+            <div className="w-full space-y-3 pt-2">
               <Button size="lg" className="w-full rounded-2xl h-12 font-bold" asChild>
-                <Link href={`/checkout/${orderId}`}>
+                <Link href={orderDetails?.event?.slug ? `/events/${orderDetails.event.slug}` : "/events"}>
                   <RefreshCw className="mr-2 h-5 w-5" />
-                  Thử thanh toán lại
+                  Chọn lại vé / Đặt lại
                 </Link>
               </Button>
               <Button variant="outline" size="lg" className="w-full rounded-2xl h-12" asChild>
-                <Link href="/">
+                <Link href="/events">
                   <Home className="mr-2 h-5 w-5" />
-                  Về trang chủ
+                  Khám phá các sự kiện khác
                 </Link>
               </Button>
             </div>

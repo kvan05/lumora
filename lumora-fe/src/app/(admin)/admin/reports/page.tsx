@@ -119,7 +119,7 @@ export default function ReportsPage() {
           }`}
         >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Mức Độ Nghiêm Trọng (High)</p>
+            <p className="text-xs font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">Mức Độ Nghiêm Trọng</p>
             <p className="text-2xl font-black text-red-600 dark:text-red-400 mt-1">{highRiskCount}</p>
           </CardContent>
         </Card>
@@ -134,7 +134,7 @@ export default function ReportsPage() {
           }`}
         >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Chờ Xử Lý (Pending)</p>
+            <p className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Chờ Xử Lý</p>
             <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{pendingCount}</p>
           </CardContent>
         </Card>
@@ -149,7 +149,7 @@ export default function ReportsPage() {
           }`}
         >
           <CardContent className="pt-4 pb-4 px-4">
-            <p className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Đã Giải Quyết (Resolved)</p>
+            <p className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Đã Giải Quyết</p>
             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{resolvedCount}</p>
           </CardContent>
         </Card>

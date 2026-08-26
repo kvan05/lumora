@@ -37,10 +37,10 @@ export default function AuditLogsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2.5 text-foreground">
-            <History className="h-7 w-7 text-primary" /> System Audit Logs
+            <History className="h-7 w-7 text-primary" /> Nhật Ký Hệ Thống
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Nhật ký kiểm toán toàn hệ thống — Ghi vết thời gian thực tất cả hành động nhạy cảm của Admin, Seller và Staff.
+            Nhật ký kiểm toán toàn hệ thống — Ghi vết thời gian thực tất cả hành động nhạy cảm của Quản trị viên, Ban tổ chức và Nhân viên.
           </p>
         </div>
         <Button
@@ -60,7 +60,7 @@ export default function AuditLogsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Tìm theo Hành động (Action), Tên Admin, Email, Nội dung..."
+              placeholder="Tìm theo Hành động, Tên người thực hiện, Email, Nội dung..."
               className="pl-9 h-10 rounded-xl"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -73,22 +73,22 @@ export default function AuditLogsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tất cả vai trò</SelectItem>
-              <SelectItem value="ADMIN">ADMIN</SelectItem>
-              <SelectItem value="SELLER">SELLER</SelectItem>
+              <SelectItem value="ADMIN">Quản trị viên (ADMIN)</SelectItem>
+              <SelectItem value="SELLER">Ban tổ chức (SELLER)</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={actionFilter} onValueChange={setActionFilter}>
-            <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-52 h-10 rounded-xl">
               <SelectValue placeholder="Hành động" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tất cả hành động</SelectItem>
-              <SelectItem value="OVERRIDE_CHECKIN">OVERRIDE_CHECKIN</SelectItem>
-              <SelectItem value="APPROVED_REFUND">APPROVED_REFUND</SelectItem>
-              <SelectItem value="REJECTED_REFUND">REJECTED_REFUND</SelectItem>
-              <SelectItem value="UPDATE_USER_ROLE">UPDATE_USER_ROLE</SelectItem>
-              <SelectItem value="CREATE_RECONCILIATION">CREATE_RECONCILIATION</SelectItem>
+              <SelectItem value="OVERRIDE_CHECKIN">Ghi đè Check-in / Soát vé</SelectItem>
+              <SelectItem value="APPROVED_REFUND">Duyệt hoàn tiền</SelectItem>
+              <SelectItem value="REJECTED_REFUND">Từ chối hoàn tiền</SelectItem>
+              <SelectItem value="UPDATE_USER_ROLE">Đổi vai trò người dùng</SelectItem>
+              <SelectItem value="CREATE_RECONCILIATION">Tạo kỳ đối soát</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
@@ -106,8 +106,8 @@ export default function AuditLogsPage() {
           ) : logs.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <History className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
-              <p className="text-base font-bold text-foreground">Chưa có nhật ký Audit Log nào</p>
-              <p className="text-xs mt-1">Dữ liệu kiểm toán trong CSDL đang trống hoặc không khớp từ khóa tìm kiếm.</p>
+              <p className="text-base font-bold text-foreground">Chưa có nhật ký kiểm toán nào</p>
+              <p className="text-xs mt-1">Dữ liệu kiểm toán trong cơ sở dữ liệu đang trống hoặc không khớp từ khóa tìm kiếm.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-border/40">
@@ -116,9 +116,9 @@ export default function AuditLogsPage() {
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Thời gian</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Người thực hiện</TableHead>
-                    <TableHead className="font-bold text-xs uppercase tracking-wider">Hành động (Action)</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider">Hành động</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider">Chi tiết nội dung</TableHead>
-                    <TableHead className="font-bold text-xs uppercase tracking-wider">IP Address</TableHead>
+                    <TableHead className="font-bold text-xs uppercase tracking-wider">Địa chỉ IP</TableHead>
                     <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Chi tiết</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -130,9 +130,9 @@ export default function AuditLogsPage() {
                       </TableCell>
 
                       <TableCell>
-                        <p className="font-bold text-xs text-foreground">{log.admin?.name || log.admin?.email || "System Admin"}</p>
+                        <p className="font-bold text-xs text-foreground">{log.admin?.name || log.admin?.email || "Hệ thống"}</p>
                         <Badge variant="outline" className="text-[10px] h-4 font-mono px-1">
-                          {log.admin?.role || "ADMIN"}
+                          {log.admin?.role === "ADMIN" ? "Quản trị viên" : log.admin?.role === "SELLER" ? "Ban tổ chức" : "Hệ thống"}
                         </Badge>
                       </TableCell>
 
@@ -149,7 +149,7 @@ export default function AuditLogsPage() {
                       </TableCell>
 
                       <TableCell className="text-xs font-mono text-muted-foreground">
-                        {log.ipAddress || "Internal"}
+                        {log.ipAddress || "Nội bộ"}
                       </TableCell>
 
                       <TableCell className="text-right">
@@ -176,22 +176,22 @@ export default function AuditLogsPage() {
         <DialogContent className="max-w-md rounded-2xl p-6">
           <DialogHeader>
             <DialogTitle className="font-bold text-lg flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" /> Chi Tiết Bản Ghi Audit Log
+              <FileText className="h-5 w-5 text-primary" /> Chi Tiết Bản Ghi Nhật Ký
             </DialogTitle>
-            <DialogDescription className="text-xs">Dữ liệu log được ghi vết chính xác trong CSDL PostgreSQL.</DialogDescription>
+            <DialogDescription className="text-xs">Dữ liệu nhật ký được ghi vết an toàn trong cơ sở dữ liệu.</DialogDescription>
           </DialogHeader>
 
           {selectedLog && (
             <div className="space-y-3 text-xs">
               <div className="bg-muted/40 p-3 rounded-xl border space-y-1 font-mono">
-                <p>Log ID: {selectedLog.id}</p>
-                <p>Action: <span className="font-bold text-primary">{selectedLog.action}</span></p>
+                <p>Mã nhật ký: {selectedLog.id}</p>
+                <p>Hành động: <span className="font-bold text-primary">{selectedLog.action}</span></p>
                 <p>Thời gian: {new Date(selectedLog.createdAt).toLocaleString("vi-VN")}</p>
-                <p>IP: {selectedLog.ipAddress || "N/A"}</p>
+                <p>Địa chỉ IP: {selectedLog.ipAddress || "Không có"}</p>
               </div>
 
               <div>
-                <p className="font-bold text-foreground mb-1">Nội dung JSON Details:</p>
+                <p className="font-bold text-foreground mb-1">Nội dung chi tiết (JSON):</p>
                 <pre className="p-3 rounded-xl bg-slate-950 text-slate-50 font-mono text-[11px] overflow-x-auto whitespace-pre-wrap max-h-60">
                   {JSON.stringify(JSON.parse(selectedLog.details || "{}"), null, 2)}
                 </pre>

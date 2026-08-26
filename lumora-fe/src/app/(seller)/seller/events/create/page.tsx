@@ -36,6 +36,7 @@ interface TicketTypeConfig {
   price: number;
   quantity: number;
   description: string;
+  eventDate: string; // ISO date string "YYYY-MM-DD" or "" for all days
 }
 
 interface SeatSectionConfig {
@@ -125,8 +126,8 @@ export default function CreateEventPage() {
   // Ticket & Seat Map State
   const [hasSeatMap, setHasSeatMap] = useState<boolean>(false);
   const [ticketTypes, setTicketTypes] = useState<TicketTypeConfig[]>([
-    { name: "Vé Tiêu Chuẩn (GA)", price: 250000, quantity: 200, description: "Vé tham dự tự do" },
-    { name: "Vé VIP Thượng Đỉnh", price: 850000, quantity: 50, description: "Vé ưu tiên vị trí đẹp & quà tặng" },
+    { name: "Vé Tiêu Chuẩn (GA)", price: 250000, quantity: 200, description: "Vé tham dự tự do", eventDate: "" },
+    { name: "Vé VIP Thượng Đỉnh", price: 850000, quantity: 50, description: "Vé ưu tiên vị trí đẹp & quà tặng", eventDate: "" },
   ]);
 
   const [seatSections, setSeatSections] = useState<SeatSectionConfig[]>([
@@ -234,7 +235,7 @@ export default function CreateEventPage() {
   const handleAddTicketType = () => {
     setTicketTypes(prev => [
       ...prev,
-      { name: `Hạng vé ${prev.length + 1}`, price: 300000, quantity: 100, description: "" }
+      { name: `Hạng vé ${prev.length + 1}`, price: 300000, quantity: 100, description: "", eventDate: "" }
     ]);
   };
 
@@ -320,7 +321,10 @@ export default function CreateEventPage() {
         // Create Ticket Types
         if (!hasSeatMap && ticketTypes.length > 0) {
           for (const tt of ticketTypes) {
-            await api.post(`/events/${eventId}/tickets`, tt).catch(() => null);
+            const payload: any = { ...tt };
+            // Only send eventDate if it has a value (avoid sending empty string)
+            if (!payload.eventDate) delete payload.eventDate;
+            await api.post(`/events/${eventId}/tickets`, payload).catch(() => null);
           }
         }
 
@@ -809,57 +813,103 @@ export default function CreateEventPage() {
                       </Button>
                     </div>
 
-                    <div className="space-y-3">
-                      {ticketTypes.map((tt, idx) => (
-                        <div key={idx} className="p-4 rounded-2xl border border-border bg-muted/20 space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-mono font-bold text-primary">Hạng vé #{idx + 1}</span>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 hover:bg-red-50" onClick={() => handleRemoveTicketType(idx)}>
-                              <Trash2 className="h-3.5 w-3.5" /> Xóa
-                            </Button>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div>
-                              <label className="text-[11px] font-bold text-muted-foreground">Tên vé</label>
-                              <Input
-                                value={tt.name}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setTicketTypes(prev => prev.map((t, i) => i === idx ? { ...t, name: val } : t));
-                                }}
-                                className="h-10 rounded-xl text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-bold text-muted-foreground">Giá vé (₫)</label>
-                              <Input
-                                type="number"
-                                value={tt.price}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setTicketTypes(prev => prev.map((t, i) => i === idx ? { ...t, price: val } : t));
-                                }}
-                                className="h-10 rounded-xl text-sm font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] font-bold text-muted-foreground">Số lượng phát hành</label>
-                              <Input
-                                type="number"
-                                value={tt.quantity}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setTicketTypes(prev => prev.map((t, i) => i === idx ? { ...t, quantity: val } : t));
-                                }}
-                                className="h-10 rounded-xl text-sm"
-                              />
-                            </div>
-                          </div>
+                    {/* Multi-day notice */}
+                    {startDate && endDate && startDate.split("T")[0] !== endDate.split("T")[0] && (
+                      <div className="flex items-start gap-2 bg-blue-500/8 border border-blue-500/20 text-blue-700 dark:text-blue-400 rounded-xl px-4 py-3 text-xs font-semibold">
+                        <Calendar className="h-4 w-4 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold mb-0.5">Sự kiện nhiều ngày được phát hiện</p>
+                          <p className="font-normal opacity-80">
+                            Bạn có thể gán mỗi hạng vé với một ngày cụ thể. Để trống "Ngày áp dụng" để vé có hiệu lực cho tất cả các ngày.
+                          </p>
                         </div>
-                      ))}
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {ticketTypes.map((tt, idx) => {
+                        const isMultiDay = startDate && endDate && startDate.split("T")[0] !== endDate.split("T")[0];
+                        return (
+                          <div key={idx} className="p-4 rounded-2xl border border-border bg-muted/20 space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-mono font-bold text-primary">Hạng vé #{idx + 1}</span>
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-red-500 hover:bg-red-50" onClick={() => handleRemoveTicketType(idx)}>
+                                <Trash2 className="h-3.5 w-3.5" /> Xóa
+                              </Button>
+                            </div>
+
+                            <div className={`grid gap-3 ${isMultiDay ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"}`}>
+                              <div className={isMultiDay ? "" : ""}>
+                                <label className="text-[11px] font-bold text-muted-foreground">Tên vé</label>
+                                <Input
+                                  value={tt.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setTicketTypes(prev => prev.map((t, i) => i === idx ? { ...t, name: val } : t));
+                                  }}
+                                  className="h-10 rounded-xl text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-bold text-muted-foreground">Giá vé (₫)</label>
+                                <Input
+                                  type="number"
+                                  value={tt.price}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setTicketTypes(prev => prev.map((t, i) => i === idx ? { ...t, price: val } : t));
+                                  }}
+                                  className="h-10 rounded-xl text-sm font-bold"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-bold text-muted-foreground">Số lượng phát hành</label>
+                                <Input
+                                  type="number"
+                                  value={tt.quantity}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setTicketTypes(prev => prev.map((t, i) => i === idx ? { ...t, quantity: val } : t));
+                                  }}
+                                  className="h-10 rounded-xl text-sm"
+                                />
+                              </div>
+                              {/* Ngày áp dụng — chỉ hiện khi sự kiện nhiều ngày */}
+                              {isMultiDay && (
+                                <div>
+                                  <label className="text-[11px] font-bold text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" /> Ngày áp dụng
+                                    <span className="text-muted-foreground/50 font-normal">(tùy chọn)</span>
+                                  </label>
+                                  <Input
+                                    type="date"
+                                    value={tt.eventDate}
+                                    min={startDate ? startDate.split("T")[0] : undefined}
+                                    max={endDate ? endDate.split("T")[0] : undefined}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setTicketTypes(prev => prev.map((t, i) => i === idx ? { ...t, eventDate: val } : t));
+                                    }}
+                                    className="h-10 rounded-xl text-sm"
+                                    placeholder="Tất cả các ngày"
+                                  />
+                                  {tt.eventDate && (
+                                    <p className="text-[10px] text-primary/80 font-semibold mt-1">
+                                      ✓ Chỉ dùng cho ngày {new Date(tt.eventDate + "T00:00:00").toLocaleDateString("vi-VN")}
+                                    </p>
+                                  )}
+                                  {!tt.eventDate && (
+                                    <p className="text-[10px] text-muted-foreground mt-1">Để trống = áp dụng mọi ngày</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
+
                 ) : (
                   /* MODE B: VISUAL SEAT MAP BUILDER */
                   <div className="space-y-6">

@@ -102,11 +102,18 @@ function EventCardHScroll({ event }: { event: any }) {
       )}
 
       {/* Category Badge always visible */}
-      {event.category && (
-        <Badge className="absolute top-2 left-2 bg-[#93C453] text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border-none shadow-md z-20">
-          {event.category}
-        </Badge>
-      )}
+      <div className="absolute top-2 left-2 flex items-center gap-1.5 z-20">
+        {event.category && (
+          <Badge className="bg-[#93C453] text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border-none shadow-md">
+            {event.category}
+          </Badge>
+        )}
+        {event.canPurchase === false && (
+          <Badge variant="destructive" className="text-[10px] font-bold px-2 py-0.5 rounded-full border-none shadow-md bg-red-600/90 text-white">
+            Đã kết thúc
+          </Badge>
+        )}
+      </div>
 
       {/* Hover Info Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 sm:p-4 z-10">
@@ -163,11 +170,18 @@ function EventCardGrid({ event }: { event: any }) {
       )}
 
       {/* Category Badge */}
-      {event.category && (
-        <Badge className="absolute top-2 left-2 bg-[#93C453] text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border-none shadow-md z-20">
-          {event.category}
-        </Badge>
-      )}
+      <div className="absolute top-2 left-2 flex items-center gap-1.5 z-20">
+        {event.category && (
+          <Badge className="bg-[#93C453] text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border-none shadow-md">
+            {event.category}
+          </Badge>
+        )}
+        {event.canPurchase === false && (
+          <Badge variant="destructive" className="text-[10px] font-bold px-2 py-0.5 rounded-full border-none shadow-md bg-red-600/90 text-white">
+            Đã kết thúc
+          </Badge>
+        )}
+      </div>
 
       {/* Hover Info Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 sm:p-4 z-10">
